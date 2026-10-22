@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Comitag</title>
+<style>
+body{font-family:system-ui,sans-serif;margin:0;background:#f4f3ef;color:#222}
+main{max-width:420px;margin:auto;padding:16px}
+.card{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.big{font-size:28px;font-weight:600;margin:4px 0}
+.muted{color:#777;font-size:13px;margin:0}
+button{font-size:16px;padding:14px;border-radius:12px;border:1px solid #ccc;background:#fff;width:100%}
+.primary{background:#2563eb;color:#fff;border:none}
+.row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-top:1px solid #eee;font-size:14px}
+.ok{background:#dcfce7;color:#166534;padding:3px 8px;border-radius:8px;font-size:12px}
+.pend{background:#fef3c7;color:#92400e;padding:3px 8px;border-radius:8px;font-size:12px}
+.warn{color:#b45309;font-weight:600}
+input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px solid #ccc;border-radius:10px}
+.hidden{display:none}
+#week{display:flex;align-items:flex-end;gap:6px;height:90px}
+.bar{flex:1;text-align:center;font-size:11px;color:#777}
+.bar div{background:#2563eb;border-radius:4px;margin:3px 0}
+</style>
+</head>
+<body>
+<main>
+  <h1 id="pet" style="font-size:22px">Cargando…</h1>
+  <p id="err" class="muted warn"></p>
+
+  <section id="nameBox" class="card hidden">
+    <p><b>¿Quién eres?</b></p>
+    <p class="muted">Solo la primera vez. Queda guardado en este teléfono.</p>
+    <input id="nameIn" placeholder="Sofía" maxlength="40">
+    <p id="nameErr" class="muted warn" style="display:none">Escribe tu nombre primero</p>
+    <button class="primary" id="nameBtn" style="margin-top:10px">Guardar nombre</button>
+  </section>
+
+  <section id="app" class="hidden">
+    <p class="muted" id="hello" style="margin-bottom:10px"></p>
+    <div class="grid">
+      <div class="card"><p class="muted">Última comida</p><p class="big" id="fT">--</p><p class="muted" id="fB"></p></div>
+      <div class="card"><p class="muted">Último agua</p><p class="big" id="wT">--</p><p class="muted" id="wB"></p></div>
+    </div>
+    <div class="grid" id="actions">
+      <button class="primary" onclick="ask('comida')">Ya le di comida</button>
+      <button onclick="ask('agua')">Cambié el agua</button>
+    </div>
+    <div class="card hidden" id="confirm">
+      <p id="cMsg"></p>
+      <div class="grid">
+        <button onclick="closeC()">Cancelar</button>
+        <button class="primary" id="cYes" onclick="save()">Confirmar</button>
+      </div>
+    </div>
+    <div class="card" style="margin-top:12px"><p><b>Horarios de hoy</b></p><div id="sched"></div></div>
+    <div class="card"><p><b>Últimos 7 días</b></p><div id="week"></div><div id="hist" style="margin-top:12px"></div></div>
+    <p class="muted" style="text-align:center"><a href="#" onclick="changeName()">Cambiar nombre</a></p>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+
+const SUPABASE_URL = "https://nwenbwkpvmfozzfwjsuq.supabase.co";
+const SUPABASE_KEY = "sb_publishable_bo4ntmZshkQk9lSiadueKg_ANPjpuRa";
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const code = (location.pathname.split("/p/")[1] || "").replace(/\/$/, "");
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = t => t.toLocaleTimeString("es-CL", {hour:"2-digit", minute:"2-digit"});
+let plate = null, log = [], pending = null, me = localStorage.getItem("comitag_nombre");
+
+function ago(t) {
+  const m = Math.round((Date.now() - t) / 60000);
+  if (m < 1) return "recién";
+  if (m < 60) return `hace ${m} min`;
+  const h = Math.round(m / 60);
+  return h < 24 ? `hace ${h} h` : `hace ${Math.round(h / 24)} d`;
+}
+const last = k => log.find(e => e.kind === k);
+
+async function load() {
+  if (!code) { $("pet").textContent = "Plato no encontrado"; return; }
+  const { data, error } = await db.rpc("get_plate", { p_code: code });
+  if (error || !data) { $("pet").textContent = "Plato no encontrado"; return; }
+  plate = data;
+  $("pet").textContent = plate.pet_name;
+  await refresh();
+  showName();
+}
+
+async function refresh() {
+  const { data, error } = await db.rpc("get_entries", { p_code: code });
+  if (error) { $("err").textContent = "No se pudo cargar. Revisa tu conexión."; return; }
+  $("err").textContent = "";
+  log = data.map(e => ({ ...e, t: new Date(e.created_at) }));
+  render();
+}
+
+function showName() {
+  $("nameBox").classList.toggle("hidden", !!me);
+  $("app").classList.toggle("hidden", !me);
+  $("hello").textContent = me ? `Hola, ${me}` : "";
+}
+
+function render() {
+  const f = last("comida"), w = last("agua");
+  $("fT").textContent = f ? fmt(f.t) : "--";
+  $("fB").textContent = f ? `${ago(f.t)} · ${f.who}` : "Sin registros";
+  $("wT").textContent = w ? fmt(w.t) : "--";
+  $("wB").textContent = w ? `${ago(w.t)} · ${w.who}` : "Sin registros";
+
+  const hoy = new Date().toDateString();
+  const today = log.filter(e => e.kind === "comida" && e.t.toDateString() === hoy).reverse();
+  $("sched").innerHTML = (plate.schedule || []).map((h, i) => {
+    const e = today[i];
+    return `<div class="row"><span>${esc(h)}</span>${e
+      ? `<span class="ok">Dado ${fmt(e.t)} · ${esc(e.who)}</span>`
+      : `<span class="pend">Pendiente</span>`}</div>`;
+  }).join("");
+
+  const days = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - 6 + i); return d; });
+  const cnt = days.map(d => log.filter(e => e.kind === "comida" && e.t.toDateString() === d.toDateString()).length);
+  const mx = Math.max(3, ...cnt);
+  $("week").innerHTML = days.map((d, i) =>
+    `<div class="bar">${cnt[i]}<div style="height:${Math.round(cnt[i] / mx * 55) + 2}px"></div>${d.toLocaleDateString("es-CL", {weekday:"short"}).slice(0, 2)}</div>`
+  ).join("");
+
+  $("hist").innerHTML = log.slice(0, 8).map(e =>
+    `<div class="row"><span>${e.kind === "comida" ? "Comida" : "Agua"} · ${esc(e.who)}</span><span class="muted">${e.t.toLocaleDateString("es-CL", {weekday:"short", day:"numeric"})} ${fmt(e.t)}</span></div>`
+  ).join("");
+}
+
+function ask(k) {
+  pending = k;
+  const l = last(k), n = esc(plate.pet_name);
+  $("cMsg").innerHTML = (k === "comida" && l && Date.now() - l.t < 3 * 3600000)
+    ? `<span class="warn">Ojo:</span> ${n} ya comió ${ago(l.t)} (lo marcó ${esc(l.who)}). ¿Seguro que quieres marcar otra comida?`
+    : `¿Confirmas que ${k === "comida" ? "le diste comida" : "cambiaste el agua"} a ${n} ahora?`;
+  $("confirm").classList.remove("hidden");
+  $("actions").classList.add("hidden");
+}
+
+function closeC() {
+  pending = null;
+  $("confirm").classList.add("hidden");
+  $("actions").classList.remove("hidden");
+}
+
+async function save() {
+  $("cYes").disabled = true;
+  const { error } = await db.rpc("add_entry", { p_code: code, p_kind: pending, p_who: me });
+  $("cYes").disabled = false;
+  if (error) { $("cMsg").textContent = "No se pudo guardar. Intenta de nuevo."; return; }
+  closeC();
+  await refresh();
+}
+
+$("nameIn").oninput = () => $("nameErr").style.display = "none";
+$("nameBtn").onclick = () => {
+  const v = $("nameIn").value.trim();
+  if (!v) { $("nameErr").style.display = "block"; return; }
+  me = v;
+  localStorage.setItem("comitag_nombre", v);
+  showName();
+};
+function changeName() { me = null; localStorage.removeItem("comitag_nombre"); showName(); }
+
+setInterval(() => plate && refresh(), 30000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden && plate) refresh(); });
+load();
+</script>
+</body>
+</html>
+
+
