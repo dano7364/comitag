@@ -153,11 +153,20 @@ function render() {
   const hoy = new Date().toDateString();
   const today = log.filter(e => e.kind === "comida" && e.t.toDateString() === hoy).reverse();
   const sch = plate.schedule || [];
-  $("sched").innerHTML = sch.length ? sch.map((h, i) => {
-    const e = today[i];
-    return `<div class="row"><span>${esc(h)}</span>${e
-      ? `<span class="ok">Dado ${fmt(e.t)} · ${esc(e.who)}</span>`
-      : `<span class="pend">Pendiente</span>`}</div>`;
+  const slots = sch.map(h => { const [hh, mm] = h.split(":").map(Number); const d = new Date(); d.setHours(hh, mm || 0, 0, 0); return d; });
+  const used = new Set();
+  $("sched").innerHTML = sch.length ? slots.map((s, i) => {
+    // Cada horario acepta comidas desde 3 h antes (o la mitad con el horario anterior)
+    // hasta la mitad con el horario siguiente (o fin del día, por si se dio tarde).
+    const from = Math.max(i ? (slots[i - 1].getTime() + s.getTime()) / 2 : 0, s.getTime() - 3 * 3600000);
+    const to = i < slots.length - 1 ? (s.getTime() + slots[i + 1].getTime()) / 2 : Infinity;
+    const cands = today.filter(e => !used.has(e) && e.t >= from && e.t < to);
+    const e = cands.sort((a, b) => Math.abs(a.t - s) - Math.abs(b.t - s))[0];
+    if (e) used.add(e);
+    const status = e ? `<span class="ok">Dado ${fmt(e.t)} · ${esc(e.who)}</span>`
+      : Date.now() < s ? `<span class="muted">Más tarde</span>`
+      : `<span class="pend">Pendiente</span>`;
+    return `<div class="row"><span>${fmt(s)}</span>${status}</div>`;
   }).join("") : `<p class="muted">Aún no hay horarios. Toca “Editar” para agregarlos.</p>`;
 
   const days = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - 6 + i); return d; });
