@@ -47,6 +47,8 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .wa.alt{background:#fff;color:#128c4b;border:1px solid #25d366}
 .wrow{display:grid;grid-template-columns:1fr 1.3fr 44px;gap:8px;margin-bottom:8px}
 .wrow .x{padding:10px;color:#b91c1c}
+.offline{background:#eef2ff;color:#3730a3;border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:14px}
+.q{color:#92400e;font-size:12px}
 .diff{margin:-2px 0 6px;font-size:12px}
 .note{background:#dcfce7;color:#166534;border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:14px}
 </style>
@@ -105,6 +107,7 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 
   <section id="app" class="hidden">
     <p class="muted" id="hello" style="margin-bottom:10px"></p>
+    <div id="offline" class="offline hidden"></div>
     <div id="note" class="note hidden"></div>
     <div id="waBox" class="card hidden">
       <div class="head"><p><b>¿Avisar por WhatsApp?</b></p><button class="link" onclick="$('waBox').classList.add('hidden')">✕ Cerrar</button></div>
@@ -163,7 +166,10 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 
 const SUPABASE_URL = "https://nwenbwkpvmfozzfwjsuq.supabase.co";
 const SUPABASE_KEY = "sb_publishable_bo4ntmZshkQk9lSiadueKg_ANPjpuRa";
-const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// Si no hay internet y la librería no cargó, la página igual funciona con lo guardado.
+const db = window.supabase ? supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+  : { rpc: async () => ({ data: null, error: { message: "sin conexión", code: "" } }) };
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 const code = (location.pathname.split("/p/")[1] || "").replace(/\/$/, "");
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -178,6 +184,54 @@ function ago(t) {
   return h < 24 ? `hace ${h} h` : `hace ${Math.round(h / 24)} d`;
 }
 const last = k => log.find(e => e.kind === k);
+
+// ---- Sin internet: copia local y registros en espera ----
+let offline = false, serverLog = [];
+// Error de red (no hay conexión) vs. error del servidor (que sí respondió)
+const netErr = e => !!e && (!navigator.onLine || !e.code);
+function lsGet(k, def) { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? def; } catch { return def; } }
+function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+const cacheKey = () => "comitag_copia_" + code;
+const cacheGet = () => lsGet(cacheKey(), {});
+const cachePut = patch => lsSet(cacheKey(), { ...cacheGet(), ...patch });
+const queueGet = () => lsGet("comitag_en_espera", []);
+const queueSet = q => lsSet("comitag_en_espera", q);
+function setOffline(v) {
+  offline = v;
+  $("offline").classList.toggle("hidden", !v);
+  updateQueueInfo();
+}
+function updateQueueInfo() {
+  const n = queueGet().filter(q => q.code === code).length;
+  $("offline").textContent = offline
+    ? `📴 Sin conexión. Lo que marques queda guardado en este teléfono y se enviará solo al volver internet.${n ? ` (${n} por enviar)` : ""}`
+    : "";
+}
+// Une lo que viene del servidor con lo que está esperando en este teléfono
+function mergeLog() {
+  const q = queueGet().filter(x => x.code === code)
+    .map(x => ({ kind: x.kind, who: x.who, created_at: x.at, t: new Date(x.at), queued: true }));
+  log = [...q, ...serverLog].sort((a, b) => b.t - a.t);
+}
+let syncing = false;
+const rejected = new Set();   // registros que el servidor rechazó (no por falta de internet)
+async function syncQueue() {
+  if (syncing || !queueGet().length) return;
+  syncing = true;
+  try {
+    for (const item of queueGet()) {
+      let { error } = await db.rpc("add_entry_at",
+        { p_code: item.code, p_kind: item.kind, p_who: item.who, p_at: item.at, p_client_id: item.id });
+      if (error && error.code === "PGRST202")  // si aún no existe la función nueva, usa la antigua
+        ({ error } = await db.rpc("add_entry", { p_code: item.code, p_kind: item.kind, p_who: item.who }));
+      if (error && netErr(error)) break;      // sigue sin internet: se intenta más tarde
+      if (error) { console.error("Registro rechazado", item, error); rejected.add(item.id); }
+      queueSet(queueGet().filter(x => x.id !== item.id));
+    }
+  } finally { syncing = false; }
+  updateQueueInfo();
+}
+window.addEventListener("online", async () => { await syncQueue(); if (ready) refresh(); });
 
 // "Se registró 5 min antes de la hora indicada" / "1 h 10 min después" / "justo a la hora"
 function diffText(t, slot) {
@@ -200,9 +254,21 @@ async function load() {
       : "Acerca tu celular a la pegatina del plato para abrir la página de tu mascota.";
     return;
   }
-  const { data, error } = await db.rpc("get_plate", { p_code: code });
-  if (!error && !data) { forgetPet(code); renderPets(); }
-  if (error || !data) { $("pet").textContent = "Plato no encontrado"; return; }
+  let { data, error } = await db.rpc("get_plate", { p_code: code });
+  if (error && netErr(error)) {
+    // Sin internet: usar la última copia guardada de esta mascota
+    data = cacheGet().plate;
+    if (!data) {
+      $("pet").textContent = "Sin conexión";
+      $("err").textContent = "Esta mascota todavía no se ha abierto con internet en este teléfono. Conéctate una vez y después funcionará aunque no haya señal.";
+      return;
+    }
+    offline = true;
+  } else {
+    if (!error && !data) { forgetPet(code); renderPets(); }
+    if (error || !data) { $("pet").textContent = "Plato no encontrado"; return; }
+    cachePut({ plate: data });
+  }
   plate = data;
   plate.schedule = sortTimes(plate.schedule || []);
   if (!plate.pet_name || !String(plate.pet_name).trim()) { showSetup(); return; }
@@ -224,12 +290,25 @@ async function start() {
 }
 
 async function refresh() {
+  await syncQueue();
   const { data, error } = await db.rpc("get_entries", { p_code: code });
-  if (error) { $("err").textContent = "No se pudo cargar. Revisa tu conexión."; return; }
+  if (error) {
+    // Sin internet: mostrar lo último guardado más lo que está por enviar
+    serverLog = (cacheGet().entries || []).map(e => ({ ...e, t: new Date(e.created_at) }));
+    setOffline(netErr(error));
+    $("err").textContent = netErr(error) ? "" : "No se pudo cargar. Intenta de nuevo.";
+    mergeLog();
+    render();
+    return;
+  }
+  setOffline(false);
   $("err").textContent = "";
-  log = data.map(e => ({ ...e, t: new Date(e.created_at) }));
+  cachePut({ entries: data });
+  serverLog = data.map(e => ({ ...e, t: new Date(e.created_at) }));
+  mergeLog();
   const p = await db.rpc("get_plate", { p_code: code });
   if (!p.error && p.data) {
+    cachePut({ plate: p.data });
     plate.schedule = sortTimes(p.data.schedule || []);
     if ($("petEdit").classList.contains("hidden") && p.data.pet_name && p.data.pet_name !== plate.pet_name) {
       plate.pet_name = p.data.pet_name; $("pet").textContent = plate.pet_name; rememberPet(code, plate.pet_name);
@@ -248,9 +327,9 @@ function showName() {
 function render() {
   const f = last("comida"), w = last("agua");
   $("fT").textContent = f ? fmt(f.t) : "--";
-  $("fB").textContent = f ? `${ago(f.t)} · ${f.who}` : "Sin registros";
+  $("fB").textContent = f ? `${ago(f.t)} · ${f.who}${f.queued ? " · ⏳ por enviar" : ""}` : "Sin registros";
   $("wT").textContent = w ? fmt(w.t) : "--";
-  $("wB").textContent = w ? `${ago(w.t)} · ${w.who}` : "Sin registros";
+  $("wB").textContent = w ? `${ago(w.t)} · ${w.who}${w.queued ? " · ⏳ por enviar" : ""}` : "Sin registros";
 
   const hoy = new Date().toDateString();
   const today = log.filter(e => e.kind === "comida" && e.t.toDateString() === hoy).reverse();
@@ -283,7 +362,7 @@ function render() {
   ).join("");
 
   $("hist").innerHTML = log.slice(0, 8).map(e =>
-    `<div class="row"><span>${e.kind === "comida" ? "Comida" : "Agua"} · ${esc(e.who)}</span><span class="muted">${e.t.toLocaleDateString("es-CL", {weekday:"short", day:"numeric"})} ${fmt(e.t)}</span></div>`
+    `<div class="row"><span>${e.kind === "comida" ? "Comida" : "Agua"} · ${esc(e.who)}${e.queued ? ` <span class="q">⏳ por enviar</span>` : ""}</span><span class="muted">${e.t.toLocaleDateString("es-CL", {weekday:"short", day:"numeric"})} ${fmt(e.t)}</span></div>`
   ).join("");
 }
 
@@ -334,13 +413,25 @@ function chime(kind) {
 async function save() {
   unlockAudio();
   $("cYes").disabled = true;
-  const { error } = await db.rpc("add_entry", { p_code: code, p_kind: pending, p_who: me });
+  // Primero queda guardado en el teléfono (con la hora real); después se envía.
+  const item = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 10),
+                 code, kind: pending, who: me, at: new Date().toISOString() };
+  queueSet([...queueGet(), item]);
+  for (let i = 0; syncing && i < 50; i++) await new Promise(r => setTimeout(r, 100));
+  await syncQueue();
   $("cYes").disabled = false;
-  if (error) { $("cMsg").textContent = "No se pudo guardar. Intenta de nuevo."; return; }
+  if (rejected.has(item.id)) { $("cMsg").textContent = "No se pudo guardar. Intenta de nuevo."; return; }
+  const waiting = queueGet().some(x => x.id === item.id);
   chime(pending);
   const kind = pending;
   closeC();
   await refresh();
+  if (waiting) {
+    showNote("⏳ Quedó guardado en este teléfono. Se enviará solo cuando vuelva internet.");
+    const e = last(kind);
+    if (e) offerWa(kind, e, kind === "comida" && matches.has(e) ? matches.get(e) : null);
+    return;
+  }
   // Aviso: cuánto antes o después del horario se dio esta comida
   const e = last(kind);
   const s = kind === "comida" && e && matches.has(e) ? matches.get(e) : null;
@@ -460,7 +551,8 @@ function showPhoto(src) {
 }
 async function loadPhoto() {
   const { data, error } = await db.rpc("get_photo", { p_code: code });
-  if (!error) showPhoto(data);
+  if (!error) { showPhoto(data); cachePut({ photo: data }); }
+  else showPhoto(cacheGet().photo);
 }
 // Recorta al centro en cuadrado y achica a 480 px en JPEG (~40 KB).
 function shrink(file) {
@@ -495,7 +587,8 @@ $("photoIn").onchange = async () => {
 let contacts = [];
 async function loadWa() {
   const { data, error } = await db.rpc("get_whatsapp", { p_code: code });
-  if (!error && Array.isArray(data)) contacts = data;
+  if (!error && Array.isArray(data)) { contacts = data; cachePut({ contacts: data }); }
+  else if (error && !contacts.length) contacts = cacheGet().contacts || [];
   if ($("waEdit").classList.contains("hidden")) renderWa();
 }
 function renderWa() {
