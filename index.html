@@ -85,6 +85,7 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .hx{background:none;border:none;color:var(--muted);width:auto;padding:4px 6px;font-size:14px;cursor:pointer}
 .hrow{display:flex;align-items:center;gap:4px}
 .pin{letter-spacing:.6em;text-align:center;font-size:24px;padding:12px 0 12px .6em}
+.pin::placeholder{letter-spacing:normal;font-size:15px}
 .qr{background:#fff;border-radius:14px;padding:12px;width:220px;height:220px;margin:12px auto;display:flex;align-items:center;justify-content:center}
 .qr svg{width:100%;height:100%}
 .foot{text-align:center;margin:18px 0 8px}
@@ -142,13 +143,30 @@ main{position:relative}
     <p style="margin-top:16px"><b>¿A qué horas come?</b> <span class="muted">(opcional)</span></p>
     <div id="setRows"></div>
     <button class="add" onclick="addRow('', 'setRows')">+ Agregar horario</button>
-    <div id="setMeBox">
+    <p style="margin-top:16px"><b>Crea un PIN familiar</b> <span class="muted">(4 a 6 números)</span></p>
+    <p class="muted">Se pedirá una sola vez en cada teléfono que quiera entrar. Compártelo solo con tu familia.</p>
+    <div class="grid" style="margin-top:8px">
+      <input id="setPin" class="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="PIN" aria-label="PIN">
+      <input id="setPin2" class="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="Repetir" aria-label="Repite el PIN">
+    </div>
+    <div id="setMeBox" style="margin-top:16px">
       <p><b>¿Y tú cómo te llamas?</b></p>
       <p class="muted">Queda guardado en este teléfono para saber quién registra.</p>
       <input id="setMe" placeholder="Sofía" maxlength="40">
     </div>
     <p id="setErr" class="muted warn"></p>
     <button class="primary" id="setBtn" onclick="saveSetup()" style="margin-top:10px">Listo</button>
+  </section>
+
+  <section id="gate" class="card hidden">
+    <p style="font-size:18px;margin-top:2px"><b id="gateTitle"></b></p>
+    <p id="gateText" class="muted"></p>
+    <input id="gatePin" class="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="6" aria-label="PIN" style="margin-top:14px">
+    <div id="gate2Box"><p class="muted" style="margin-top:12px">Repite el PIN</p>
+      <input id="gatePin2" class="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="6" aria-label="Repite el PIN" style="margin-top:6px"></div>
+    <p id="gateErr" class="muted warn" style="margin-top:8px"></p>
+    <button class="primary" id="gateBtn" onclick="submitGate()" style="margin-top:8px"></button>
+    <p id="gateHint" class="muted" style="margin-top:12px;font-size:12px"></p>
   </section>
 
   <section id="nameBox" class="card hidden">
@@ -305,12 +323,17 @@ async function syncQueue() {
   try {
     for (const item of queueGet()) {
       const base = { p_code: item.code, p_kind: item.kind, p_who: item.who, p_at: item.at, p_client_id: item.id };
-      let { error } = await db.rpc("add_entry_at", { ...base, p_note: item.note || null });
+      let { data, error } = await db.rpc("add_entry_at", { ...base, p_note: item.note || null, p_pin: getPinFor(item.code) || null });
       // Si Supabase todavía tiene una versión anterior de las funciones, usa la que haya
-      if (error && error.code === "PGRST202") ({ error } = await db.rpc("add_entry_at", base));
+      if (error && error.code === "PGRST202") ({ data, error } = await db.rpc("add_entry_at", { ...base, p_note: item.note || null }));
+      if (error && error.code === "PGRST202") ({ data, error } = await db.rpc("add_entry_at", base));
       if (error && error.code === "PGRST202")
-        ({ error } = await db.rpc("add_entry", { p_code: item.code, p_kind: item.kind, p_who: item.who }));
+        ({ data, error } = await db.rpc("add_entry", { p_code: item.code, p_kind: item.kind, p_who: item.who }));
       if (error && netErr(error)) break;      // sigue sin internet: se intenta más tarde
+      if (!error && typeof data === "string" && data.startsWith("PIN")) {   // falta el PIN: queda esperando
+        if (item.code === code) pinLost(data);
+        break;
+      }
       if (error) { console.error("Registro rechazado", item, error); rejected.add(item.id); }
       queueSet(queueGet().filter(x => x.id !== item.id));
     }
@@ -360,6 +383,7 @@ async function load() {
   plate = data;
   plate.schedule = sortTimes(plate.schedule || []);
   if (!plate.pet_name || !String(plate.pet_name).trim()) { showSetup(); return; }
+  if (await needsGate()) return;
   start();
 }
 
@@ -383,8 +407,9 @@ async function start() {
 async function refresh() {
   await syncQueue();
   // get_entries2 trae también las notas; si aún no existe en Supabase, usa la anterior
-  let { data, error } = await db.rpc("get_entries2", { p_code: code });
+  let { data, error } = await rpcP("get_entries2", { p_code: code });
   if (error && error.code === "PGRST202") ({ data, error } = await db.rpc("get_entries", { p_code: code }));
+  if (pinStatus({ data, error })) { pinLost(data); return; }
   if (error) {
     // Sin internet: mostrar lo último guardado más lo que está por enviar
     serverLog = (cacheGet().entries || []).map(e => ({ ...e, t: new Date(e.created_at) }));
@@ -555,7 +580,8 @@ async function undoLast() {
   if (queueGet().some(x => x.id === item.id)) {
     queueSet(queueGet().filter(x => x.id !== item.id));      // aún no se enviaba: basta con sacarlo
   } else {
-    const { error } = await db.rpc("delete_entry_mine", { p_code: item.code, p_client_id: item.id });
+    const r = await rpcP("delete_entry_mine", { p_code: item.code, p_client_id: item.id });
+    const error = r.error || (pinStatus(r) ? { message: r.data, code: "PIN" } : null);
     if (error) { showNote(netErr(error) ? "No se pudo deshacer: no hay internet." : "No se pudo deshacer. Bórralo desde el historial."); return; }
   }
   await refresh();
@@ -708,7 +734,8 @@ function showPhoto(src) {
   $("photoImg").alt = src ? `Foto de ${plate.pet_name}` : "";
 }
 async function loadPhoto() {
-  const { data, error } = await db.rpc("get_photo", { p_code: code });
+  const { data, error } = await rpcP("get_photo", { p_code: code });
+  if (pinStatus({ data, error })) return;
   if (!error) { showPhoto(data); cachePut({ photo: data }); }
   else showPhoto(cacheGet().photo);
 }
@@ -744,7 +771,8 @@ $("photoIn").onchange = async () => {
 // ---- Contactos de WhatsApp ----
 let contacts = [];
 async function loadWa() {
-  const { data, error } = await db.rpc("get_whatsapp", { p_code: code });
+  const { data, error } = await rpcP("get_whatsapp", { p_code: code });
+  if (pinStatus({ data, error })) return;
   if (!error && Array.isArray(data)) { contacts = data; cachePut({ contacts: data }); }
   else if (error && !contacts.length) contacts = cacheGet().contacts || [];
   if ($("waEdit").classList.contains("hidden")) renderWa();
@@ -848,12 +876,13 @@ document.addEventListener("keydown", e => {
 let hasPin = false;
 const PIN_RE = /^[0-9]{4,6}$/;
 const pinKey = () => "comitag_pin_" + code;
-function getPin() { try { return localStorage.getItem(pinKey()) || ""; } catch { return ""; } }
+function getPinFor(c) { try { return localStorage.getItem("comitag_pin_" + c) || ""; } catch { return ""; } }
+function getPin() { return getPinFor(code); }
 function savePin(p) { try { p ? localStorage.setItem(pinKey(), p) : localStorage.removeItem(pinKey()); } catch {} }
 function errText(e, fallback) { return e.cancelled ? "" : (e.friendly || fallback); }
 // Supabase responde "PIN requerido", "PIN incorrecto" o "PIN bloqueado" como texto
 const pinStatus = r => !r.error && typeof r.data === "string" && r.data.startsWith("PIN") ? r.data : "";
-function updatePinLink() { $("pinLink").textContent = hasPin ? "PIN familiar: activado" : "Poner PIN familiar"; }
+function updatePinLink() { $("pinLink").textContent = hasPin ? "Cambiar PIN familiar" : "Crear PIN familiar"; }
 async function loadPin() {
   const { data, error } = await db.rpc("has_pin", { p_code: code });
   if (!error) { hasPin = data === true; cachePut({ hasPin }); } else hasPin = !!cacheGet().hasPin;
@@ -884,13 +913,12 @@ function askPin(msg) {
     openModal(`<p style="font-size:18px;margin-top:4px"><b>🔒 PIN familiar</b></p>
       <p class="muted">Para hacer cambios en ${esc(plate.pet_name)} se necesita el PIN de la familia.</p>
       <input id="pinIn" class="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="6" style="margin-top:12px" aria-label="PIN">
-      <label class="muted" style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="pinRem" checked style="width:auto"> Recordar en este teléfono</label>
       <p id="pinErr" class="muted warn" style="margin-top:8px">${esc(msg || "")}</p>
       <div class="grid" style="margin-top:12px"><button onclick="closeModal()">Cancelar</button><button class="primary" id="pinOk">Continuar</button></div>`, res);
     const go = () => {
       const v = $("pinIn").value.trim();
       if (!PIN_RE.test(v)) { $("pinErr").textContent = "El PIN tiene de 4 a 6 números."; return; }
-      closeModal({ pin: v, remember: $("pinRem").checked });
+      closeModal({ pin: v, remember: true });
     };
     $("pinOk").onclick = go;
     $("pinIn").onkeydown = e => { if (e.key === "Enter") go(); };
@@ -900,7 +928,7 @@ function askPin(msg) {
 function openPinSettings() {
   openModal(`<p style="font-size:18px;margin-top:4px"><b>${hasPin ? "🔒 PIN familiar" : "🔓 Poner PIN familiar"}</b></p>
     <p class="muted">${hasPin
-      ? "Para cambiar el PIN escribe el actual y el nuevo. Para quitarlo, deja el nuevo en blanco."
+      ? "Escribe el PIN actual y el nuevo. Los demás teléfonos tendrán que escribir el nuevo la próxima vez que entren."
       : "Con un PIN, se pedirá para cambiar el nombre, los horarios, los contactos, la foto o para borrar registros. Marcar comida o agua sigue siendo con un toque."}</p>
     ${hasPin ? '<p style="margin-top:12px"><b>PIN actual</b></p><input id="pinOld" class="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="6" aria-label="PIN actual">' : ""}
     <p style="margin-top:12px"><b>${hasPin ? "PIN nuevo" : "PIN (4 a 6 números)"}</b></p>
@@ -910,7 +938,7 @@ function openPinSettings() {
   $("pinSave").onclick = async () => {
     const old = hasPin ? $("pinOld").value.trim() : null, nw = $("pinNew").value.trim();
     if (hasPin && !PIN_RE.test(old)) { $("pinErr").textContent = "Escribe el PIN actual."; return; }
-    if ((!hasPin || nw) && !PIN_RE.test(nw)) { $("pinErr").textContent = "El PIN tiene de 4 a 6 números."; return; }
+    if (!PIN_RE.test(nw)) { $("pinErr").textContent = "El PIN nuevo tiene que ser de 4 a 6 números."; return; }
     $("pinSave").disabled = true;
     const r = await db.rpc("set_pin", { p_code: code, p_old: old, p_new: nw || null });
     $("pinSave").disabled = false;
@@ -923,7 +951,7 @@ function openPinSettings() {
     if (st === "PIN bloqueado") { $("pinErr").textContent = "Demasiados intentos. Espera 15 minutos."; return; }
     if (st) { $("pinErr").textContent = "El PIN actual no es correcto."; return; }
     hasPin = !!nw; savePin(nw || ""); cachePut({ hasPin }); updatePinLink(); closeModal();
-    showNote(nw ? "🔒 PIN familiar guardado. Compártelo solo con tu familia." : "🔓 PIN familiar quitado.");
+    showNote("🔒 PIN familiar guardado. Compártelo solo con tu familia.");
   };
 }
 
@@ -974,8 +1002,8 @@ async function openInvite() {
     <p class="muted" style="text-align:center;overflow-wrap:anywhere;font-size:12px">${esc(url)}</p>
     <div class="grid" style="margin-top:12px"><button id="copyBtn">Copiar link</button><button class="primary" id="shareBtn">Compartir</button></div>
     <p class="muted" style="margin-top:12px;font-size:12px">${hasPin
-      ? "Cualquiera con el link puede marcar comidas; para hacer cambios se pide el PIN."
-      : "Ojo: cualquiera con el link puede ver y cambiar todo. Si quieres, pon un PIN familiar."}</p>
+      ? "La primera vez que entren les pedirá el PIN familiar: díselo tú."
+      : "Ojo: sin PIN familiar, cualquiera con el link puede entrar."}</p>
     <button class="link" style="display:block;margin:6px auto 0" onclick="closeModal()">Cerrar</button>`);
   $("copyBtn").onclick = async () => {
     try { await navigator.clipboard.writeText(url); $("copyBtn").textContent = "✓ Copiado"; }
@@ -1037,7 +1065,7 @@ async function toggleBell() {
   if (bellOn()) {
     try {
       const reg = await navigator.serviceWorker.ready, sub = await reg.pushManager.getSubscription();
-      if (sub) await db.rpc("remove_push", { p_code: code, p_endpoint: sub.endpoint });
+      if (sub) await rpcP("remove_push", { p_code: code, p_endpoint: sub.endpoint });
     } catch {}
     lsSet(bellKey(), false); $("bellMsg").classList.add("hidden"); bellUI();
     return;
@@ -1052,7 +1080,8 @@ async function toggleBell() {
     const reg = await navigator.serviceWorker.ready;
     const sub = (await reg.pushManager.getSubscription())
       || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(VAPID_PUBLIC) });
-    const { error } = await db.rpc("save_push", { p_code: code, p_sub: sub.toJSON() });
+    const r = await rpcP("save_push", { p_code: code, p_sub: sub.toJSON() });
+    const error = r.error || (pinStatus(r) ? { code: "PIN" } : null);
     if (error) return say(error.code === "PGRST202" ? "Falta configurar los avisos en Supabase (parte 2)." : "No se pudo activar. Intenta de nuevo.");
     lsSet(bellKey(), true); bellUI();
   } catch (e) { console.error(e); say("No se pudo activar los avisos en este teléfono."); }
@@ -1093,6 +1122,84 @@ function menuDo(fn) { toggleMenu(false); fn(); }
 document.addEventListener("click", e => { if (!$("menu").contains(e.target) && !$("menuList").classList.contains("hidden")) toggleMenu(false); });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("menuList").classList.contains("hidden")) toggleMenu(false); });
 
+// ================= PIN al entrar =================
+// Lectura/escritura con el PIN guardado de esta mascota (si Supabase aún no lo pide, sin él)
+async function rpcP(fn, args) {
+  let r = await db.rpc(fn, { ...args, p_pin: getPin() || null });
+  if (r.error && r.error.code === "PGRST202") r = await db.rpc(fn, args);
+  return r;
+}
+// El PIN guardado ya no sirve (por ejemplo, alguien lo cambió): pedirlo de nuevo
+function pinLost(st) {
+  if (!$("gate").classList.contains("hidden")) return;
+  savePin("");
+  ready = false;
+  showGate("enter", st === "PIN bloqueado" ? "Demasiados intentos. Espera 15 minutos." : "El PIN familiar cambió. Escribe el nuevo.");
+}
+// ¿Hay que pedir (o crear) el PIN antes de mostrar la mascota?
+async function needsGate() {
+  if (offline) return false;                       // sin internet: se usa lo guardado
+  const hp = await db.rpc("has_pin", { p_code: code });
+  if (hp.error) return false;                      // Supabase sin el SQL del PIN, o sin conexión
+  hasPin = hp.data === true; cachePut({ hasPin });
+  if (!hasPin) { showGate("create"); return true; }
+  const pin = getPin();
+  if (!pin) { showGate("enter"); return true; }
+  const v = await db.rpc("verify_pin", { p_code: code, p_pin: pin });
+  if (v.error || v.data === "ok") return false;
+  savePin("");
+  showGate("enter", v.data === "PIN bloqueado" ? "Demasiados intentos. Espera 15 minutos." : "El PIN familiar cambió. Escribe el nuevo.");
+  return true;
+}
+let gateMode = "enter";
+function showGate(mode, msg) {
+  gateMode = mode;
+  const pet = plate.pet_name;
+  $("pet").textContent = pet;
+  document.title = `${pet} · Comitag`;
+  ["app", "nameBox", "photoBox", "petEditBtn"].forEach(id => $(id).classList.add("hidden"));
+  $("gateTitle").textContent = mode === "create" ? "🔒 Crea el PIN familiar" : "🔒 Escribe el PIN familiar";
+  $("gateText").textContent = mode === "create"
+    ? `Desde ahora, cada teléfono nuevo que quiera entrar a ${pet} tendrá que escribirlo una vez. Compártelo solo con tu familia.`
+    : `Para entrar a ${pet} desde este teléfono. Se pide una sola vez y queda guardado.`;
+  $("gate2Box").classList.toggle("hidden", mode !== "create");
+  $("gateBtn").textContent = mode === "create" ? "Guardar PIN" : "Entrar";
+  $("gateHint").textContent = mode === "create" ? "Usa de 4 a 6 números." : "¿No lo sabes? Pídeselo a quien configuró el plato.";
+  $("gateErr").textContent = msg || "";
+  $("gatePin").value = ""; $("gatePin2").value = "";
+  $("gate").classList.remove("hidden");
+  setTimeout(() => $("gatePin").focus(), 50);
+}
+async function submitGate() {
+  const pin = $("gatePin").value.trim();
+  if (!PIN_RE.test(pin)) { $("gateErr").textContent = "El PIN tiene que ser de 4 a 6 números."; return; }
+  if (gateMode === "create" && pin !== $("gatePin2").value.trim()) { $("gateErr").textContent = "Los dos PIN no coinciden."; return; }
+  $("gateBtn").disabled = true;
+  const r = gateMode === "create"
+    ? await db.rpc("set_pin", { p_code: code, p_old: null, p_new: pin })
+    : await db.rpc("verify_pin", { p_code: code, p_pin: pin });
+  $("gateBtn").disabled = false;
+  if (r.error) {
+    $("gateErr").textContent = netErr(r.error) ? "No hay internet. Intenta cuando vuelva la conexión."
+      : r.error.code === "PGRST202" ? "Falta agregar el PIN en Supabase (pin_inicio.sql)." : "No se pudo. Intenta de nuevo.";
+    return;
+  }
+  if (r.data === "PIN bloqueado") { $("gateErr").textContent = "Demasiados intentos. Espera 15 minutos."; return; }
+  if (r.data !== "ok") {
+    // Al crear: si otro familiar ya creó un PIN justo antes, hay que escribir ese
+    if (gateMode === "create") { showGate("enter", "Alguien de la familia ya creó el PIN. Escríbelo para entrar."); return; }
+    $("gateErr").textContent = "PIN incorrecto. Intenta de nuevo.";
+    $("gatePin").value = ""; $("gatePin").focus();
+    return;
+  }
+  savePin(pin); hasPin = true; cachePut({ hasPin });
+  $("gate").classList.add("hidden");
+  $("petEditBtn").classList.remove("hidden");
+  if (gateMode === "create") setTimeout(() => showNote("🔒 PIN familiar guardado. Compártelo solo con tu familia."), 600);
+  start();
+}
+$("gatePin").onkeydown = $("gatePin2").onkeydown = e => { if (e.key === "Enter") submitGate(); };
+
 function changeName() { me = null; localStorage.removeItem("comitag_nombre"); showName(); }
 
 // ---- Configurar un plato nuevo (primera vez) ----
@@ -1107,12 +1214,20 @@ async function saveSetup() {
   const pet = $("setPet").value.trim();
   const who = me || $("setMe").value.trim();
   if (!pet) { $("setErr").textContent = "Escribe el nombre de tu mascota"; return; }
+  const pin = $("setPin").value.trim();
+  if (!PIN_RE.test(pin)) { $("setErr").textContent = "El PIN tiene que ser de 4 a 6 números"; return; }
+  if (pin !== $("setPin2").value.trim()) { $("setErr").textContent = "Los dos PIN no coinciden"; return; }
   if (!who) { $("setErr").textContent = "Escribe tu nombre"; return; }
   const times = sortTimes([...$("setRows").querySelectorAll("input")].map(i => i.value));
   $("setBtn").disabled = true;
   const ok = await updatePlate(pet, times);
   $("setBtn").disabled = false;
   if (ok !== true) { $("setErr").textContent = ok; return; }
+  const r = await db.rpc("set_pin", { p_code: code, p_old: null, p_new: pin });
+  if (!r.error || r.error.code !== "PGRST202") {
+    if (r.error || pinStatus(r)) { $("setErr").textContent = "No se pudo guardar el PIN. Intenta de nuevo."; return; }
+    hasPin = true; savePin(pin); cachePut({ hasPin });
+  }
   if (!me) { me = who; localStorage.setItem("comitag_nombre", who); }
   plate.pet_name = pet;
   plate.schedule = times;
