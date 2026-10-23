@@ -312,7 +312,7 @@ function addRow(val, box = "schedRows") {
 function editSched() {
   $("schedRows").innerHTML = "";
   const s = plate.schedule || [];
-  (s.length ? s : [""]).forEach(addRow);
+  (s.length ? s : [""]).forEach(v => addRow(v));
   $("schedErr").textContent = "";
   $("sched").classList.add("hidden");
   $("schedEditBtn").classList.add("hidden");
