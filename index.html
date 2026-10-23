@@ -146,7 +146,7 @@ main{position:relative}
     <p class="muted">Este plato todavía no está configurado. Solo hay que hacerlo una vez y queda listo para toda la familia.</p>
     <p><b>¿Cómo se llama tu mascota?</b></p>
     <div id="setRows0" style="margin-top:8px"></div>
-    <button class="add" id="setRows0Add" onclick="addNameRow('setRows0', '')">+ Otra mascota come de este plato</button>
+    <button class="add" id="setRows0Add" onclick="addNameRow('setRows0', '')">+ Agrega otra mascota</button>
     <p style="margin-top:16px"><b>¿A qué horas come?</b> <span class="muted">(opcional)</span></p>
     <div id="setRows"></div>
     <button class="add" onclick="addRow('', 'setRows')">+ Agregar horario</button>
@@ -539,7 +539,7 @@ function render() {
 }
 
 // ---- Varias mascotas en un plato ----
-const MAX_PETS = 4;
+const MAX_PETS = 6;
 const petsOf = () => plate && Array.isArray(plate.pets) && plate.pets.length > 1 ? plate.pets : [];
 function joinNames(a) { return a.length < 2 ? (a[0] || "") : a.slice(0, -1).join(", ") + " y " + a[a.length - 1]; }
 function addNameRow(box, val) {
