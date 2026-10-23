@@ -22,11 +22,29 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 #week{display:flex;align-items:flex-end;gap:6px;height:90px}
 .bar{flex:1;text-align:center;font-size:11px;color:#777}
 .bar div{background:#2563eb;border-radius:4px;margin:3px 0}
+.head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.link{background:none;border:none;color:#2563eb;font-size:14px;padding:6px 0;width:auto;cursor:pointer}
+.trow{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.trow input{flex:1}
+.trow .x{width:44px;padding:10px;color:#b91c1c}
+.add{margin:4px 0 12px}
 </style>
 </head>
 <body>
 <main>
-  <h1 id="pet" style="font-size:22px">Cargando…</h1>
+  <div class="head" id="petView">
+    <h1 id="pet" style="font-size:22px">Cargando…</h1>
+    <button class="link hidden" id="petEditBtn" onclick="editPet()">✏️ Editar</button>
+  </div>
+  <section id="petEdit" class="card hidden">
+    <p><b>Nombre de la mascota</b></p>
+    <input id="petIn" maxlength="40">
+    <p id="petErr" class="muted warn"></p>
+    <div class="grid" style="margin-top:10px">
+      <button onclick="cancelPet()">Cancelar</button>
+      <button class="primary" id="petSave" onclick="savePet()">Guardar</button>
+    </div>
+  </section>
   <p id="err" class="muted warn"></p>
 
   <section id="nameBox" class="card hidden">
@@ -54,7 +72,20 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
         <button class="primary" id="cYes" onclick="save()">Confirmar</button>
       </div>
     </div>
-    <div class="card" style="margin-top:12px"><p><b>Horarios de hoy</b></p><div id="sched"></div></div>
+    <div class="card" style="margin-top:12px">
+      <div class="head"><p><b>Horarios de comida</b></p><button class="link" id="schedEditBtn" onclick="editSched()">✏️ Editar</button></div>
+      <div id="sched"></div>
+      <div id="schedEdit" class="hidden">
+        <p class="muted" style="margin-bottom:10px">Pon las horas en que hay que darle comida cada día.</p>
+        <div id="schedRows"></div>
+        <button class="add" onclick="addRow('')">+ Agregar horario</button>
+        <p id="schedErr" class="muted warn"></p>
+        <div class="grid">
+          <button onclick="cancelSched()">Cancelar</button>
+          <button class="primary" id="schedSave" onclick="saveSched()">Guardar</button>
+        </div>
+      </div>
+    </div>
     <div class="card"><p><b>Últimos 7 días</b></p><div id="week"></div><div id="hist" style="margin-top:12px"></div></div>
     <p class="muted" style="text-align:center"><a href="#" onclick="changeName()">Cambiar nombre</a></p>
   </section>
@@ -86,7 +117,9 @@ async function load() {
   const { data, error } = await db.rpc("get_plate", { p_code: code });
   if (error || !data) { $("pet").textContent = "Plato no encontrado"; return; }
   plate = data;
+  plate.schedule = sortTimes(plate.schedule || []);
   $("pet").textContent = plate.pet_name;
+  $("petEditBtn").classList.remove("hidden");
   await refresh();
   showName();
 }
@@ -96,6 +129,11 @@ async function refresh() {
   if (error) { $("err").textContent = "No se pudo cargar. Revisa tu conexión."; return; }
   $("err").textContent = "";
   log = data.map(e => ({ ...e, t: new Date(e.created_at) }));
+  const p = await db.rpc("get_plate", { p_code: code });
+  if (!p.error && p.data) {
+    plate.schedule = sortTimes(p.data.schedule || []);
+    if ($("petEdit").classList.contains("hidden")) { plate.pet_name = p.data.pet_name; $("pet").textContent = plate.pet_name; }
+  }
   render();
 }
 
@@ -114,12 +152,13 @@ function render() {
 
   const hoy = new Date().toDateString();
   const today = log.filter(e => e.kind === "comida" && e.t.toDateString() === hoy).reverse();
-  $("sched").innerHTML = (plate.schedule || []).map((h, i) => {
+  const sch = plate.schedule || [];
+  $("sched").innerHTML = sch.length ? sch.map((h, i) => {
     const e = today[i];
     return `<div class="row"><span>${esc(h)}</span>${e
       ? `<span class="ok">Dado ${fmt(e.t)} · ${esc(e.who)}</span>`
       : `<span class="pend">Pendiente</span>`}</div>`;
-  }).join("");
+  }).join("") : `<p class="muted">Aún no hay horarios. Toca “Editar” para agregarlos.</p>`;
 
   const days = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - 6 + i); return d; });
   const cnt = days.map(d => log.filter(e => e.kind === "comida" && e.t.toDateString() === d.toDateString()).length);
@@ -166,6 +205,70 @@ $("nameBtn").onclick = () => {
   localStorage.setItem("comitag_nombre", v);
   showName();
 };
+// ---- Editar nombre de la mascota ----
+function editPet() {
+  $("petIn").value = plate.pet_name;
+  $("petErr").textContent = "";
+  $("petView").classList.add("hidden");
+  $("petEdit").classList.remove("hidden");
+  $("petIn").focus();
+}
+function cancelPet() {
+  $("petEdit").classList.add("hidden");
+  $("petView").classList.remove("hidden");
+}
+async function savePet() {
+  const v = $("petIn").value.trim();
+  if (!v) { $("petErr").textContent = "Escribe un nombre"; return; }
+  $("petSave").disabled = true;
+  const ok = await updatePlate(v, plate.schedule || []);
+  $("petSave").disabled = false;
+  if (!ok) { $("petErr").textContent = "No se pudo guardar. Intenta de nuevo."; return; }
+  plate.pet_name = v;
+  $("pet").textContent = v;
+  cancelPet();
+  render();
+}
+
+// ---- Editar horarios de comida ----
+function sortTimes(a) { return [...new Set(a.map(s => String(s).trim()).filter(Boolean))].sort(); }
+function addRow(val) {
+  const r = document.createElement("div");
+  r.className = "trow";
+  r.innerHTML = `<input type="time" value="${esc(val)}"><button class="x" title="Quitar" onclick="this.parentNode.remove()">✕</button>`;
+  $("schedRows").appendChild(r);
+}
+function editSched() {
+  $("schedRows").innerHTML = "";
+  const s = plate.schedule || [];
+  (s.length ? s : [""]).forEach(addRow);
+  $("schedErr").textContent = "";
+  $("sched").classList.add("hidden");
+  $("schedEditBtn").classList.add("hidden");
+  $("schedEdit").classList.remove("hidden");
+}
+function cancelSched() {
+  $("schedEdit").classList.add("hidden");
+  $("sched").classList.remove("hidden");
+  $("schedEditBtn").classList.remove("hidden");
+}
+async function saveSched() {
+  const times = sortTimes([...$("schedRows").querySelectorAll("input")].map(i => i.value));
+  $("schedSave").disabled = true;
+  const ok = await updatePlate(plate.pet_name, times);
+  $("schedSave").disabled = false;
+  if (!ok) { $("schedErr").textContent = "No se pudo guardar. Intenta de nuevo."; return; }
+  plate.schedule = times;
+  cancelSched();
+  render();
+}
+
+async function updatePlate(name, schedule) {
+  const { error } = await db.rpc("update_plate", { p_code: code, p_pet_name: name, p_schedule: schedule });
+  if (error) console.error(error);
+  return !error;
+}
+
 function changeName() { me = null; localStorage.removeItem("comitag_nombre"); showName(); }
 
 setInterval(() => plate && refresh(), 30000);
