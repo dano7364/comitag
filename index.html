@@ -28,12 +28,17 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .trow input{flex:1}
 .trow .x{width:44px;padding:10px;color:#b91c1c}
 .add{margin:4px 0 12px}
+.petHead{position:relative;text-align:center;margin:8px 0 14px}
+.petHead h1{font-size:32px;margin:0;padding:0 72px;overflow-wrap:anywhere}
+.petHead .link{position:absolute;right:0;top:50%;transform:translateY(-50%)}
+.diff{margin:-2px 0 6px;font-size:12px}
+.note{background:#dcfce7;color:#166534;border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:14px}
 </style>
 </head>
 <body>
 <main>
-  <div class="head" id="petView">
-    <h1 id="pet" style="font-size:22px">Cargando…</h1>
+  <div class="petHead" id="petView">
+    <h1 id="pet">Cargando…</h1>
     <button class="link hidden" id="petEditBtn" onclick="editPet()">✏️ Editar</button>
   </div>
   <section id="petEdit" class="card hidden">
@@ -73,6 +78,7 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 
   <section id="app" class="hidden">
     <p class="muted" id="hello" style="margin-bottom:10px"></p>
+    <div id="note" class="note hidden"></div>
     <div class="grid">
       <div class="card"><p class="muted">Última comida</p><p class="big" id="fT">--</p><p class="muted" id="fB"></p></div>
       <div class="card"><p class="muted">Último agua</p><p class="big" id="wT">--</p><p class="muted" id="wB"></p></div>
@@ -117,7 +123,7 @@ const code = (location.pathname.split("/p/")[1] || "").replace(/\/$/, "");
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt = t => t.toLocaleTimeString("es-CL", {hour:"2-digit", minute:"2-digit"});
-let ready = false, plate = null, log = [], pending = null, me = localStorage.getItem("comitag_nombre");
+let matches = new Map(), ready = false, plate = null, log = [], pending = null, me = localStorage.getItem("comitag_nombre");
 
 function ago(t) {
   const m = Math.round((Date.now() - t) / 60000);
@@ -127,6 +133,15 @@ function ago(t) {
   return h < 24 ? `hace ${h} h` : `hace ${Math.round(h / 24)} d`;
 }
 const last = k => log.find(e => e.kind === k);
+
+// "Se registró 5 min antes de la hora indicada" / "1 h 10 min después" / "justo a la hora"
+function diffText(t, slot) {
+  const m = Math.round((t - slot) / 60000);
+  if (m === 0) return "Se registró justo a la hora indicada";
+  const a = Math.abs(m), h = Math.floor(a / 60), r = a % 60;
+  const dur = h ? `${h} h${r ? ` ${r} min` : ""}` : `${a} min`;
+  return `Se registró ${dur} ${m < 0 ? "antes" : "después"} de la hora indicada`;
+}
 
 async function load() {
   if (!code) {
@@ -181,18 +196,22 @@ function render() {
   const sch = plate.schedule || [];
   const slots = sch.map(h => { const [hh, mm] = h.split(":").map(Number); const d = new Date(); d.setHours(hh, mm || 0, 0, 0); return d; });
   const used = new Set();
+  matches = new Map();
   $("sched").innerHTML = sch.length ? slots.map((s, i) => {
-    // Cada horario acepta comidas desde 3 h antes (o la mitad con el horario anterior)
-    // hasta la mitad con el horario siguiente (o fin del día, por si se dio tarde).
-    const from = Math.max(i ? (slots[i - 1].getTime() + s.getTime()) / 2 : 0, s.getTime() - 3 * 3600000);
-    const to = i < slots.length - 1 ? (s.getTime() + slots[i + 1].getTime()) / 2 : Infinity;
+    // Cada horario acepta comidas de hasta 3 h antes o después de su hora,
+    // sin cruzarse con el horario vecino (se corta a la mitad entre ambos).
+    const W = 3 * 3600000;
+    const from = Math.max(i ? (slots[i - 1].getTime() + s.getTime()) / 2 : 0, s.getTime() - W);
+    const to = Math.min(i < slots.length - 1 ? (s.getTime() + slots[i + 1].getTime()) / 2 : Infinity, s.getTime() + W);
     const cands = today.filter(e => !used.has(e) && e.t >= from && e.t < to);
     const e = cands.sort((a, b) => Math.abs(a.t - s) - Math.abs(b.t - s))[0];
-    if (e) used.add(e);
+    if (e) { used.add(e); matches.set(e, s); }
     const status = e ? `<span class="ok">Dado ${fmt(e.t)} · ${esc(e.who)}</span>`
       : Date.now() < s ? `<span class="muted">Más tarde</span>`
-      : `<span class="pend">Pendiente</span>`;
-    return `<div class="row"><span>${fmt(s)}</span>${status}</div>`;
+      : Date.now() < to ? `<span class="pend">Pendiente</span>`
+      : `<span class="pend">No se registró</span>`;
+    return `<div class="row"><span>${fmt(s)}</span>${status}</div>`
+      + (e ? `<p class="muted diff">${diffText(e.t, s)}</p>` : "");
   }).join("") : `<p class="muted">Aún no hay horarios. Toca “Editar” para agregarlos.</p>`;
 
   const days = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - 6 + i); return d; });
@@ -228,8 +247,25 @@ async function save() {
   const { error } = await db.rpc("add_entry", { p_code: code, p_kind: pending, p_who: me });
   $("cYes").disabled = false;
   if (error) { $("cMsg").textContent = "No se pudo guardar. Intenta de nuevo."; return; }
+  const kind = pending;
   closeC();
   await refresh();
+  // Aviso: cuánto antes o después del horario se dio esta comida
+  const e = last(kind);
+  if (kind === "comida" && e && matches.has(e)) {
+    const s = matches.get(e);
+    showNote(`✅ Comida registrada ${diffText(e.t, s).replace("Se registró ", "")} (${fmt(s)}).`);
+  } else {
+    showNote(kind === "comida" ? "✅ Comida registrada." : "✅ Agua registrada.");
+  }
+}
+
+let noteTimer;
+function showNote(msg) {
+  $("note").textContent = msg;
+  $("note").classList.remove("hidden");
+  clearTimeout(noteTimer);
+  noteTimer = setTimeout(() => $("note").classList.add("hidden"), 8000);
 }
 
 $("nameIn").oninput = () => $("nameErr").style.display = "none";
