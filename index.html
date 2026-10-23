@@ -44,7 +44,8 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .head{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .link{background:none;border:none;color:var(--blue);font-size:14px;padding:6px 0;width:auto;cursor:pointer}
 .trow{display:flex;gap:8px;align-items:center;margin-bottom:8px}
-.trow input{flex:1}
+.trow input{flex:1;min-width:0}
+.trow select{flex:none;width:auto;max-width:42%;font-size:16px;padding:12px 8px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text)}
 .trow .x{width:44px;padding:10px;color:var(--red)}
 .add{margin:4px 0 12px}
 .brand{text-align:center;font-size:12px;font-weight:600;letter-spacing:.42em;color:var(--brand);margin:10px 0 4px;padding-left:.42em}
@@ -216,6 +217,7 @@ main{position:relative}
       <p class="muted hidden" id="bellMsg" style="margin-top:8px"></p>
       <div id="schedEdit" class="hidden">
         <p class="muted" style="margin-bottom:10px">Pon las horas en que hay que darle comida cada día.</p>
+        <p class="muted hidden" id="schedHint" style="margin:-4px 0 10px">Al lado de cada hora elige si es para todos o para una mascota.</p>
         <div id="schedRows"></div>
         <button class="add" onclick="addRow('')">+ Agregar horario</button>
         <p id="schedErr" class="muted warn"></p>
@@ -478,37 +480,43 @@ function render() {
 
   const hoy = new Date().toDateString();
   const today = log.filter(e => e.kind === "comida" && e.t.toDateString() === hoy).reverse();
-  const sch = plate.schedule || [];
-  const slots = sch.map(h => { const [hh, mm] = h.split(":").map(Number); const d = new Date(); d.setHours(hh, mm || 0, 0, 0); return d; });
+  // Horarios (en platos de una mascota, las etiquetas de mascota no aplican)
+  const toDate = h => { const [hh, mm] = h.split(":").map(Number); const d = new Date(); d.setHours(hh, mm || 0, 0, 0); return d; };
+  const items = (plate.schedule || []).map(parseSlot).filter(x => /^\d\d:\d\d$/.test(x.t))
+    .map(x => ({ t: x.t, p: pets.length && pets.includes(x.p) ? x.p : null, d: toDate(x.t) }))
+    .sort((a, b) => a.d - b.d);
   // Cada horario acepta comidas de hasta 3 h antes o después de su hora,
-  // sin cruzarse con el horario vecino (se corta a la mitad entre ambos).
+  // sin cruzarse con el horario vecino de esa misma mascota (se corta a la mitad entre ambos).
   const W = 3 * 3600000;
-  const win = slots.map((s, i) => ({
-    from: Math.max(i ? (slots[i - 1].getTime() + s.getTime()) / 2 : 0, s.getTime() - W),
-    to: Math.min(i < slots.length - 1 ? (s.getTime() + slots[i + 1].getTime()) / 2 : Infinity, s.getTime() + W),
-  }));
-  const matchList = list => {               // a cada horario, la comida más cercana de la lista
-    const used = new Set();
-    return slots.map((s, i) => {
-      const e = list.filter(x => !used.has(x) && x.t >= win[i].from && x.t < win[i].to)
-                    .sort((a, b) => Math.abs(a.t - s) - Math.abs(b.t - s))[0];
-      if (e) { used.add(e); matches.set(e, s); }
-      return e || null;
-    });
-  };
   matches = new Map();
-  const groups = pets.length ? pets.map(p => ({ p, m: matchList(today.filter(e => !e.pet || e.pet === p)) }))
-                             : [{ p: null, m: matchList(today) }];
-  $("sched").innerHTML = sch.length ? slots.map((s, i) => {
-    const got = groups.filter(g => g.m[i]), miss = groups.filter(g => !g.m[i]).map(g => g.p);
+  const res = items.map(() => ({}));            // por horario: mascota → { e, to }
+  for (const p of (pets.length ? pets : [null])) {
+    const mine = items.map((it, idx) => ({ it, idx })).filter(x => !x.it.p || x.it.p === p);
+    const list = today.filter(e => !p || !e.pet || e.pet === p), used = new Set();
+    mine.forEach((x, k) => {
+      const s = x.it.d;
+      const from = Math.max(k ? (mine[k - 1].it.d.getTime() + s.getTime()) / 2 : 0, s.getTime() - W);
+      const to = Math.min(k < mine.length - 1 ? (s.getTime() + mine[k + 1].it.d.getTime()) / 2 : Infinity, s.getTime() + W);
+      const e = list.filter(y => !used.has(y) && y.t >= from && y.t < to)
+                    .sort((a, b) => Math.abs(a.t - s) - Math.abs(b.t - s))[0] || null;
+      if (e) { used.add(e); matches.set(e, s); }
+      res[x.idx][p || ""] = { e, to };
+    });
+  }
+  $("sched").innerHTML = items.length ? items.map((it, idx) => {
+    const s = it.d, who = it.p ? [it.p] : (pets.length ? pets : [""]);
+    const got = who.filter(p => res[idx][p].e), miss = who.filter(p => !res[idx][p].e);
+    const to = Math.max(...who.map(p => res[idx][p].to));
     const waiting = Date.now() < s ? `<span class="muted">Más tarde</span>`
-      : Date.now() < win[i].to ? `<span class="pend">Pendiente</span>` : `<span class="pend">No se registró</span>`;
+      : Date.now() < to ? `<span class="pend">Pendiente</span>` : `<span class="pend">No se registró</span>`;
     let status;
-    if (!pets.length) { const e = got[0] && got[0].m[i]; status = e ? `<span class="ok">Dado ${fmt(e.t)} · ${esc(e.who)}</span>` : waiting; }
+    if (who.length === 1) { const e = res[idx][who[0]].e; status = e ? `<span class="ok">Dado ${fmt(e.t)} · ${esc(e.who)}</span>` : waiting; }
     else status = !got.length ? waiting : !miss.length ? `<span class="ok">Dado a todos</span>` : `<span class="pend">Falta ${esc(joinNames(miss))}</span>`;
-    const details = got.map(g => { const e = g.m[i];
-      return `<p class="muted diff">${g.p ? `<b>${esc(g.p)}</b>: ${fmt(e.t)} · ${esc(e.who)} · ` : ""}${g.p ? diffText(e.t, s).replace("Se registró ", "") : diffText(e.t, s)}</p>`; }).join("");
-    return `<div class="row"><span>${fmt(s)}</span>${status}</div>` + details;
+    const details = got.map(p => { const e = res[idx][p].e;
+      return who.length > 1
+        ? `<p class="muted diff"><b>${esc(p)}</b>: ${fmt(e.t)} · ${esc(e.who)} · ${diffText(e.t, s).replace("Se registró ", "")}</p>`
+        : `<p class="muted diff">${diffText(e.t, s)}</p>`; }).join("");
+    return `<div class="row"><span>${fmt(s)}${it.p ? ` · <b>${esc(it.p)}</b>` : ""}</span>${status}</div>` + details;
   }).join("") : `<p class="muted">Aún no hay horarios. Toca “Editar” para agregarlos.</p>`;
 
   // Cada vez que se marca la comida cuenta una sola vez, aunque sea para varias mascotas
@@ -697,7 +705,9 @@ $("nameBtn").onclick = () => {
   showName();
 };
 // ---- Editar nombre de la mascota ----
+let readNamesBefore = [];
 function editPet() {
+  readNamesBefore = petsOf().slice();
   $("petRows").innerHTML = "";
   (petsOf().length ? petsOf() : [plate.pet_name]).forEach(n => addNameRow("petRows", n));
   $("petErr").textContent = "";
@@ -712,11 +722,20 @@ async function savePet() {
   const names = readNames("petRows");
   if (!names.length) { $("petErr").textContent = "Escribe un nombre"; return; }
   const title = joinNames(names), pets = names.length > 1 ? names : [];
+  // Los horarios de una mascota siguen a su nombre (se compara por posición en la lista)
+  const before = readNamesBefore, rename = {};
+  before.forEach((n, i) => { if (names[i]) rename[n] = names[i]; });
+  const schedule = sortTimes((plate.schedule || []).map(x => {
+    const { t, p } = parseSlot(x);
+    if (!p) return t;
+    const np = rename[p];
+    return np && pets.includes(np) ? `${t}|${np}` : t;      // si la mascota ya no está, queda para todos
+  }));
   $("petSave").disabled = true;
-  const ok = await updatePlate(title, plate.schedule || [], pets);
+  const ok = await updatePlate(title, schedule, pets);
   $("petSave").disabled = false;
   if (ok !== true) { $("petErr").textContent = ok; return; }
-  plate.pet_name = title; plate.pets = pets;
+  plate.pet_name = title; plate.pets = pets; plate.schedule = schedule;
   $("pet").textContent = title;
   document.title = `${title} · Comitag`;
   rememberPet(code, title);
@@ -726,16 +745,24 @@ async function savePet() {
 
 // ---- Editar horarios de comida ----
 function sortTimes(a) { return [...new Set(a.map(s => String(s).trim()).filter(Boolean))].sort(); }
+// Un horario es "08:00" (para todas) o "13:00|Luna" (solo para Luna)
+function parseSlot(x) { const [t, p] = String(x).split("|"); return { t: (t || "").trim(), p: (p || "").trim() || null }; }
 function addRow(val, box = "schedRows") {
+  const { t, p } = parseSlot(val), pets = box === "schedRows" ? petsOf() : [];
   const r = document.createElement("div");
   r.className = "trow";
-  r.innerHTML = `<input type="time" value="${esc(val)}"><button class="x" title="Quitar" onclick="this.parentNode.remove()">✕</button>`;
+  r.innerHTML = `<input type="time" value="${esc(t)}">`
+    + (pets.length ? `<select aria-label="Para quién">${["", ...pets].map(n =>
+        `<option value="${esc(n)}"${n === (p && pets.includes(p) ? p : "") ? " selected" : ""}>${n ? esc(n) : "Todos"}</option>`).join("")}</select>` : "")
+    + `<button class="x" title="Quitar" onclick="this.parentNode.remove()">✕</button>`;
   $(box).appendChild(r);
 }
 function editSched() {
   $("schedRows").innerHTML = "";
   const s = plate.schedule || [];
   (s.length ? s : [""]).forEach(v => addRow(v));
+  $("schedHint").classList.toggle("hidden", !petsOf().length);
+  $("bellBtn").classList.add("hidden"); $("bellMsg").classList.add("hidden");
   $("schedErr").textContent = "";
   $("sched").classList.add("hidden");
   $("schedEditBtn").classList.add("hidden");
@@ -745,9 +772,16 @@ function cancelSched() {
   $("schedEdit").classList.add("hidden");
   $("sched").classList.remove("hidden");
   $("schedEditBtn").classList.remove("hidden");
+  bellUI();
 }
 async function saveSched() {
-  const times = sortTimes([...$("schedRows").querySelectorAll("input")].map(i => i.value));
+  const vals = [...$("schedRows").querySelectorAll(".trow")].map(r => {
+    const t = r.querySelector("input").value, sel = r.querySelector("select");
+    return t ? t + (sel && sel.value ? "|" + sel.value : "") : "";
+  }).filter(Boolean);
+  const hours = vals.map(v => parseSlot(v).t);
+  if (new Set(hours).size !== hours.length) { $("schedErr").textContent = "Hay dos horarios a la misma hora. Deja uno (puede ser para “Todos”)."; return; }
+  const times = sortTimes(vals);
   $("schedSave").disabled = true;
   const ok = await updatePlate(plate.pet_name, times);
   $("schedSave").disabled = false;
@@ -1157,7 +1191,7 @@ function b64u(s) {
 }
 function bellOn() { return lsGet(bellKey(), false) && typeof Notification !== "undefined" && Notification.permission === "granted"; }
 function bellUI() {
-  if (!plate) return;
+  if (!plate || !$("schedEdit").classList.contains("hidden")) return;
   const on = bellOn();
   $("bellBtn").classList.toggle("hidden", !(plate.schedule || []).length && !on);
   $("bellBtn").textContent = on ? "🔕 Dejar de avisarme" : "🔔 Avisarme si se olvida un horario";
