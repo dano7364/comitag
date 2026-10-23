@@ -35,6 +35,10 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .pets a.on{background:#2563eb;color:#fff;border-color:#2563eb}
 .pets.list{flex-direction:column;align-items:stretch;margin-top:16px}
 .pets.list a{padding:14px;font-size:16px;text-align:center}
+.pets .link{margin:2px auto 0}
+.prow{display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid #e2dfd8;border-radius:14px;padding:8px 8px 8px 16px;font-size:16px}
+.rm{width:auto;padding:9px 14px;font-size:14px;color:#b91c1c;border-color:#fecaca}
+.rm.sure,.danger{background:#dc2626;color:#fff;border-color:#dc2626}
 .photoBox{text-align:center;margin-top:12px}
 .photo{width:136px;height:136px;border-radius:50%;padding:0;overflow:hidden;border:4px solid #fff;background:#e7e5df;box-shadow:0 2px 10px rgba(0,0,0,.12);color:#777;font-size:13px;cursor:pointer}
 .photo img{width:100%;height:100%;object-fit:cover;display:block}
@@ -157,7 +161,15 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
       </div>
     </div>
     <div class="card"><p><b>Últimos 7 días</b></p><div id="week"></div><div id="hist" style="margin-top:12px"></div></div>
-    <p class="muted" style="text-align:center"><a href="#" onclick="changeName()">Cambiar nombre</a></p>
+    <p class="muted" style="text-align:center"><a href="#" onclick="changeName()">Cambiar nombre</a> · <a href="#" onclick="askRemoveHere(); return false">Quitar de este teléfono</a></p>
+    <div id="rmBox" class="card hidden">
+      <p><b>¿Quitar a <span id="rmName"></span> de este teléfono?</b></p>
+      <p class="muted">Solo deja de aparecer en tu celular. La mascota y sus registros siguen igual para el resto de la familia. Si vuelves a acercar el celular a su plato, aparece de nuevo.</p>
+      <div class="grid" style="margin-top:10px">
+        <button onclick="askRemoveHere()">Cancelar</button>
+        <button class="danger" onclick="removeThisPet()">Quitar</button>
+      </div>
+    </div>
   </section>
 </main>
 
@@ -280,6 +292,7 @@ async function start() {
   $("pet").textContent = plate.pet_name;
   document.title = `${plate.pet_name} · Comitag`;
   rememberPet(code, plate.pet_name);
+  $("rmName").textContent = plate.pet_name;
   $("petEditBtn").classList.remove("hidden");
   renderWa();
   await refresh();
@@ -536,9 +549,42 @@ function renderPets() {
   const asList = !code;               // en la página sin código, lista grande para elegir
   nav.classList.toggle("list", asList);
   nav.classList.toggle("hidden", asList ? !l.length : l.length < 2);
+  if (asList && editingPets && l.length) {
+    // Modo editar: cada mascota con su botón para quitarla de este teléfono
+    nav.innerHTML = l.map(p => {
+      const ask = confirmPet === p.code;
+      return `<div class="prow"><span>${esc(p.name)}</span><button class="rm${ask ? " sure" : ""}" onclick="tapRemove('${esc(p.code)}')">${ask ? "¿Seguro? Quitar" : "Quitar"}</button></div>`;
+    }).join("") + `<button class="link" onclick="toggleEditPets()">Listo</button>`;
+    return;
+  }
   nav.innerHTML = l.map(p =>
     `<a href="/p/${encodeURIComponent(p.code)}"${p.code === code ? ' class="on" aria-current="page"' : ""}>${esc(p.name)}</a>`
-  ).join("");
+  ).join("") + (asList && l.length ? `<button class="link" onclick="toggleEditPets()">✏️ Editar lista</button>` : "");
+}
+let editingPets = false, confirmPet = null;
+function toggleEditPets() { editingPets = !editingPets; confirmPet = null; renderPets(); }
+// Primer toque pide confirmar; el segundo la quita
+function tapRemove(c) {
+  if (confirmPet !== c) { confirmPet = c; renderPets(); return; }
+  removePetHere(c);
+  confirmPet = null;
+  if (!getPets().length) editingPets = false;
+  renderPets();
+  if (!code) $("err").textContent = getPets().length
+    ? "Elige una mascota, o acerca tu celular a la pegatina de otro plato."
+    : "Acerca tu celular a la pegatina del plato para abrir la página de tu mascota.";
+}
+// Solo la saca de ESTE teléfono: la mascota y sus registros siguen para la familia.
+// Los registros "por enviar" de esa mascota NO se borran: se envían igual al volver internet.
+function removePetHere(c) {
+  forgetPet(c);
+  try { localStorage.removeItem("comitag_copia_" + c); } catch {}
+}
+// Desde la página de la mascota
+function askRemoveHere() { $("rmBox").classList.toggle("hidden"); }
+function removeThisPet() {
+  removePetHere(code);
+  location.href = "/";
 }
 
 // ---- Foto de la mascota ----
