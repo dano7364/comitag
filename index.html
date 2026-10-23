@@ -285,7 +285,7 @@ if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").cat
 const code = (location.pathname.split("/p/")[1] || "").replace(/\/$/, "");
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const fmt = t => t.toLocaleTimeString("es-CL", {hour:"2-digit", minute:"2-digit"});
+const fmt = t => t.toLocaleTimeString("es-CL", {hour:"2-digit", minute:"2-digit", hourCycle:"h23"});
 let histShown = [], matches = new Map(), ready = false, plate = null, log = [], pending = null, me = localStorage.getItem("comitag_nombre");
 
 function ago(t) {
@@ -963,8 +963,8 @@ async function saveWa() {
 function offerWa(kind, e, slot, names) {
   const n = names && names[0] ? joinNames(names) : plate.pet_name, hora = fmt(e.t);
   let msg = kind === "comida"
-    ? `🐾 ${n} ya ${names && names.length > 1 ? "comieron" : "comió"} a las ${hora} (lo registró ${e.who}).`
-    : `💧 Le cambiaron el agua a ${n} a las ${hora} (lo registró ${e.who}).`;
+    ? `🐾 ${n} ya ${names && names.length > 1 ? "comieron" : "comió"} a las ${hora}.`
+    : `💧 Le cambiaron el agua a ${n} a las ${hora}.`;
   if (slot) msg += ` ${diffText(e.t, slot)} (${fmt(slot)}).`;
   if (e.note) msg += ` Nota: “${e.note}”`;
   const t = encodeURIComponent(msg);
