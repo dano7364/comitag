@@ -303,11 +303,41 @@ function closeC() {
   $("actions").classList.remove("hidden");
 }
 
+// ---- Sonido al registrar (generado aquí mismo, sin archivos) ----
+let audio;
+function unlockAudio() {
+  // iPhone solo deja sonar si el audio se prepara justo al tocar un botón
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    if (audio.state === "suspended") audio.resume();
+  } catch {}
+}
+function chime(kind) {
+  try {
+    if (!audio) return;
+    const notes = kind === "comida" ? [659, 880, 1319] : [523, 659]; // comida: Mi-La-Mi; agua: Do-Mi suave
+    const vol = kind === "comida" ? 0.22 : 0.14;
+    notes.forEach((f, i) => {
+      const t = audio.currentTime + i * 0.13;
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.type = "sine"; o.frequency.value = f;
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(vol, t + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+      o.connect(g).connect(audio.destination);
+      o.start(t); o.stop(t + 0.5);
+    });
+  } catch {}
+  try { navigator.vibrate && navigator.vibrate(kind === "comida" ? [60, 50, 60] : 40); } catch {}
+}
+
 async function save() {
+  unlockAudio();
   $("cYes").disabled = true;
   const { error } = await db.rpc("add_entry", { p_code: code, p_kind: pending, p_who: me });
   $("cYes").disabled = false;
   if (error) { $("cMsg").textContent = "No se pudo guardar. Intenta de nuevo."; return; }
+  chime(pending);
   const kind = pending;
   closeC();
   await refresh();
