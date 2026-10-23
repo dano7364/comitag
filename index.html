@@ -47,6 +47,22 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
   </section>
   <p id="err" class="muted warn"></p>
 
+  <section id="setup" class="card hidden">
+    <p class="muted">Este plato todavía no está configurado. Solo hay que hacerlo una vez y queda listo para toda la familia.</p>
+    <p><b>¿Cómo se llama tu mascota?</b></p>
+    <input id="setPet" placeholder="Toby" maxlength="40">
+    <p style="margin-top:16px"><b>¿A qué horas come?</b> <span class="muted">(opcional)</span></p>
+    <div id="setRows"></div>
+    <button class="add" onclick="addRow('', 'setRows')">+ Agregar horario</button>
+    <div id="setMeBox">
+      <p><b>¿Y tú cómo te llamas?</b></p>
+      <p class="muted">Queda guardado en este teléfono para saber quién registra.</p>
+      <input id="setMe" placeholder="Sofía" maxlength="40">
+    </div>
+    <p id="setErr" class="muted warn"></p>
+    <button class="primary" id="setBtn" onclick="saveSetup()" style="margin-top:10px">Listo</button>
+  </section>
+
   <section id="nameBox" class="card hidden">
     <p><b>¿Quién eres?</b></p>
     <p class="muted">Solo la primera vez. Queda guardado en este teléfono.</p>
@@ -101,7 +117,7 @@ const code = (location.pathname.split("/p/")[1] || "").replace(/\/$/, "");
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt = t => t.toLocaleTimeString("es-CL", {hour:"2-digit", minute:"2-digit"});
-let plate = null, log = [], pending = null, me = localStorage.getItem("comitag_nombre");
+let ready = false, plate = null, log = [], pending = null, me = localStorage.getItem("comitag_nombre");
 
 function ago(t) {
   const m = Math.round((Date.now() - t) / 60000);
@@ -113,11 +129,21 @@ function ago(t) {
 const last = k => log.find(e => e.kind === k);
 
 async function load() {
-  if (!code) { $("pet").textContent = "Plato no encontrado"; return; }
+  if (!code) {
+    $("pet").textContent = "Comitag";
+    $("err").textContent = "Acerca tu celular a la pegatina del plato para abrir la página de tu mascota.";
+    return;
+  }
   const { data, error } = await db.rpc("get_plate", { p_code: code });
   if (error || !data) { $("pet").textContent = "Plato no encontrado"; return; }
   plate = data;
   plate.schedule = sortTimes(plate.schedule || []);
+  if (!plate.pet_name || !String(plate.pet_name).trim()) { showSetup(); return; }
+  start();
+}
+
+async function start() {
+  ready = true;
   $("pet").textContent = plate.pet_name;
   $("petEditBtn").classList.remove("hidden");
   await refresh();
@@ -241,11 +267,11 @@ async function savePet() {
 
 // ---- Editar horarios de comida ----
 function sortTimes(a) { return [...new Set(a.map(s => String(s).trim()).filter(Boolean))].sort(); }
-function addRow(val) {
+function addRow(val, box = "schedRows") {
   const r = document.createElement("div");
   r.className = "trow";
   r.innerHTML = `<input type="time" value="${esc(val)}"><button class="x" title="Quitar" onclick="this.parentNode.remove()">✕</button>`;
-  $("schedRows").appendChild(r);
+  $(box).appendChild(r);
 }
 function editSched() {
   $("schedRows").innerHTML = "";
@@ -280,8 +306,33 @@ async function updatePlate(name, schedule) {
 
 function changeName() { me = null; localStorage.removeItem("comitag_nombre"); showName(); }
 
-setInterval(() => plate && refresh(), 30000);
-document.addEventListener("visibilitychange", () => { if (!document.hidden && plate) refresh(); });
+// ---- Configurar un plato nuevo (primera vez) ----
+function showSetup() {
+  $("pet").textContent = "¡Bienvenido a Comitag!";
+  $("setRows").innerHTML = "";
+  addRow("", "setRows");
+  $("setMeBox").classList.toggle("hidden", !!me);
+  $("setup").classList.remove("hidden");
+}
+async function saveSetup() {
+  const pet = $("setPet").value.trim();
+  const who = me || $("setMe").value.trim();
+  if (!pet) { $("setErr").textContent = "Escribe el nombre de tu mascota"; return; }
+  if (!who) { $("setErr").textContent = "Escribe tu nombre"; return; }
+  const times = sortTimes([...$("setRows").querySelectorAll("input")].map(i => i.value));
+  $("setBtn").disabled = true;
+  const ok = await updatePlate(pet, times);
+  $("setBtn").disabled = false;
+  if (!ok) { $("setErr").textContent = "No se pudo guardar. Intenta de nuevo."; return; }
+  if (!me) { me = who; localStorage.setItem("comitag_nombre", who); }
+  plate.pet_name = pet;
+  plate.schedule = times;
+  $("setup").classList.add("hidden");
+  start();
+}
+
+setInterval(() => ready && refresh(), 30000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden && ready) refresh(); });
 load();
 </script>
 </body>
