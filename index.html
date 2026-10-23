@@ -84,6 +84,10 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .enote{display:block;color:var(--muted);font-size:12px;font-style:italic;margin-top:2px;overflow-wrap:anywhere}
 .hx{background:none;border:none;color:var(--muted);width:auto;padding:4px 6px;font-size:14px;cursor:pointer}
 .hrow{display:flex;align-items:center;gap:4px}
+.chips{margin:4px 0 12px}
+.chip{display:inline-block;width:auto;margin:0 6px 6px 0;padding:9px 14px;border-radius:999px;font-size:15px;border:1px solid var(--chip);background:var(--card);color:var(--muted)}
+.chip.on{background:var(--blue);border-color:var(--blue);color:var(--on-blue)}
+.chip.on::before{content:"✓ "}
 .pin{letter-spacing:.6em;text-align:center;font-size:24px;padding:12px 0 12px .6em}
 .pin::placeholder{letter-spacing:normal;font-size:15px}
 .qr{background:#fff;border-radius:14px;padding:12px;width:220px;height:220px;margin:12px auto;display:flex;align-items:center;justify-content:center}
@@ -123,8 +127,10 @@ main{position:relative}
     <button class="link hidden" id="petEditBtn" onclick="editPet()">✏️ Editar</button>
   </div>
   <section id="petEdit" class="card hidden">
-    <p><b>Nombre de la mascota</b></p>
-    <input id="petIn" maxlength="40">
+    <p><b>Mascotas de este plato</b></p>
+    <p class="muted" style="margin-bottom:10px">Si varias comen del mismo plato, agrégalas para marcar a cuál le diste.</p>
+    <div id="petRows"></div>
+    <button class="add" id="petRowsAdd" onclick="addNameRow('petRows', '')">+ Agregar otra mascota</button>
     <p id="petErr" class="muted warn"></p>
     <div class="grid" style="margin-top:10px">
       <button onclick="cancelPet()">Cancelar</button>
@@ -139,7 +145,8 @@ main{position:relative}
   <section id="setup" class="card hidden">
     <p class="muted">Este plato todavía no está configurado. Solo hay que hacerlo una vez y queda listo para toda la familia.</p>
     <p><b>¿Cómo se llama tu mascota?</b></p>
-    <input id="setPet" placeholder="Toby" maxlength="40">
+    <div id="setRows0" style="margin-top:8px"></div>
+    <button class="add" id="setRows0Add" onclick="addNameRow('setRows0', '')">+ Otra mascota come de este plato</button>
     <p style="margin-top:16px"><b>¿A qué horas come?</b> <span class="muted">(opcional)</span></p>
     <div id="setRows"></div>
     <button class="add" onclick="addRow('', 'setRows')">+ Agregar horario</button>
@@ -195,6 +202,7 @@ main{position:relative}
     </div>
     <div class="card hidden" id="confirm">
       <p id="cMsg"></p>
+      <div id="cPets" class="chips hidden"></div>
       <input id="cNote" maxlength="120" placeholder="Nota (opcional): comió poco, media porción…" style="margin-bottom:12px">
       <div class="grid">
         <button onclick="closeC()">Cancelar</button>
@@ -312,7 +320,7 @@ function updateQueueInfo() {
 // Une lo que viene del servidor con lo que está esperando en este teléfono
 function mergeLog() {
   const q = queueGet().filter(x => x.code === code)
-    .map(x => ({ kind: x.kind, who: x.who, note: x.note, created_at: x.at, t: new Date(x.at), queued: true, qid: x.id }));
+    .map(x => ({ kind: x.kind, who: x.who, note: x.note, pet: x.pet || null, created_at: x.at, t: new Date(x.at), queued: true, qid: x.id }));
   log = [...q, ...serverLog].sort((a, b) => b.t - a.t);
 }
 let syncing = false;
@@ -323,8 +331,9 @@ async function syncQueue() {
   try {
     for (const item of queueGet()) {
       const base = { p_code: item.code, p_kind: item.kind, p_who: item.who, p_at: item.at, p_client_id: item.id };
-      let { data, error } = await db.rpc("add_entry_at", { ...base, p_note: item.note || null, p_pin: getPinFor(item.code) || null });
+      let { data, error } = await db.rpc("add_entry_at", { ...base, p_note: item.note || null, p_pin: getPinFor(item.code) || null, p_pet: item.pet || null });
       // Si Supabase todavía tiene una versión anterior de las funciones, usa la que haya
+      if (error && error.code === "PGRST202") ({ data, error } = await db.rpc("add_entry_at", { ...base, p_note: item.note || null, p_pin: getPinFor(item.code) || null }));
       if (error && error.code === "PGRST202") ({ data, error } = await db.rpc("add_entry_at", { ...base, p_note: item.note || null }));
       if (error && error.code === "PGRST202") ({ data, error } = await db.rpc("add_entry_at", base));
       if (error && error.code === "PGRST202")
@@ -341,6 +350,13 @@ async function syncQueue() {
   updateQueueInfo();
 }
 window.addEventListener("online", async () => { await syncQueue(); if (ready) refresh(); });
+
+// Datos del plato (con su lista de mascotas si Supabase ya la tiene)
+async function getPlate() {
+  let r = await db.rpc("get_plate2", { p_code: code });
+  if (r.error && r.error.code === "PGRST202") r = await db.rpc("get_plate", { p_code: code });
+  return r;
+}
 
 // "Se registró 5 min antes de la hora indicada" / "1 h 10 min después" / "justo a la hora"
 function diffText(t, slot) {
@@ -365,7 +381,7 @@ async function load() {
     $("addPetBox").classList.remove("hidden");
     return;
   }
-  let { data, error } = await db.rpc("get_plate", { p_code: code });
+  let { data, error } = await getPlate();
   if (error && netErr(error)) {
     // Sin internet: usar la última copia guardada de esta mascota
     data = cacheGet().plate;
@@ -424,10 +440,11 @@ async function refresh() {
   cachePut({ entries: data });
   serverLog = data.map(e => ({ ...e, t: new Date(e.created_at) }));
   mergeLog();
-  const p = await db.rpc("get_plate", { p_code: code });
+  const p = await getPlate();
   if (!p.error && p.data) {
     cachePut({ plate: p.data });
     plate.schedule = sortTimes(p.data.schedule || []);
+    plate.pets = Array.isArray(p.data.pets) ? p.data.pets : [];
     if ($("petEdit").classList.contains("hidden") && p.data.pet_name && p.data.pet_name !== plate.pet_name) {
       plate.pet_name = p.data.pet_name; $("pet").textContent = plate.pet_name; rememberPet(code, plate.pet_name);
     }
@@ -443,9 +460,17 @@ function showName() {
 }
 
 function render() {
-  const f = last("comida"), w = last("agua");
+  const f = last("comida"), w = last("agua"), pets = petsOf();
   $("fT").textContent = f ? fmt(f.t) : "--";
-  $("fB").textContent = f ? `${ago(f.t)} · ${f.who}${f.queued ? " · ⏳ por enviar" : ""}` : "Sin registros";
+  if (pets.length) {
+    // Varias mascotas: la última comida de cada una
+    $("fB").innerHTML = pets.map(p => {
+      const e = log.find(x => x.kind === "comida" && (!x.pet || x.pet === p));
+      return `<b>${esc(p)}</b>: ${e ? `${ago(e.t)} · ${esc(e.who)}${e.queued ? " ⏳" : ""}` : "sin registros"}`;
+    }).join("<br>");
+  } else {
+    $("fB").textContent = f ? `${ago(f.t)} · ${f.who}${f.queued ? " · ⏳ por enviar" : ""}` : "Sin registros";
+  }
   $("wT").textContent = w ? fmt(w.t) : "--";
   $("wB").textContent = w ? `${ago(w.t)} · ${w.who}${w.queued ? " · ⏳ por enviar" : ""}` : "Sin registros";
   $("fN").textContent = f && f.note ? `“${f.note}”` : "";
@@ -455,46 +480,111 @@ function render() {
   const today = log.filter(e => e.kind === "comida" && e.t.toDateString() === hoy).reverse();
   const sch = plate.schedule || [];
   const slots = sch.map(h => { const [hh, mm] = h.split(":").map(Number); const d = new Date(); d.setHours(hh, mm || 0, 0, 0); return d; });
-  const used = new Set();
+  // Cada horario acepta comidas de hasta 3 h antes o después de su hora,
+  // sin cruzarse con el horario vecino (se corta a la mitad entre ambos).
+  const W = 3 * 3600000;
+  const win = slots.map((s, i) => ({
+    from: Math.max(i ? (slots[i - 1].getTime() + s.getTime()) / 2 : 0, s.getTime() - W),
+    to: Math.min(i < slots.length - 1 ? (s.getTime() + slots[i + 1].getTime()) / 2 : Infinity, s.getTime() + W),
+  }));
+  const matchList = list => {               // a cada horario, la comida más cercana de la lista
+    const used = new Set();
+    return slots.map((s, i) => {
+      const e = list.filter(x => !used.has(x) && x.t >= win[i].from && x.t < win[i].to)
+                    .sort((a, b) => Math.abs(a.t - s) - Math.abs(b.t - s))[0];
+      if (e) { used.add(e); matches.set(e, s); }
+      return e || null;
+    });
+  };
   matches = new Map();
+  const groups = pets.length ? pets.map(p => ({ p, m: matchList(today.filter(e => !e.pet || e.pet === p)) }))
+                             : [{ p: null, m: matchList(today) }];
   $("sched").innerHTML = sch.length ? slots.map((s, i) => {
-    // Cada horario acepta comidas de hasta 3 h antes o después de su hora,
-    // sin cruzarse con el horario vecino (se corta a la mitad entre ambos).
-    const W = 3 * 3600000;
-    const from = Math.max(i ? (slots[i - 1].getTime() + s.getTime()) / 2 : 0, s.getTime() - W);
-    const to = Math.min(i < slots.length - 1 ? (s.getTime() + slots[i + 1].getTime()) / 2 : Infinity, s.getTime() + W);
-    const cands = today.filter(e => !used.has(e) && e.t >= from && e.t < to);
-    const e = cands.sort((a, b) => Math.abs(a.t - s) - Math.abs(b.t - s))[0];
-    if (e) { used.add(e); matches.set(e, s); }
-    const status = e ? `<span class="ok">Dado ${fmt(e.t)} · ${esc(e.who)}</span>`
-      : Date.now() < s ? `<span class="muted">Más tarde</span>`
-      : Date.now() < to ? `<span class="pend">Pendiente</span>`
-      : `<span class="pend">No se registró</span>`;
-    return `<div class="row"><span>${fmt(s)}</span>${status}</div>`
-      + (e ? `<p class="muted diff">${diffText(e.t, s)}</p>` : "");
+    const got = groups.filter(g => g.m[i]), miss = groups.filter(g => !g.m[i]).map(g => g.p);
+    const waiting = Date.now() < s ? `<span class="muted">Más tarde</span>`
+      : Date.now() < win[i].to ? `<span class="pend">Pendiente</span>` : `<span class="pend">No se registró</span>`;
+    let status;
+    if (!pets.length) { const e = got[0] && got[0].m[i]; status = e ? `<span class="ok">Dado ${fmt(e.t)} · ${esc(e.who)}</span>` : waiting; }
+    else status = !got.length ? waiting : !miss.length ? `<span class="ok">Dado a todos</span>` : `<span class="pend">Falta ${esc(joinNames(miss))}</span>`;
+    const details = got.map(g => { const e = g.m[i];
+      return `<p class="muted diff">${g.p ? `<b>${esc(g.p)}</b>: ${fmt(e.t)} · ${esc(e.who)} · ` : ""}${g.p ? diffText(e.t, s).replace("Se registró ", "") : diffText(e.t, s)}</p>`; }).join("");
+    return `<div class="row"><span>${fmt(s)}</span>${status}</div>` + details;
   }).join("") : `<p class="muted">Aún no hay horarios. Toca “Editar” para agregarlos.</p>`;
 
+  // Cada vez que se marca la comida cuenta una sola vez, aunque sea para varias mascotas
+  const events = e => new Set(e.map(x => x.created_at + "|" + x.who)).size;
   const days = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - 6 + i); return d; });
-  const cnt = days.map(d => log.filter(e => e.kind === "comida" && e.t.toDateString() === d.toDateString()).length);
+  const cnt = days.map(d => events(log.filter(e => e.kind === "comida" && e.t.toDateString() === d.toDateString())));
   const mx = Math.max(3, ...cnt);
   $("week").innerHTML = days.map((d, i) =>
     `<div class="bar">${cnt[i]}<div style="height:${Math.round(cnt[i] / mx * 55) + 2}px"></div>${d.toLocaleDateString("es-CL", {weekday:"short"}).slice(0, 2)}</div>`
   ).join("");
 
-  histShown = log.slice(0, 8);
-  $("hist").innerHTML = histShown.map((e, i) =>
-    `<div class="row"><span>${e.kind === "comida" ? "Comida" : "Agua"} · ${esc(e.who)}${e.queued ? ` <span class="q">⏳ por enviar</span>` : ""}${e.note ? `<span class="enote">“${esc(e.note)}”</span>` : ""}</span>`
+  // Historial: los registros hechos juntos (mismo momento, misma persona) van en una sola línea
+  const hist = [];
+  for (const e of log) {
+    const g = hist.find(h => h.kind === e.kind && h.who === e.who && h.created_at === e.created_at);
+    if (g) { g.items.push(e); if (e.pet) g.pets.push(e.pet); }
+    else { if (hist.length >= 8) break; hist.push({ kind: e.kind, who: e.who, created_at: e.created_at, t: e.t, note: e.note, queued: e.queued, items: [e], pets: e.pet ? [e.pet] : [] }); }
+  }
+  const order = petsOf();
+  hist.forEach(g => g.pets.sort((x, y) => order.indexOf(x) - order.indexOf(y)));
+  histShown = hist;
+  $("hist").innerHTML = hist.map((e, i) =>
+    `<div class="row"><span>${e.kind === "comida" ? "Comida" : "Agua"}${e.pets.length ? ` · ${esc(joinNames(e.pets))}` : ""} · ${esc(e.who)}${e.queued ? ` <span class="q">⏳ por enviar</span>` : ""}${e.note ? `<span class="enote">“${esc(e.note)}”</span>` : ""}</span>`
     + `<span class="hrow"><span class="muted">${e.t.toLocaleDateString("es-CL", {weekday:"short", day:"numeric"})} ${fmt(e.t)}</span>`
     + `<button class="hx" title="Borrar registro" aria-label="Borrar registro" onclick="askDelete(${i})">✕</button></span></div>`
-  ).join("");  bellUI();
+  ).join("");
+  bellUI();
 }
+
+// ---- Varias mascotas en un plato ----
+const MAX_PETS = 4;
+const petsOf = () => plate && Array.isArray(plate.pets) && plate.pets.length > 1 ? plate.pets : [];
+function joinNames(a) { return a.length < 2 ? (a[0] || "") : a.slice(0, -1).join(", ") + " y " + a[a.length - 1]; }
+function addNameRow(box, val) {
+  if ($(box).children.length >= MAX_PETS) return;
+  const r = document.createElement("div");
+  r.className = "trow";
+  r.innerHTML = `<input maxlength="20" placeholder="Nombre" value="${esc(val)}"><button class="x" title="Quitar" onclick="this.parentNode.remove(); nameRowsUI('${box}')">✕</button>`;
+  $(box).appendChild(r);
+  nameRowsUI(box);
+}
+function nameRowsUI(box) {
+  const n = $(box).children.length;
+  [...$(box).querySelectorAll(".x")].forEach(x => x.classList.toggle("hidden", n < 2));   // siempre queda al menos una
+  const add = $(box + "Add"); if (add) add.classList.toggle("hidden", n >= MAX_PETS);
+}
+function readNames(box) {
+  return [...new Set([...$(box).querySelectorAll("input")].map(i => i.value.trim().slice(0, 20)).filter(Boolean))];
+}
+// Botones para elegir a qué mascotas se les dio comida
+function renderPetChips() {
+  const pets = petsOf();
+  $("cPets").classList.toggle("hidden", !(pending === "comida" && pets.length));
+  if (!pets.length) return;
+  $("cPets").innerHTML = `<p class="muted" style="margin-bottom:8px">¿A quién le diste?</p>` + pets.map(p =>
+    `<button type="button" class="chip on" data-p="${esc(p)}" aria-pressed="true" onclick="this.classList.toggle('on'); this.setAttribute('aria-pressed', this.classList.contains('on'))">${esc(p)}</button>`).join("");
+}
+const chosenPets = () => [...$("cPets").querySelectorAll(".chip.on")].map(b => b.dataset.p);
 
 function ask(k) {
   pending = k;
-  const l = last(k), n = esc(plate.pet_name);
-  $("cMsg").innerHTML = (k === "comida" && l && Date.now() - l.t < 3 * 3600000)
-    ? `<span class="warn">Ojo:</span> ${n} ya comió ${ago(l.t)} (lo marcó ${esc(l.who)}). ¿Seguro que quieres marcar otra comida?`
-    : `¿Confirmas que ${k === "comida" ? "le diste comida" : "cambiaste el agua"} a ${n} ahora?`;
+  const n = esc(plate.pet_name), pets = petsOf();
+  if (k === "comida" && pets.length) {
+    // Avisar si alguna ya comió hace poco
+    const recent = pets.map(p => ({ p, e: log.find(x => x.kind === "comida" && (!x.pet || x.pet === p)) }))
+                       .filter(x => x.e && Date.now() - x.e.t < 3 * 3600000);
+    $("cMsg").innerHTML = recent.length
+      ? `<span class="warn">Ojo:</span> ` + recent.map(x => `${esc(x.p)} ya comió ${ago(x.e.t)} (${esc(x.e.who)})`).join("; ") + "."
+      : "¿Confirmas que les diste comida ahora?";
+  } else {
+    const l = last(k);
+    $("cMsg").innerHTML = (k === "comida" && l && Date.now() - l.t < 3 * 3600000)
+      ? `<span class="warn">Ojo:</span> ${n} ya comió ${ago(l.t)} (lo marcó ${esc(l.who)}). ¿Seguro que quieres marcar otra comida?`
+      : `¿Confirmas que ${k === "comida" ? "le diste comida" : "cambiaste el agua"} a ${n} ahora?`;
+  }
+  renderPetChips();
   $("cNote").value = "";
   $("confirm").classList.remove("hidden");
   $("actions").classList.add("hidden");
@@ -536,53 +626,55 @@ function chime(kind) {
 
 async function save() {
   unlockAudio();
+  const kind = pending, pets = kind === "comida" ? petsOf() : [];
+  const sel = pets.length ? chosenPets() : [null];
+  if (!sel.length) { $("cMsg").innerHTML = '<span class="warn">Elige al menos una mascota.</span>'; return; }
   $("cYes").disabled = true;
   // Primero queda guardado en el teléfono (con la hora real); después se envía.
   const note = $("cNote").value.trim().slice(0, 120);
-  const item = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 10),
-                 code, kind: pending, who: me, at: new Date().toISOString(), note: note || null };
-  queueSet([...queueGet(), item]);
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 10), at = new Date().toISOString();
+  const items = sel.map((pet, i) => ({ id: sel.length > 1 ? `${id}-${i}` : id, code, kind, who: me, at, note: note || null, pet }));
+  queueSet([...queueGet(), ...items]);
   for (let i = 0; syncing && i < 50; i++) await new Promise(r => setTimeout(r, 100));
   await syncQueue();
   $("cYes").disabled = false;
-  if (rejected.has(item.id)) { $("cMsg").textContent = "No se pudo guardar. Intenta de nuevo."; return; }
-  const waiting = queueGet().some(x => x.id === item.id);
-  chime(pending);
-  const kind = pending;
+  if (items.some(x => rejected.has(x.id))) { $("cMsg").textContent = "No se pudo guardar. Intenta de nuevo."; return; }
+  const waiting = queueGet().some(x => items.some(y => y.id === x.id));
+  chime(kind);
   closeC();
   await refresh();
-  lastSaved = item;
+  lastSaved = items;
+  const names = sel[0] ? sel : [plate.pet_name];
   // El registro recién hecho (por su hora exacta), o el último de ese tipo
-  const e = log.find(x => x.kind === kind && Math.abs(x.t - new Date(item.at)) < 1500) || last(kind);
+  const e = log.find(x => x.kind === kind && Math.abs(x.t - new Date(at)) < 1500) || last(kind);
+  const s = kind === "comida" && e && matches.has(e) ? matches.get(e) : null;
   if (waiting) {
     showNote("⏳ Quedó guardado en este teléfono. Se enviará solo cuando vuelva internet.", true);
-    if (e) offerWa(kind, e, kind === "comida" && matches.has(e) ? matches.get(e) : null);
-    return;
-  }
-  // Aviso: cuánto antes o después del horario se dio esta comida
-  const s = kind === "comida" && e && matches.has(e) ? matches.get(e) : null;
-  if (s) {
-    showNote(`✅ Comida registrada ${diffText(e.t, s).replace("Se registró ", "")} (${fmt(s)}).`, true);
+  } else if (kind === "comida") {
+    const para = sel[0] ? ` para ${joinNames(sel)}` : "";
+    showNote(`✅ Comida registrada${para}` + (s ? ` ${diffText(e.t, s).replace("Se registró ", "")} (${fmt(s)}).` : "."), true);
   } else {
-    showNote(kind === "comida" ? "✅ Comida registrada." : "✅ Agua registrada.", true);
+    showNote("✅ Agua registrada.", true);
   }
-  if (e) offerWa(kind, e, s);
+  if (e) offerWa(kind, e, s, names);
 }
 
-// ---- Deshacer el registro recién hecho (no pide PIN: solo quien lo marcó puede) ----
+// ---- Deshacer lo recién marcado ----
 let lastSaved = null;
 async function undoLast() {
-  const item = lastSaved;
-  if (!item) return;
+  const items = lastSaved;
+  if (!items || !items.length) return;
   lastSaved = null;
   $("note").classList.add("hidden");
   $("waBox").classList.add("hidden");
-  if (queueGet().some(x => x.id === item.id)) {
-    queueSet(queueGet().filter(x => x.id !== item.id));      // aún no se enviaba: basta con sacarlo
-  } else {
+  for (const item of items) {
+    if (queueGet().some(x => x.id === item.id)) {
+      queueSet(queueGet().filter(x => x.id !== item.id));      // aún no se enviaba: basta con sacarlo
+      continue;
+    }
     const r = await rpcP("delete_entry_mine", { p_code: item.code, p_client_id: item.id });
     const error = r.error || (pinStatus(r) ? { message: r.data, code: "PIN" } : null);
-    if (error) { showNote(netErr(error) ? "No se pudo deshacer: no hay internet." : "No se pudo deshacer. Bórralo desde el historial."); return; }
+    if (error) { showNote(netErr(error) ? "No se pudo deshacer: no hay internet." : "No se pudo deshacer. Bórralo desde el historial."); await refresh(); return; }
   }
   await refresh();
   showNote("↩️ Registro deshecho.");
@@ -606,26 +698,28 @@ $("nameBtn").onclick = () => {
 };
 // ---- Editar nombre de la mascota ----
 function editPet() {
-  $("petIn").value = plate.pet_name;
+  $("petRows").innerHTML = "";
+  (petsOf().length ? petsOf() : [plate.pet_name]).forEach(n => addNameRow("petRows", n));
   $("petErr").textContent = "";
   $("petView").classList.add("hidden");
   $("petEdit").classList.remove("hidden");
-  $("petIn").focus();
 }
 function cancelPet() {
   $("petEdit").classList.add("hidden");
   $("petView").classList.remove("hidden");
 }
 async function savePet() {
-  const v = $("petIn").value.trim();
-  if (!v) { $("petErr").textContent = "Escribe un nombre"; return; }
+  const names = readNames("petRows");
+  if (!names.length) { $("petErr").textContent = "Escribe un nombre"; return; }
+  const title = joinNames(names), pets = names.length > 1 ? names : [];
   $("petSave").disabled = true;
-  const ok = await updatePlate(v, plate.schedule || []);
+  const ok = await updatePlate(title, plate.schedule || [], pets);
   $("petSave").disabled = false;
   if (ok !== true) { $("petErr").textContent = ok; return; }
-  plate.pet_name = v;
-  $("pet").textContent = v;
-  rememberPet(code, v);
+  plate.pet_name = title; plate.pets = pets;
+  $("pet").textContent = title;
+  document.title = `${title} · Comitag`;
+  rememberPet(code, title);
   cancelPet();
   render();
 }
@@ -832,10 +926,10 @@ async function saveWa() {
   cancelWa();
 }
 // Botones para avisar después de registrar
-function offerWa(kind, e, slot) {
-  const n = plate.pet_name, hora = fmt(e.t);
+function offerWa(kind, e, slot, names) {
+  const n = names && names[0] ? joinNames(names) : plate.pet_name, hora = fmt(e.t);
   let msg = kind === "comida"
-    ? `🐾 ${n} ya comió a las ${hora} (lo registró ${e.who}).`
+    ? `🐾 ${n} ya ${names && names.length > 1 ? "comieron" : "comió"} a las ${hora} (lo registró ${e.who}).`
     : `💧 Le cambiaron el agua a ${n} a las ${hora} (lo registró ${e.who}).`;
   if (slot) msg += ` ${diffText(e.t, slot)} (${fmt(slot)}).`;
   if (e.note) msg += ` Nota: “${e.note}”`;
@@ -846,8 +940,14 @@ function offerWa(kind, e, slot) {
   $("waBox").classList.remove("hidden");
 }
 
-async function updatePlate(name, schedule) {
-  const { error } = await rpcPin("update_plate", { p_code: code, p_pet_name: name, p_schedule: schedule });
+async function updatePlate(name, schedule, pets) {
+  const args = { p_code: code, p_pet_name: name, p_schedule: schedule };
+  let { error } = await rpcPin("update_plate", pets ? { ...args, p_pets: pets } : args);
+  // Supabase sin el SQL de varias mascotas: si es una sola mascota, se guarda igual
+  if (error && error.code === "PGRST202" && pets) {
+    if (pets.length > 1) return "Falta agregar “varias mascotas” en Supabase (varias_mascotas.sql).";
+    ({ error } = await rpcPin("update_plate", args));
+  }
   return error ? errText(error, "No se pudo guardar. Intenta de nuevo.") : true;
 }
 
@@ -957,21 +1057,24 @@ function openPinSettings() {
 
 // ================= Borrar un registro del historial =================
 function askDelete(i) {
-  const e = histShown[i];
-  if (!e) return;
-  const label = `${e.kind === "comida" ? "Comida" : "Agua"} · ${e.who} · ${e.t.toLocaleDateString("es-CL", {weekday:"short", day:"numeric"})} ${fmt(e.t)}`;
+  const g = histShown[i];
+  if (!g) return;
+  const label = `${g.kind === "comida" ? "Comida" : "Agua"}${g.pets.length ? " · " + joinNames(g.pets) : ""} · ${g.who} · ${g.t.toLocaleDateString("es-CL", {weekday:"short", day:"numeric"})} ${fmt(g.t)}`;
   openModal(`<p style="font-size:18px;margin-top:4px"><b>¿Borrar este registro?</b></p>
-    <p class="muted">${esc(label)}${e.note ? ` · “${esc(e.note)}”` : ""}</p>
-    <p class="muted" style="margin-top:6px">${hasPin && !e.queued && !getPin() ? "Se pedirá el PIN familiar." : "Se borrará para toda la familia."}</p>
+    <p class="muted">${esc(label)}${g.note ? ` · “${esc(g.note)}”` : ""}</p>
+    <p class="muted" style="margin-top:6px">${hasPin && !g.queued && !getPin() ? "Se pedirá el PIN familiar." : "Se borrará para toda la familia."}</p>
     <div class="grid" style="margin-top:16px"><button onclick="closeModal()">Cancelar</button><button class="danger" id="delOk">Borrar</button></div>`);
   $("delOk").onclick = async () => {
     closeModal();
-    if (e.queued) { queueSet(queueGet().filter(x => x.id !== e.qid)); await refresh(); showNote("🗑️ Registro borrado."); return; }
-    const r = await rpcPin("delete_entry", { p_code: code, p_kind: e.kind, p_at: e.created_at });
-    if (r.error) {
-      if (!r.error.cancelled) showNote(r.error.code === "PGRST202" ? "Falta agregar la función para borrar en Supabase (parte 1 del SQL)."
-        : errText(r.error, "No se pudo borrar. Intenta de nuevo."));
-      return;
+    for (const e of g.items) {
+      if (e.queued) { queueSet(queueGet().filter(x => x.id !== e.qid)); continue; }
+      const r = await rpcPin("delete_entry", { p_code: code, p_kind: e.kind, p_at: e.created_at });
+      if (r.error) {
+        if (!r.error.cancelled) showNote(r.error.code === "PGRST202" ? "Falta agregar la función para borrar en Supabase (parte 1 del SQL)."
+          : errText(r.error, "No se pudo borrar. Intenta de nuevo."));
+        await refresh();
+        return;
+      }
     }
     await refresh();
     showNote("🗑️ Registro borrado.");
@@ -1207,20 +1310,22 @@ function showSetup() {
   $("pet").textContent = "¡Bienvenido a Comitag!";
   $("setRows").innerHTML = "";
   addRow("", "setRows");
+  $("setRows0").innerHTML = "";
+  addNameRow("setRows0", "");
   $("setMeBox").classList.toggle("hidden", !!me);
   $("setup").classList.remove("hidden");
 }
 async function saveSetup() {
-  const pet = $("setPet").value.trim();
+  const names = readNames("setRows0"), pet = joinNames(names), pets = names.length > 1 ? names : [];
   const who = me || $("setMe").value.trim();
-  if (!pet) { $("setErr").textContent = "Escribe el nombre de tu mascota"; return; }
+  if (!names.length) { $("setErr").textContent = "Escribe el nombre de tu mascota"; return; }
   const pin = $("setPin").value.trim();
   if (!PIN_RE.test(pin)) { $("setErr").textContent = "El PIN tiene que ser de 4 a 6 números"; return; }
   if (pin !== $("setPin2").value.trim()) { $("setErr").textContent = "Los dos PIN no coinciden"; return; }
   if (!who) { $("setErr").textContent = "Escribe tu nombre"; return; }
   const times = sortTimes([...$("setRows").querySelectorAll("input")].map(i => i.value));
   $("setBtn").disabled = true;
-  const ok = await updatePlate(pet, times);
+  const ok = await updatePlate(pet, times, pets);
   $("setBtn").disabled = false;
   if (ok !== true) { $("setErr").textContent = ok; return; }
   const r = await db.rpc("set_pin", { p_code: code, p_old: null, p_new: pin });
@@ -1230,6 +1335,7 @@ async function saveSetup() {
   }
   if (!me) { me = who; localStorage.setItem("comitag_nombre", who); }
   plate.pet_name = pet;
+  plate.pets = pets;
   plate.schedule = times;
   $("setup").classList.add("hidden");
   start();
