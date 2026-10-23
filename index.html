@@ -962,7 +962,7 @@ function askDelete(i) {
   const label = `${e.kind === "comida" ? "Comida" : "Agua"} · ${e.who} · ${e.t.toLocaleDateString("es-CL", {weekday:"short", day:"numeric"})} ${fmt(e.t)}`;
   openModal(`<p style="font-size:18px;margin-top:4px"><b>¿Borrar este registro?</b></p>
     <p class="muted">${esc(label)}${e.note ? ` · “${esc(e.note)}”` : ""}</p>
-    ${hasPin && !e.queued ? '<p class="muted" style="margin-top:6px">Se pedirá el PIN familiar.</p>' : ""}
+    <p class="muted" style="margin-top:6px">${hasPin && !e.queued && !getPin() ? "Se pedirá el PIN familiar." : "Se borrará para toda la familia."}</p>
     <div class="grid" style="margin-top:16px"><button onclick="closeModal()">Cancelar</button><button class="danger" id="delOk">Borrar</button></div>`);
   $("delOk").onclick = async () => {
     closeModal();
