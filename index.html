@@ -34,8 +34,7 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .add{margin:4px 0 12px}
 .brand{text-align:center;font-size:12px;font-weight:600;letter-spacing:.42em;color:#a29d92;margin:10px 0 4px;padding-left:.42em}
 .brand{display:flex;align-items:center;justify-content:center}
-.brand .logo{width:22px;height:22px;margin-right:9px}
-.brand .dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:#2563eb;margin-left:2px;vertical-align:middle}
+.brand .logo{width:22px;height:22px;margin-left:2px}
 .pets{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:10px 0 2px}
 .pets a{text-decoration:none;font-size:14px;padding:7px 14px;border-radius:999px;background:#fff;color:#444;border:1px solid #e2dfd8}
 .pets a.on{background:#2563eb;color:#fff;border-color:#2563eb}
@@ -69,7 +68,7 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 </head>
 <body>
 <main>
-  <div class="brand"><svg class="logo" viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="42" fill="none" stroke="#2563eb" stroke-width="9"/><g fill="#2563eb"><ellipse cx="60" cy="70" rx="13" ry="11"/><circle cx="42" cy="55" r="6.5"/><circle cx="52" cy="43.5" r="6.5"/><circle cx="68" cy="43.5" r="6.5"/><circle cx="78" cy="55" r="6.5"/></g></svg>COMITAG<span class="dot"></span></div>
+  <div class="brand">COMITAG<svg class="logo" viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="42" fill="none" stroke="#2563eb" stroke-width="9"/><g fill="#2563eb"><ellipse cx="60" cy="70" rx="13" ry="11"/><circle cx="42" cy="55" r="6.5"/><circle cx="52" cy="43.5" r="6.5"/><circle cx="68" cy="43.5" r="6.5"/><circle cx="78" cy="55" r="6.5"/></g></svg></div>
   <nav id="pets" class="pets hidden" aria-label="Mis mascotas"></nav>
   <div id="photoBox" class="photoBox hidden">
     <button class="photo" id="photoBtn" onclick="$('photoIn').click()" aria-label="Foto de la mascota">
