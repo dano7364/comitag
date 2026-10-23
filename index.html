@@ -149,8 +149,9 @@ main{position:relative}
     <div id="setRows0" style="margin-top:8px"></div>
     <button class="add" id="setRows0Add" onclick="addNameRow('setRows0', '')">+ Agrega otra mascota</button>
     <p style="margin-top:16px"><b>¿A qué horas come?</b> <span class="muted">(opcional)</span></p>
+    <p class="muted hidden" id="setSchedHint" style="margin:-4px 0 10px">Al lado de cada hora elige si es para todos o para una mascota.</p>
     <div id="setRows"></div>
-    <button class="add" onclick="addRow('', 'setRows')">+ Agregar horario</button>
+    <button class="add" onclick="addRow('', 'setRows'); refreshSetSelectors()">+ Agregar horario</button>
     <p style="margin-top:16px"><b>Crea un PIN familiar</b> <span class="muted">(4 a 6 números)</span></p>
     <p class="muted">Se pedirá una sola vez en cada teléfono que quiera entrar. Compártelo solo con tu familia.</p>
     <div class="grid" style="margin-top:8px">
@@ -559,6 +560,7 @@ function addNameRow(box, val) {
   nameRowsUI(box);
 }
 function nameRowsUI(box) {
+  if (box === "setRows0") setTimeout(refreshSetSelectors);
   const n = $(box).children.length;
   [...$(box).querySelectorAll(".x")].forEach(x => x.classList.toggle("hidden", n < 2));   // siempre queda al menos una
   const add = $(box + "Add"); if (add) add.classList.toggle("hidden", n >= MAX_PETS);
@@ -756,6 +758,24 @@ function addRow(val, box = "schedRows") {
         `<option value="${esc(n)}"${n === (p && pets.includes(p) ? p : "") ? " selected" : ""}>${n ? esc(n) : "Todos"}</option>`).join("")}</select>` : "")
     + `<button class="x" title="Quitar" onclick="this.parentNode.remove()">✕</button>`;
   $(box).appendChild(r);
+}
+// Configuración inicial: si hay 2 o más mascotas, cada hora puede ser para todas o para una
+let setNamesBefore = [];
+function refreshSetSelectors() {
+  // Nombres por posición (incluye vacíos) para que la selección siga a la mascota mientras se escribe
+  const raw = [...$("setRows0").querySelectorAll("input")].map(i => i.value.trim());
+  const before = setNamesBefore; setNamesBefore = raw;
+  const names = readNames("setRows0");
+  $("setSchedHint").classList.toggle("hidden", names.length < 2);
+  for (const r of $("setRows").querySelectorAll(".trow")) {
+    let sel = r.querySelector("select");
+    if (names.length < 2) { if (sel) sel.remove(); continue; }
+    const prev = sel ? sel.value : "";
+    if (!sel) { sel = document.createElement("select"); sel.setAttribute("aria-label", "Para quién"); r.querySelector("input").after(sel); }
+    sel.innerHTML = ["", ...names].map(n => `<option value="${esc(n)}">${n ? esc(n) : "Todos"}</option>`).join("");
+    const moved = raw[before.indexOf(prev)];                 // mismo lugar en la lista, nombre nuevo
+    sel.value = names.includes(prev) ? prev : (prev && moved && names.includes(moved) ? moved : "");
+  }
 }
 function editSched() {
   $("schedRows").innerHTML = "";
@@ -1346,6 +1366,7 @@ function showSetup() {
   addRow("", "setRows");
   $("setRows0").innerHTML = "";
   addNameRow("setRows0", "");
+  $("setRows0").oninput = refreshSetSelectors;
   $("setMeBox").classList.toggle("hidden", !!me);
   $("setup").classList.remove("hidden");
 }
@@ -1357,7 +1378,13 @@ async function saveSetup() {
   if (!PIN_RE.test(pin)) { $("setErr").textContent = "El PIN tiene que ser de 4 a 6 números"; return; }
   if (pin !== $("setPin2").value.trim()) { $("setErr").textContent = "Los dos PIN no coinciden"; return; }
   if (!who) { $("setErr").textContent = "Escribe tu nombre"; return; }
-  const times = sortTimes([...$("setRows").querySelectorAll("input")].map(i => i.value));
+  const vals = [...$("setRows").querySelectorAll(".trow")].map(r => {
+    const t = r.querySelector("input").value, sel = r.querySelector("select");
+    return t ? t + (pets.length && sel && sel.value ? "|" + sel.value : "") : "";
+  }).filter(Boolean);
+  const hours = vals.map(v => parseSlot(v).t);
+  if (new Set(hours).size !== hours.length) { $("setErr").textContent = "Hay dos horarios a la misma hora. Deja uno (puede ser para “Todos”)."; return; }
+  const times = sortTimes(vals);
   $("setBtn").disabled = true;
   const ok = await updatePlate(pet, times, pets);
   $("setBtn").disabled = false;
