@@ -596,6 +596,7 @@ function ask(k) {
   }
   renderPetChips();
   $("cNote").value = "";
+  $("cNote").placeholder = k === "agua" ? "Notas" : "Nota (opcional): comió poco, media porción…";
   $("confirm").classList.remove("hidden");
   $("actions").classList.add("hidden");
 }
