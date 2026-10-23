@@ -30,6 +30,11 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .add{margin:4px 0 12px}
 .brand{text-align:center;font-size:12px;font-weight:600;letter-spacing:.42em;color:#a29d92;margin:10px 0 4px;padding-left:.42em}
 .brand .dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:#2563eb;margin-left:2px;vertical-align:middle}
+.pets{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:10px 0 2px}
+.pets a{text-decoration:none;font-size:14px;padding:7px 14px;border-radius:999px;background:#fff;color:#444;border:1px solid #e2dfd8}
+.pets a.on{background:#2563eb;color:#fff;border-color:#2563eb}
+.pets.list{flex-direction:column;align-items:stretch;margin-top:16px}
+.pets.list a{padding:14px;font-size:16px;text-align:center}
 .photoBox{text-align:center;margin-top:12px}
 .photo{width:136px;height:136px;border-radius:50%;padding:0;overflow:hidden;border:4px solid #fff;background:#e7e5df;box-shadow:0 2px 10px rgba(0,0,0,.12);color:#777;font-size:13px;cursor:pointer}
 .photo img{width:100%;height:100%;object-fit:cover;display:block}
@@ -49,6 +54,7 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 <body>
 <main>
   <div class="brand">COMITAG<span class="dot"></span></div>
+  <nav id="pets" class="pets hidden" aria-label="Mis mascotas"></nav>
   <div id="photoBox" class="photoBox hidden">
     <button class="photo" id="photoBtn" onclick="$('photoIn').click()" aria-label="Foto de la mascota">
       <img id="photoImg" class="hidden" alt="">
@@ -183,12 +189,19 @@ function diffText(t, slot) {
 }
 
 async function load() {
+  renderPets();
   if (!code) {
     $("pet").textContent = "¡Hola!";
-    $("err").textContent = "Acerca tu celular a la pegatina del plato para abrir la página de tu mascota.";
+    $("err").classList.remove("warn");
+    $("err").style.textAlign = "center";
+    $("err").after($("pets"));
+    $("err").textContent = getPets().length
+      ? "Elige una mascota, o acerca tu celular a la pegatina de otro plato."
+      : "Acerca tu celular a la pegatina del plato para abrir la página de tu mascota.";
     return;
   }
   const { data, error } = await db.rpc("get_plate", { p_code: code });
+  if (!error && !data) { forgetPet(code); renderPets(); }
   if (error || !data) { $("pet").textContent = "Plato no encontrado"; return; }
   plate = data;
   plate.schedule = sortTimes(plate.schedule || []);
@@ -200,6 +213,7 @@ async function start() {
   ready = true;
   $("pet").textContent = plate.pet_name;
   document.title = `${plate.pet_name} · Comitag`;
+  rememberPet(code, plate.pet_name);
   $("petEditBtn").classList.remove("hidden");
   renderWa();
   await refresh();
@@ -217,7 +231,9 @@ async function refresh() {
   const p = await db.rpc("get_plate", { p_code: code });
   if (!p.error && p.data) {
     plate.schedule = sortTimes(p.data.schedule || []);
-    if ($("petEdit").classList.contains("hidden")) { plate.pet_name = p.data.pet_name; $("pet").textContent = plate.pet_name; }
+    if ($("petEdit").classList.contains("hidden") && p.data.pet_name && p.data.pet_name !== plate.pet_name) {
+      plate.pet_name = p.data.pet_name; $("pet").textContent = plate.pet_name; rememberPet(code, plate.pet_name);
+    }
   }
   render();
   if (ready) loadWa();
@@ -343,6 +359,7 @@ async function savePet() {
   if (!ok) { $("petErr").textContent = "No se pudo guardar. Intenta de nuevo."; return; }
   plate.pet_name = v;
   $("pet").textContent = v;
+  rememberPet(code, v);
   cancelPet();
   render();
 }
@@ -378,6 +395,29 @@ async function saveSched() {
   plate.schedule = times;
   cancelSched();
   render();
+}
+
+// ---- Mis mascotas (las que se abrieron en este teléfono) ----
+function getPets() {
+  try { const l = JSON.parse(localStorage.getItem("comitag_mascotas") || "[]"); return Array.isArray(l) ? l : []; }
+  catch { return []; }
+}
+function savePets(l) { try { localStorage.setItem("comitag_mascotas", JSON.stringify(l)); } catch {} }
+function rememberPet(c, name) {
+  const l = getPets(), p = l.find(x => x.code === c);
+  if (p) p.name = name; else l.push({ code: c, name });
+  savePets(l);
+  renderPets();
+}
+function forgetPet(c) { savePets(getPets().filter(x => x.code !== c)); }
+function renderPets() {
+  const l = getPets(), nav = $("pets");
+  const asList = !code;               // en la página sin código, lista grande para elegir
+  nav.classList.toggle("list", asList);
+  nav.classList.toggle("hidden", asList ? !l.length : l.length < 2);
+  nav.innerHTML = l.map(p =>
+    `<a href="/p/${encodeURIComponent(p.code)}"${p.code === code ? ' class="on" aria-current="page"' : ""}>${esc(p.name)}</a>`
+  ).join("");
 }
 
 // ---- Foto de la mascota ----
