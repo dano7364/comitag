@@ -18,7 +18,7 @@ button{font-size:16px;padding:14px;border-radius:12px;border:1px solid #ccc;back
 .pend{background:#fef3c7;color:#92400e;padding:3px 8px;border-radius:8px;font-size:12px}
 .warn{color:#b45309;font-weight:600}
 input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px solid #ccc;border-radius:10px}
-.hidden{display:none}
+.hidden{display:none !important}
 #week{display:flex;align-items:flex-end;gap:6px;height:90px}
 .bar{flex:1;text-align:center;font-size:11px;color:#777}
 .bar div{background:#2563eb;border-radius:4px;margin:3px 0}
@@ -28,6 +28,11 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .trow input{flex:1}
 .trow .x{width:44px;padding:10px;color:#b91c1c}
 .add{margin:4px 0 12px}
+.photoBox{text-align:center;margin-top:12px}
+.photo{width:136px;height:136px;border-radius:50%;padding:0;overflow:hidden;border:4px solid #fff;background:#e7e5df;box-shadow:0 2px 10px rgba(0,0,0,.12);color:#777;font-size:13px;cursor:pointer}
+.photo img{width:100%;height:100%;object-fit:cover;display:block}
+.photoBox .link{display:block;margin:4px auto 0;font-size:13px}
+.photoBox .muted:empty{display:none}
 .petHead{position:relative;text-align:center;margin:8px 0 14px}
 .petHead h1{font-size:32px;margin:0;padding:0 72px;overflow-wrap:anywhere}
 .petHead .link{position:absolute;right:0;top:50%;transform:translateY(-50%)}
@@ -41,6 +46,15 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 </head>
 <body>
 <main>
+  <div id="photoBox" class="photoBox hidden">
+    <button class="photo" id="photoBtn" onclick="$('photoIn').click()" aria-label="Foto de la mascota">
+      <img id="photoImg" class="hidden" alt="">
+      <span id="photoEmpty"><span style="font-size:34px">🐾</span><br>Agregar foto</span>
+    </button>
+    <button class="link hidden" id="photoChange" onclick="$('photoIn').click()">📷 Cambiar foto</button>
+    <p id="photoMsg" class="muted"></p>
+    <input type="file" id="photoIn" accept="image/*" class="hidden">
+  </div>
   <div class="petHead" id="petView">
     <h1 id="pet">Cargando…</h1>
     <button class="link hidden" id="petEditBtn" onclick="editPet()">✏️ Editar</button>
@@ -187,6 +201,8 @@ async function start() {
   await refresh();
   showName();
   loadWa();
+  $("photoBox").classList.remove("hidden");
+  loadPhoto();
 }
 
 async function refresh() {
@@ -360,6 +376,47 @@ async function saveSched() {
   render();
 }
 
+// ---- Foto de la mascota ----
+function showPhoto(src) {
+  $("photoImg").src = src || "";
+  $("photoImg").classList.toggle("hidden", !src);
+  $("photoEmpty").classList.toggle("hidden", !!src);
+  $("photoChange").classList.toggle("hidden", !src);
+  $("photoImg").alt = src ? `Foto de ${plate.pet_name}` : "";
+}
+async function loadPhoto() {
+  const { data, error } = await db.rpc("get_photo", { p_code: code });
+  if (!error) showPhoto(data);
+}
+// Recorta al centro en cuadrado y achica a 480 px en JPEG (~40 KB).
+function shrink(file) {
+  return new Promise((ok, fail) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      const side = Math.min(img.naturalWidth, img.naturalHeight), out = Math.min(480, side);
+      const c = document.createElement("canvas");
+      c.width = c.height = out;
+      c.getContext("2d").drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, out, out);
+      URL.revokeObjectURL(url);
+      ok(c.toDataURL("image/jpeg", 0.82));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); fail(); };
+    img.src = url;
+  });
+}
+$("photoIn").onchange = async () => {
+  const f = $("photoIn").files[0];
+  $("photoIn").value = "";
+  if (!f) return;
+  $("photoMsg").textContent = "Subiendo foto…";
+  let data;
+  try { data = await shrink(f); } catch { $("photoMsg").textContent = "No se pudo leer esa imagen. Prueba con otra."; return; }
+  const { error } = await db.rpc("set_photo", { p_code: code, p_photo: data });
+  if (error) { console.error(error); $("photoMsg").textContent = "No se pudo guardar la foto. Intenta de nuevo."; return; }
+  $("photoMsg").textContent = "";
+  showPhoto(data);
+};
+
 // ---- Contactos de WhatsApp ----
 let contacts = [];
 async function loadWa() {
@@ -469,7 +526,7 @@ async function saveSetup() {
 }
 
 setInterval(() => ready && refresh(), 30000);
-document.addEventListener("visibilitychange", () => { if (!document.hidden && ready) refresh(); });
+document.addEventListener("visibilitychange", () => { if (!document.hidden && ready) { refresh(); loadPhoto(); } });
 load();
 </script>
 </body>
