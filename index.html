@@ -31,6 +31,10 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .petHead{position:relative;text-align:center;margin:8px 0 14px}
 .petHead h1{font-size:32px;margin:0;padding:0 72px;overflow-wrap:anywhere}
 .petHead .link{position:absolute;right:0;top:50%;transform:translateY(-50%)}
+.wa{display:block;text-align:center;text-decoration:none;background:#25d366;color:#fff;border-radius:12px;padding:13px;margin-bottom:8px;font-size:16px}
+.wa.alt{background:#fff;color:#128c4b;border:1px solid #25d366}
+.wrow{display:grid;grid-template-columns:1fr 1.3fr 44px;gap:8px;margin-bottom:8px}
+.wrow .x{padding:10px;color:#b91c1c}
 .diff{margin:-2px 0 6px;font-size:12px}
 .note{background:#dcfce7;color:#166534;border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:14px}
 </style>
@@ -79,6 +83,10 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
   <section id="app" class="hidden">
     <p class="muted" id="hello" style="margin-bottom:10px"></p>
     <div id="note" class="note hidden"></div>
+    <div id="waBox" class="card hidden">
+      <div class="head"><p><b>¿Avisar por WhatsApp?</b></p><button class="link" onclick="$('waBox').classList.add('hidden')">✕ Cerrar</button></div>
+      <div id="waBtns"></div>
+    </div>
     <div class="grid">
       <div class="card"><p class="muted">Última comida</p><p class="big" id="fT">--</p><p class="muted" id="fB"></p></div>
       <div class="card"><p class="muted">Último agua</p><p class="big" id="wT">--</p><p class="muted" id="wB"></p></div>
@@ -105,6 +113,20 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
         <div class="grid">
           <button onclick="cancelSched()">Cancelar</button>
           <button class="primary" id="schedSave" onclick="saveSched()">Guardar</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="head"><p><b>Avisos por WhatsApp</b></p><button class="link" id="waEditBtn" onclick="editWa()">✏️ Editar</button></div>
+      <div id="waList"></div>
+      <div id="waEdit" class="hidden">
+        <p class="muted" style="margin-bottom:10px">Nombre y número de quienes quieren recibir el aviso. Ej: +56 9 1234 5678</p>
+        <div id="waRows"></div>
+        <button class="add" onclick="addWaRow('', '')">+ Agregar contacto</button>
+        <p id="waErr" class="muted warn"></p>
+        <div class="grid">
+          <button onclick="cancelWa()">Cancelar</button>
+          <button class="primary" id="waSave" onclick="saveWa()">Guardar</button>
         </div>
       </div>
     </div>
@@ -161,8 +183,10 @@ async function start() {
   ready = true;
   $("pet").textContent = plate.pet_name;
   $("petEditBtn").classList.remove("hidden");
+  renderWa();
   await refresh();
   showName();
+  loadWa();
 }
 
 async function refresh() {
@@ -176,6 +200,7 @@ async function refresh() {
     if ($("petEdit").classList.contains("hidden")) { plate.pet_name = p.data.pet_name; $("pet").textContent = plate.pet_name; }
   }
   render();
+  if (ready) loadWa();
 }
 
 function showName() {
@@ -252,12 +277,13 @@ async function save() {
   await refresh();
   // Aviso: cuánto antes o después del horario se dio esta comida
   const e = last(kind);
-  if (kind === "comida" && e && matches.has(e)) {
-    const s = matches.get(e);
+  const s = kind === "comida" && e && matches.has(e) ? matches.get(e) : null;
+  if (s) {
     showNote(`✅ Comida registrada ${diffText(e.t, s).replace("Se registró ", "")} (${fmt(s)}).`);
   } else {
     showNote(kind === "comida" ? "✅ Comida registrada." : "✅ Agua registrada.");
   }
+  if (e) offerWa(kind, e, s);
 }
 
 let noteTimer;
@@ -332,6 +358,81 @@ async function saveSched() {
   plate.schedule = times;
   cancelSched();
   render();
+}
+
+// ---- Contactos de WhatsApp ----
+let contacts = [];
+async function loadWa() {
+  const { data, error } = await db.rpc("get_whatsapp", { p_code: code });
+  if (!error && Array.isArray(data)) contacts = data;
+  if ($("waEdit").classList.contains("hidden")) renderWa();
+}
+function renderWa() {
+  $("waList").innerHTML = contacts.length
+    ? contacts.map(c => `<div class="row"><span>${esc(c.name)}</span><span class="muted">${esc(prettyPhone(c.phone))}</span></div>`).join("")
+    : `<p class="muted">Sin contactos. También puedes avisar al grupo familiar sin agregar a nadie.</p>`;
+}
+// Deja solo dígitos con código de país. Para Chile acepta "9 1234 5678" o "912345678".
+function cleanPhone(s) {
+  let d = String(s).replace(/\D/g, "");
+  if (d.startsWith("00")) d = d.slice(2);
+  if (d.length === 9 && d.startsWith("9")) d = "56" + d;
+  if (d.length === 8) d = "569" + d;
+  return d.length >= 10 && d.length <= 15 ? d : "";
+}
+function prettyPhone(d) {
+  return d.startsWith("569") && d.length === 11 ? `+56 9 ${d.slice(3, 7)} ${d.slice(7)}` : "+" + d;
+}
+function addWaRow(name, phone) {
+  const r = document.createElement("div");
+  r.className = "wrow";
+  r.innerHTML = `<input placeholder="Nombre" maxlength="30" value="${esc(name)}"><input type="tel" placeholder="+56 9 1234 5678" value="${esc(phone ? prettyPhone(phone) : "")}"><button class="x" title="Quitar" onclick="this.parentNode.remove()">✕</button>`;
+  $("waRows").appendChild(r);
+}
+function editWa() {
+  $("waRows").innerHTML = "";
+  (contacts.length ? contacts : [{ name: "", phone: "" }]).forEach(c => addWaRow(c.name, c.phone));
+  $("waErr").textContent = "";
+  $("waList").classList.add("hidden");
+  $("waEditBtn").classList.add("hidden");
+  $("waEdit").classList.remove("hidden");
+}
+function cancelWa() {
+  $("waEdit").classList.add("hidden");
+  $("waList").classList.remove("hidden");
+  $("waEditBtn").classList.remove("hidden");
+  renderWa();
+}
+async function saveWa() {
+  const list = [];
+  for (const r of $("waRows").querySelectorAll(".wrow")) {
+    const [n, p] = r.querySelectorAll("input");
+    const name = n.value.trim(), raw = p.value.trim();
+    if (!name && !raw) continue;
+    const phone = cleanPhone(raw);
+    if (!name) { $("waErr").textContent = "Falta el nombre de un contacto"; return; }
+    if (!phone) { $("waErr").textContent = `El número de ${name} no parece válido`; return; }
+    list.push({ name, phone });
+  }
+  $("waSave").disabled = true;
+  const { error } = await db.rpc("set_whatsapp", { p_code: code, p_list: list });
+  $("waSave").disabled = false;
+  if (error) { console.error(error); $("waErr").textContent = "No se pudo guardar. Intenta de nuevo."; return; }
+  contacts = list;
+  cancelWa();
+}
+// Botones para avisar después de registrar
+function offerWa(kind, e, slot) {
+  const n = plate.pet_name, hora = fmt(e.t);
+  let msg = kind === "comida"
+    ? `🐾 ${n} ya comió a las ${hora} (lo registró ${e.who}).`
+    : `💧 Le cambiaron el agua a ${n} a las ${hora} (lo registró ${e.who}).`;
+  if (slot) msg += ` ${diffText(e.t, slot)} (${fmt(slot)}).`;
+  const t = encodeURIComponent(msg);
+  $("waBtns").innerHTML = contacts.map(c =>
+    `<a class="wa" target="_blank" rel="noopener" href="https://wa.me/${c.phone}?text=${t}">Avisar a ${esc(c.name)}</a>`
+  ).join("") + `<a class="wa alt" target="_blank" rel="noopener" href="https://wa.me/?text=${t}">Elegir chat o grupo…</a>`;
+  $("waBox").classList.remove("hidden");
 }
 
 async function updatePlate(name, schedule) {
