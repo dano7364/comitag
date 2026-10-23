@@ -89,6 +89,18 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .qr svg{width:100%;height:100%}
 .foot{text-align:center;margin:18px 0 8px}
 .foot .link{font-size:13px;color:var(--muted)}
+main{position:relative}
+.menu{position:absolute;top:17px;left:10px;z-index:40}
+.menuBtn{display:flex;align-items:center;justify-content:center;width:40px;height:40px;padding:0;border-radius:12px;border:none;background:transparent;color:var(--text);cursor:pointer}
+.menuBtn svg{width:24px;height:24px}
+.menuBtn:active,.menuBtn.open{background:var(--card);box-shadow:0 1px 6px var(--shadow)}
+.menuList{position:absolute;top:46px;left:0;width:260px;max-width:calc(100vw - 32px);background:var(--card);border-radius:14px;overflow:hidden;animation:drop .16s ease-out;box-shadow:0 10px 30px var(--shadow),0 0 0 1px var(--line)}
+.menuList button{display:flex;align-items:center;gap:12px;border:none;border-radius:0;border-top:1px solid var(--line);background:none;text-align:left;font-size:15px;padding:14px 16px}
+.menuList button:first-child{border-top:none}
+.menuList button:active{background:var(--line)}
+.menuList .mi{font-style:normal;width:22px;text-align:center;flex:none}
+.menuList .mdanger{color:var(--red)}
+@keyframes drop{from{opacity:0;transform:translateY(-6px)}}
 .bell{margin-top:12px;font-size:14px;padding:11px}
 </style>
 </head>
@@ -202,7 +214,19 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
       </div>
     </div>
     <div class="card"><p><b>Últimos 7 días</b></p><div id="week"></div><div id="hist" style="margin-top:12px"></div></div>
-    <p class="muted" style="text-align:center;line-height:2"><a href="#" onclick="openInvite(); return false">👨‍👩‍👧 Invitar a la familia</a> · <a href="#" onclick="openPinSettings(); return false" id="pinLink">🔒 PIN familiar</a><br><a href="#" onclick="changeName()">Cambiar nombre</a> · <a href="#" onclick="askRemoveHere(); return false">Quitar de este teléfono</a><br><a href="#" onclick="openAddPet(); return false">＋ Agregar otra mascota</a></p>
+    <div class="menu" id="menu">
+      <button class="menuBtn" id="menuBtn" aria-label="Menú" aria-expanded="false" aria-controls="menuList" onclick="toggleMenu()">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <div id="menuList" class="menuList hidden" role="menu">
+        <button role="menuitem" onclick="menuDo(openInvite)"><i class="mi">👨‍👩‍👧</i><span>Invitar a la familia</span></button>
+        <button role="menuitem" onclick="menuDo(openPinSettings)"><i class="mi">🔒</i><span id="pinLink">PIN familiar</span></button>
+        <button role="menuitem" onclick="menuDo(openAddPet)"><i class="mi">＋</i><span>Agregar otra mascota</span></button>
+        <button role="menuitem" onclick="cycleTheme()"><i class="mi">🌓</i><span class="themeLbl">Tema</span></button>
+        <button role="menuitem" onclick="menuDo(changeName)"><i class="mi">✏️</i><span>Cambiar mi nombre</span></button>
+        <button role="menuitem" class="mdanger" onclick="menuDo(askRemoveHere)"><i class="mi">🗑️</i><span>Quitar de este teléfono</span></button>
+      </div>
+    </div>
     <div id="rmBox" class="overlay hidden" onclick="if (event.target === this) askRemoveHere()">
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="rmTitle">
         <p id="rmTitle" style="font-size:18px;margin-top:4px"><b>¿Quitar a <span id="rmName"></span> de este teléfono?</b></p>
@@ -218,7 +242,7 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
   <div id="modal" class="overlay hidden" onclick="if (event.target === this) closeModal()">
     <div class="modal" role="dialog" aria-modal="true" id="modalBody"></div>
   </div>
-  <div class="foot"><button class="link" id="themeBtn" onclick="cycleTheme()"></button></div>
+  <div class="foot" id="foot"><button class="link themeLbl" id="themeBtn" onclick="cycleTheme()"></button></div>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -341,6 +365,7 @@ async function load() {
 
 async function start() {
   ready = true;
+  $("foot").classList.add("hidden");
   $("pet").textContent = plate.pet_name;
   document.title = `${plate.pet_name} · Comitag`;
   rememberPet(code, plate.pet_name);
@@ -828,7 +853,7 @@ function savePin(p) { try { p ? localStorage.setItem(pinKey(), p) : localStorage
 function errText(e, fallback) { return e.cancelled ? "" : (e.friendly || fallback); }
 // Supabase responde "PIN requerido", "PIN incorrecto" o "PIN bloqueado" como texto
 const pinStatus = r => !r.error && typeof r.data === "string" && r.data.startsWith("PIN") ? r.data : "";
-function updatePinLink() { $("pinLink").textContent = hasPin ? "🔒 PIN familiar: activado" : "🔓 Poner PIN familiar"; }
+function updatePinLink() { $("pinLink").textContent = hasPin ? "PIN familiar: activado" : "Poner PIN familiar"; }
 async function loadPin() {
   const { data, error } = await db.rpc("has_pin", { p_code: code });
   if (!error) { hasPin = data === true; cachePut({ hasPin }); } else hasPin = !!cacheGet().hasPin;
@@ -974,7 +999,9 @@ async function openInvite() {
 const darkMQ = matchMedia("(prefers-color-scheme: dark)");
 function themeLabel() {
   const t = document.documentElement.dataset.theme || "auto";
-  $("themeBtn").textContent = { auto: "🌓 Tema: automático", dark: "🌙 Tema: oscuro", light: "☀️ Tema: claro" }[t];
+  const label = { auto: "🌓 Tema: automático", dark: "🌙 Tema: oscuro", light: "☀️ Tema: claro" }[t];
+  $("themeBtn").textContent = label;
+  document.querySelectorAll(".menuList .themeLbl").forEach(el => el.textContent = label.slice(label.indexOf(" ") + 1));
   const dark = t === "dark" || (t === "auto" && darkMQ.matches);
   document.querySelector('meta[name="theme-color"]').content = dark ? "#141413" : "#f4f3ef";
 }
@@ -1054,6 +1081,17 @@ function openAddPet() {
   $("addIn").onkeydown = e => { if (e.key === "Enter") go(); };
   setTimeout(() => $("addIn") && $("addIn").focus(), 50);
 }
+
+// ================= Menú de opciones =================
+function toggleMenu(open) {
+  const show = open ?? $("menuList").classList.contains("hidden");
+  $("menuList").classList.toggle("hidden", !show);
+  $("menuBtn").setAttribute("aria-expanded", show);
+  $("menuBtn").classList.toggle("open", show);
+}
+function menuDo(fn) { toggleMenu(false); fn(); }
+document.addEventListener("click", e => { if (!$("menu").contains(e.target) && !$("menuList").classList.contains("hidden")) toggleMenu(false); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("menuList").classList.contains("hidden")) toggleMenu(false); });
 
 function changeName() { me = null; localStorage.removeItem("comitag_nombre"); showName(); }
 
