@@ -8,48 +8,63 @@
 <link rel="apple-touch-icon" href="/icon.png">
 <meta name="apple-mobile-web-app-title" content="Comitag">
 <meta name="theme-color" content="#f4f3ef">
+<link rel="manifest" href="/manifest.json">
+<script>
+// Tema guardado en este teléfono: "auto" (según el celular), "light" o "dark"
+try { const t = localStorage.getItem("comitag_tema"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch {}
+</script>
 <style>
-body{font-family:system-ui,sans-serif;margin:0;background:#f4f3ef;color:#222}
+:root{--bg:#f4f3ef;--card:#fff;--text:#222;--muted:#777;--line:#eee;--border:#ccc;--chip:#e2dfd8;--blue:#2563eb;--on-blue:#fff;
+--ok-bg:#dcfce7;--ok:#166534;--pend-bg:#fef3c7;--pend:#92400e;--warn:#b45309;--red:#b91c1c;--red-border:#fecaca;--danger:#dc2626;
+--off-bg:#eef2ff;--off:#3730a3;--brand:#a29d92;--photo-bg:#e7e5df;--shadow:rgba(0,0,0,.12);--scrim:rgba(20,18,14,.45);--wa-text:#128c4b;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#141413;--card:#1f1e1c;--text:#ecebe7;--muted:#a19e97;--line:#2e2d2a;--border:#3a3935;--chip:#34332f;--blue:#3b82f6;
+--ok-bg:#12321d;--ok:#86efac;--pend-bg:#3a2a0b;--pend:#fcd34d;--warn:#f59e0b;--red:#f87171;--red-border:#5b2424;
+--off-bg:#1d2240;--off:#a5b4fc;--brand:#7d796f;--photo-bg:#2a2926;--shadow:rgba(0,0,0,.5);--scrim:rgba(0,0,0,.6);--wa-text:#4ade80;color-scheme:dark}}
+:root[data-theme=dark]{--bg:#141413;--card:#1f1e1c;--text:#ecebe7;--muted:#a19e97;--line:#2e2d2a;--border:#3a3935;--chip:#34332f;--blue:#3b82f6;
+--ok-bg:#12321d;--ok:#86efac;--pend-bg:#3a2a0b;--pend:#fcd34d;--warn:#f59e0b;--red:#f87171;--red-border:#5b2424;
+--off-bg:#1d2240;--off:#a5b4fc;--brand:#7d796f;--photo-bg:#2a2926;--shadow:rgba(0,0,0,.5);--scrim:rgba(0,0,0,.6);--wa-text:#4ade80;color-scheme:dark}
+body{font-family:system-ui,sans-serif;margin:0;background:var(--bg);color:var(--text)}
+a{color:var(--blue)}
 main{max-width:420px;margin:auto;padding:16px}
-.card{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px}
+.card{background:var(--card);border-radius:14px;padding:16px;margin-bottom:12px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .big{font-size:28px;font-weight:600;margin:4px 0}
-.muted{color:#777;font-size:13px;margin:0}
-button{font-size:16px;padding:14px;border-radius:12px;border:1px solid #ccc;background:#fff;width:100%}
-.primary{background:#2563eb;color:#fff;border:none}
-.row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-top:1px solid #eee;font-size:14px}
-.ok{background:#dcfce7;color:#166534;padding:3px 8px;border-radius:8px;font-size:12px}
-.pend{background:#fef3c7;color:#92400e;padding:3px 8px;border-radius:8px;font-size:12px}
-.warn{color:#b45309;font-weight:600}
-input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px solid #ccc;border-radius:10px}
+.muted{color:var(--muted);font-size:13px;margin:0}
+button{font-size:16px;padding:14px;border-radius:12px;border:1px solid var(--border);background:var(--card);color:var(--text);width:100%}
+.primary{background:var(--blue);color:var(--on-blue);border:none}
+.row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-top:1px solid var(--line);font-size:14px;gap:8px}
+.ok{background:var(--ok-bg);color:var(--ok);padding:3px 8px;border-radius:8px;font-size:12px}
+.pend{background:var(--pend-bg);color:var(--pend);padding:3px 8px;border-radius:8px;font-size:12px}
+.warn{color:var(--warn);font-weight:600}
+input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text)}
 .hidden{display:none !important}
 #week{display:flex;align-items:flex-end;gap:6px;height:90px}
-.bar{flex:1;text-align:center;font-size:11px;color:#777}
-.bar div{background:#2563eb;border-radius:4px;margin:3px 0}
+.bar{flex:1;text-align:center;font-size:11px;color:var(--muted)}
+.bar div{background:var(--blue);border-radius:4px;margin:3px 0}
 .head{display:flex;justify-content:space-between;align-items:center;gap:8px}
-.link{background:none;border:none;color:#2563eb;font-size:14px;padding:6px 0;width:auto;cursor:pointer}
+.link{background:none;border:none;color:var(--blue);font-size:14px;padding:6px 0;width:auto;cursor:pointer}
 .trow{display:flex;gap:8px;align-items:center;margin-bottom:8px}
 .trow input{flex:1}
-.trow .x{width:44px;padding:10px;color:#b91c1c}
+.trow .x{width:44px;padding:10px;color:var(--red)}
 .add{margin:4px 0 12px}
-.brand{text-align:center;font-size:12px;font-weight:600;letter-spacing:.42em;color:#a29d92;margin:10px 0 4px;padding-left:.42em}
+.brand{text-align:center;font-size:12px;font-weight:600;letter-spacing:.42em;color:var(--brand);margin:10px 0 4px;padding-left:.42em}
 .brand{display:flex;align-items:center;justify-content:center}
 .brand .logo{width:22px;height:22px;margin-left:2px}
 .pets{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:10px 0 2px}
-.pets a{text-decoration:none;font-size:14px;padding:7px 14px;border-radius:999px;background:#fff;color:#444;border:1px solid #e2dfd8}
-.pets a.on{background:#2563eb;color:#fff;border-color:#2563eb}
+.pets a{text-decoration:none;font-size:14px;padding:7px 14px;border-radius:999px;background:var(--card);color:var(--text);border:1px solid var(--chip)}
+.pets a.on{background:var(--blue);color:var(--on-blue);border-color:var(--blue)}
 .pets.list{flex-direction:column;align-items:stretch;margin-top:16px}
 .pets.list a{padding:14px;font-size:16px;text-align:center}
 .pets .link{margin:2px auto 0}
-.prow{display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid #e2dfd8;border-radius:14px;padding:8px 8px 8px 16px;font-size:16px}
-.rm{width:auto;padding:9px 14px;font-size:14px;color:#b91c1c;border-color:#fecaca}
-.overlay{position:fixed;inset:0;background:rgba(20,18,14,.45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:50;animation:fade .15s ease-out}
-.modal{background:#fff;border-radius:18px;padding:20px;max-width:360px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.25);animation:pop .18s ease-out}
+.prow{display:flex;justify-content:space-between;align-items:center;background:var(--card);border:1px solid var(--chip);border-radius:14px;padding:8px 8px 8px 16px;font-size:16px}
+.rm{width:auto;padding:9px 14px;font-size:14px;color:var(--red);border-color:var(--red-border)}
+.overlay{position:fixed;inset:0;background:var(--scrim);display:flex;align-items:center;justify-content:center;padding:16px;z-index:50;animation:fade .15s ease-out}
+.modal{background:var(--card);border-radius:18px;padding:20px;max-width:360px;width:100%;box-sizing:border-box;box-shadow:0 12px 40px rgba(0,0,0,.25);animation:pop .18s ease-out}
 @keyframes fade{from{opacity:0}}
 @keyframes pop{from{transform:scale(.94);opacity:0}}
-.rm.sure,.danger{background:#dc2626;color:#fff;border-color:#dc2626}
+.rm.sure,.danger{background:var(--danger);color:#fff;border-color:var(--danger)}
 .photoBox{text-align:center;margin-top:12px}
-.photo{width:136px;height:136px;border-radius:50%;padding:0;overflow:hidden;border:4px solid #fff;background:#e7e5df;box-shadow:0 2px 10px rgba(0,0,0,.12);color:#777;font-size:13px;cursor:pointer}
+.photo{width:136px;height:136px;border-radius:50%;padding:0;overflow:hidden;border:4px solid var(--card);background:var(--photo-bg);box-shadow:0 2px 10px var(--shadow);color:var(--muted);font-size:13px;cursor:pointer}
 .photo img{width:100%;height:100%;object-fit:cover;display:block}
 .photoBox .link{display:block;margin:4px auto 0;font-size:13px}
 .photoBox .muted:empty{display:none}
@@ -57,18 +72,29 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .petHead h1{font-size:32px;margin:0;padding:0 72px;overflow-wrap:anywhere}
 .petHead .link{position:absolute;right:0;top:50%;transform:translateY(-50%)}
 .wa{display:block;text-align:center;text-decoration:none;background:#25d366;color:#fff;border-radius:12px;padding:13px;margin-bottom:8px;font-size:16px}
-.wa.alt{background:#fff;color:#128c4b;border:1px solid #25d366}
+.wa.alt{background:var(--card);color:var(--wa-text);border:1px solid #25d366}
 .wrow{display:grid;grid-template-columns:1fr 1.3fr 44px;gap:8px;margin-bottom:8px}
-.wrow .x{padding:10px;color:#b91c1c}
-.offline{background:#eef2ff;color:#3730a3;border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:14px}
-.q{color:#92400e;font-size:12px}
+.wrow .x{padding:10px;color:var(--red)}
+.offline{background:var(--off-bg);color:var(--off);border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:14px}
+.q{color:var(--pend);font-size:12px}
 .diff{margin:-2px 0 6px;font-size:12px}
-.note{background:#dcfce7;color:#166534;border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:14px}
+.note{background:var(--ok-bg);color:var(--ok);border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:14px;display:flex;align-items:center;gap:10px}
+.note span{flex:1}
+.note .link{color:var(--ok);font-weight:700;text-decoration:underline;padding:4px 0}
+.enote{display:block;color:var(--muted);font-size:12px;font-style:italic;margin-top:2px;overflow-wrap:anywhere}
+.hx{background:none;border:none;color:var(--muted);width:auto;padding:4px 6px;font-size:14px;cursor:pointer}
+.hrow{display:flex;align-items:center;gap:4px}
+.pin{letter-spacing:.6em;text-align:center;font-size:24px;padding:12px 0 12px .6em}
+.qr{background:#fff;border-radius:14px;padding:12px;width:220px;height:220px;margin:12px auto;display:flex;align-items:center;justify-content:center}
+.qr svg{width:100%;height:100%}
+.foot{text-align:center;margin:18px 0 8px}
+.foot .link{font-size:13px;color:var(--muted)}
+.bell{margin-top:12px;font-size:14px;padding:11px}
 </style>
 </head>
 <body>
 <main>
-  <div class="brand">COMITAG<svg class="logo" viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="42" fill="none" stroke="#2563eb" stroke-width="9"/><g fill="#2563eb"><ellipse cx="60" cy="70" rx="13" ry="11"/><circle cx="42" cy="55" r="6.5"/><circle cx="52" cy="43.5" r="6.5"/><circle cx="68" cy="43.5" r="6.5"/><circle cx="78" cy="55" r="6.5"/></g></svg></div>
+  <div class="brand">COMITAG<svg class="logo" viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="42" fill="none" stroke="var(--blue)" stroke-width="9"/><g fill="var(--blue)"><ellipse cx="60" cy="70" rx="13" ry="11"/><circle cx="42" cy="55" r="6.5"/><circle cx="52" cy="43.5" r="6.5"/><circle cx="68" cy="43.5" r="6.5"/><circle cx="78" cy="55" r="6.5"/></g></svg></div>
   <nav id="pets" class="pets hidden" aria-label="Mis mascotas"></nav>
   <div id="photoBox" class="photoBox hidden">
     <button class="photo" id="photoBtn" onclick="$('photoIn').click()" aria-label="Foto de la mascota">
@@ -127,8 +153,8 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
       <div id="waBtns"></div>
     </div>
     <div class="grid">
-      <div class="card"><p class="muted">Última comida</p><p class="big" id="fT">--</p><p class="muted" id="fB"></p></div>
-      <div class="card"><p class="muted">Último agua</p><p class="big" id="wT">--</p><p class="muted" id="wB"></p></div>
+      <div class="card"><p class="muted">Última comida</p><p class="big" id="fT">--</p><p class="muted" id="fB"></p><p class="enote" id="fN"></p></div>
+      <div class="card"><p class="muted">Último agua</p><p class="big" id="wT">--</p><p class="muted" id="wB"></p><p class="enote" id="wN"></p></div>
     </div>
     <div class="grid" id="actions">
       <button class="primary" onclick="ask('comida')">Ya le di comida</button>
@@ -136,6 +162,7 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
     </div>
     <div class="card hidden" id="confirm">
       <p id="cMsg"></p>
+      <input id="cNote" maxlength="120" placeholder="Nota (opcional): comió poco, media porción…" style="margin-bottom:12px">
       <div class="grid">
         <button onclick="closeC()">Cancelar</button>
         <button class="primary" id="cYes" onclick="save()">Confirmar</button>
@@ -144,6 +171,8 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
     <div class="card" style="margin-top:12px">
       <div class="head"><p><b>Horarios de comida</b></p><button class="link" id="schedEditBtn" onclick="editSched()">✏️ Editar</button></div>
       <div id="sched"></div>
+      <button class="bell hidden" id="bellBtn" onclick="toggleBell()">🔔 Avisarme si se olvida un horario</button>
+      <p class="muted hidden" id="bellMsg" style="margin-top:8px"></p>
       <div id="schedEdit" class="hidden">
         <p class="muted" style="margin-bottom:10px">Pon las horas en que hay que darle comida cada día.</p>
         <div id="schedRows"></div>
@@ -170,7 +199,7 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
       </div>
     </div>
     <div class="card"><p><b>Últimos 7 días</b></p><div id="week"></div><div id="hist" style="margin-top:12px"></div></div>
-    <p class="muted" style="text-align:center"><a href="#" onclick="changeName()">Cambiar nombre</a> · <a href="#" onclick="askRemoveHere(); return false">Quitar de este teléfono</a></p>
+    <p class="muted" style="text-align:center;line-height:2"><a href="#" onclick="openInvite(); return false">👨‍👩‍👧 Invitar a la familia</a> · <a href="#" onclick="openPinSettings(); return false" id="pinLink">🔒 PIN familiar</a><br><a href="#" onclick="changeName()">Cambiar nombre</a> · <a href="#" onclick="askRemoveHere(); return false">Quitar de este teléfono</a></p>
     <div id="rmBox" class="overlay hidden" onclick="if (event.target === this) askRemoveHere()">
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="rmTitle">
         <p id="rmTitle" style="font-size:18px;margin-top:4px"><b>¿Quitar a <span id="rmName"></span> de este teléfono?</b></p>
@@ -182,6 +211,11 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
       </div>
     </div>
   </section>
+  <!-- Ventana reutilizable (PIN, invitar, borrar registro) -->
+  <div id="modal" class="overlay hidden" onclick="if (event.target === this) closeModal()">
+    <div class="modal" role="dialog" aria-modal="true" id="modalBody"></div>
+  </div>
+  <div class="foot"><button class="link" id="themeBtn" onclick="cycleTheme()"></button></div>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -197,7 +231,7 @@ const code = (location.pathname.split("/p/")[1] || "").replace(/\/$/, "");
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt = t => t.toLocaleTimeString("es-CL", {hour:"2-digit", minute:"2-digit"});
-let matches = new Map(), ready = false, plate = null, log = [], pending = null, me = localStorage.getItem("comitag_nombre");
+let histShown = [], matches = new Map(), ready = false, plate = null, log = [], pending = null, me = localStorage.getItem("comitag_nombre");
 
 function ago(t) {
   const m = Math.round((Date.now() - t) / 60000);
@@ -233,7 +267,7 @@ function updateQueueInfo() {
 // Une lo que viene del servidor con lo que está esperando en este teléfono
 function mergeLog() {
   const q = queueGet().filter(x => x.code === code)
-    .map(x => ({ kind: x.kind, who: x.who, created_at: x.at, t: new Date(x.at), queued: true }));
+    .map(x => ({ kind: x.kind, who: x.who, note: x.note, created_at: x.at, t: new Date(x.at), queued: true, qid: x.id }));
   log = [...q, ...serverLog].sort((a, b) => b.t - a.t);
 }
 let syncing = false;
@@ -243,9 +277,11 @@ async function syncQueue() {
   syncing = true;
   try {
     for (const item of queueGet()) {
-      let { error } = await db.rpc("add_entry_at",
-        { p_code: item.code, p_kind: item.kind, p_who: item.who, p_at: item.at, p_client_id: item.id });
-      if (error && error.code === "PGRST202")  // si aún no existe la función nueva, usa la antigua
+      const base = { p_code: item.code, p_kind: item.kind, p_who: item.who, p_at: item.at, p_client_id: item.id };
+      let { error } = await db.rpc("add_entry_at", { ...base, p_note: item.note || null });
+      // Si Supabase todavía tiene una versión anterior de las funciones, usa la que haya
+      if (error && error.code === "PGRST202") ({ error } = await db.rpc("add_entry_at", base));
+      if (error && error.code === "PGRST202")
         ({ error } = await db.rpc("add_entry", { p_code: item.code, p_kind: item.kind, p_who: item.who }));
       if (error && netErr(error)) break;      // sigue sin internet: se intenta más tarde
       if (error) { console.error("Registro rechazado", item, error); rejected.add(item.id); }
@@ -311,11 +347,14 @@ async function start() {
   loadWa();
   $("photoBox").classList.remove("hidden");
   loadPhoto();
+  loadPin();
 }
 
 async function refresh() {
   await syncQueue();
-  const { data, error } = await db.rpc("get_entries", { p_code: code });
+  // get_entries2 trae también las notas; si aún no existe en Supabase, usa la anterior
+  let { data, error } = await db.rpc("get_entries2", { p_code: code });
+  if (error && error.code === "PGRST202") ({ data, error } = await db.rpc("get_entries", { p_code: code }));
   if (error) {
     // Sin internet: mostrar lo último guardado más lo que está por enviar
     serverLog = (cacheGet().entries || []).map(e => ({ ...e, t: new Date(e.created_at) }));
@@ -354,6 +393,8 @@ function render() {
   $("fB").textContent = f ? `${ago(f.t)} · ${f.who}${f.queued ? " · ⏳ por enviar" : ""}` : "Sin registros";
   $("wT").textContent = w ? fmt(w.t) : "--";
   $("wB").textContent = w ? `${ago(w.t)} · ${w.who}${w.queued ? " · ⏳ por enviar" : ""}` : "Sin registros";
+  $("fN").textContent = f && f.note ? `“${f.note}”` : "";
+  $("wN").textContent = w && w.note ? `“${w.note}”` : "";
 
   const hoy = new Date().toDateString();
   const today = log.filter(e => e.kind === "comida" && e.t.toDateString() === hoy).reverse();
@@ -385,9 +426,12 @@ function render() {
     `<div class="bar">${cnt[i]}<div style="height:${Math.round(cnt[i] / mx * 55) + 2}px"></div>${d.toLocaleDateString("es-CL", {weekday:"short"}).slice(0, 2)}</div>`
   ).join("");
 
-  $("hist").innerHTML = log.slice(0, 8).map(e =>
-    `<div class="row"><span>${e.kind === "comida" ? "Comida" : "Agua"} · ${esc(e.who)}${e.queued ? ` <span class="q">⏳ por enviar</span>` : ""}</span><span class="muted">${e.t.toLocaleDateString("es-CL", {weekday:"short", day:"numeric"})} ${fmt(e.t)}</span></div>`
-  ).join("");
+  histShown = log.slice(0, 8);
+  $("hist").innerHTML = histShown.map((e, i) =>
+    `<div class="row"><span>${e.kind === "comida" ? "Comida" : "Agua"} · ${esc(e.who)}${e.queued ? ` <span class="q">⏳ por enviar</span>` : ""}${e.note ? `<span class="enote">“${esc(e.note)}”</span>` : ""}</span>`
+    + `<span class="hrow"><span class="muted">${e.t.toLocaleDateString("es-CL", {weekday:"short", day:"numeric"})} ${fmt(e.t)}</span>`
+    + `<button class="hx" title="Borrar registro" aria-label="Borrar registro" onclick="askDelete(${i})">✕</button></span></div>`
+  ).join("");  bellUI();
 }
 
 function ask(k) {
@@ -396,6 +440,7 @@ function ask(k) {
   $("cMsg").innerHTML = (k === "comida" && l && Date.now() - l.t < 3 * 3600000)
     ? `<span class="warn">Ojo:</span> ${n} ya comió ${ago(l.t)} (lo marcó ${esc(l.who)}). ¿Seguro que quieres marcar otra comida?`
     : `¿Confirmas que ${k === "comida" ? "le diste comida" : "cambiaste el agua"} a ${n} ahora?`;
+  $("cNote").value = "";
   $("confirm").classList.remove("hidden");
   $("actions").classList.add("hidden");
 }
@@ -438,8 +483,9 @@ async function save() {
   unlockAudio();
   $("cYes").disabled = true;
   // Primero queda guardado en el teléfono (con la hora real); después se envía.
+  const note = $("cNote").value.trim().slice(0, 120);
   const item = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 10),
-                 code, kind: pending, who: me, at: new Date().toISOString() };
+                 code, kind: pending, who: me, at: new Date().toISOString(), note: note || null };
   queueSet([...queueGet(), item]);
   for (let i = 0; syncing && i < 50; i++) await new Promise(r => setTimeout(r, 100));
   await syncQueue();
@@ -450,29 +496,48 @@ async function save() {
   const kind = pending;
   closeC();
   await refresh();
+  lastSaved = item;
+  // El registro recién hecho (por su hora exacta), o el último de ese tipo
+  const e = log.find(x => x.kind === kind && Math.abs(x.t - new Date(item.at)) < 1500) || last(kind);
   if (waiting) {
-    showNote("⏳ Quedó guardado en este teléfono. Se enviará solo cuando vuelva internet.");
-    const e = last(kind);
+    showNote("⏳ Quedó guardado en este teléfono. Se enviará solo cuando vuelva internet.", true);
     if (e) offerWa(kind, e, kind === "comida" && matches.has(e) ? matches.get(e) : null);
     return;
   }
   // Aviso: cuánto antes o después del horario se dio esta comida
-  const e = last(kind);
   const s = kind === "comida" && e && matches.has(e) ? matches.get(e) : null;
   if (s) {
-    showNote(`✅ Comida registrada ${diffText(e.t, s).replace("Se registró ", "")} (${fmt(s)}).`);
+    showNote(`✅ Comida registrada ${diffText(e.t, s).replace("Se registró ", "")} (${fmt(s)}).`, true);
   } else {
-    showNote(kind === "comida" ? "✅ Comida registrada." : "✅ Agua registrada.");
+    showNote(kind === "comida" ? "✅ Comida registrada." : "✅ Agua registrada.", true);
   }
   if (e) offerWa(kind, e, s);
 }
 
+// ---- Deshacer el registro recién hecho (no pide PIN: solo quien lo marcó puede) ----
+let lastSaved = null;
+async function undoLast() {
+  const item = lastSaved;
+  if (!item) return;
+  lastSaved = null;
+  $("note").classList.add("hidden");
+  $("waBox").classList.add("hidden");
+  if (queueGet().some(x => x.id === item.id)) {
+    queueSet(queueGet().filter(x => x.id !== item.id));      // aún no se enviaba: basta con sacarlo
+  } else {
+    const { error } = await db.rpc("delete_entry_mine", { p_code: item.code, p_client_id: item.id });
+    if (error) { showNote(netErr(error) ? "No se pudo deshacer: no hay internet." : "No se pudo deshacer. Bórralo desde el historial."); return; }
+  }
+  await refresh();
+  showNote("↩️ Registro deshecho.");
+}
+
 let noteTimer;
-function showNote(msg) {
-  $("note").textContent = msg;
+function showNote(msg, withUndo) {
+  $("note").innerHTML = `<span>${esc(msg)}</span>` + (withUndo ? `<button class="link" onclick="undoLast()">Deshacer</button>` : "");
   $("note").classList.remove("hidden");
   clearTimeout(noteTimer);
-  noteTimer = setTimeout(() => $("note").classList.add("hidden"), 8000);
+  noteTimer = setTimeout(() => { $("note").classList.add("hidden"); if (withUndo) lastSaved = null; }, withUndo ? 15000 : 8000);
 }
 
 $("nameIn").oninput = () => $("nameErr").style.display = "none";
@@ -501,7 +566,7 @@ async function savePet() {
   $("petSave").disabled = true;
   const ok = await updatePlate(v, plate.schedule || []);
   $("petSave").disabled = false;
-  if (!ok) { $("petErr").textContent = "No se pudo guardar. Intenta de nuevo."; return; }
+  if (ok !== true) { $("petErr").textContent = ok; return; }
   plate.pet_name = v;
   $("pet").textContent = v;
   rememberPet(code, v);
@@ -536,7 +601,7 @@ async function saveSched() {
   $("schedSave").disabled = true;
   const ok = await updatePlate(plate.pet_name, times);
   $("schedSave").disabled = false;
-  if (!ok) { $("schedErr").textContent = "No se pudo guardar. Intenta de nuevo."; return; }
+  if (ok !== true) { $("schedErr").textContent = ok; return; }
   plate.schedule = times;
   cancelSched();
   render();
@@ -640,8 +705,8 @@ $("photoIn").onchange = async () => {
   $("photoMsg").textContent = "Subiendo foto…";
   let data;
   try { data = await shrink(f); } catch { $("photoMsg").textContent = "No se pudo leer esa imagen. Prueba con otra."; return; }
-  const { error } = await db.rpc("set_photo", { p_code: code, p_photo: data });
-  if (error) { console.error(error); $("photoMsg").textContent = "No se pudo guardar la foto. Intenta de nuevo."; return; }
+  const { error } = await rpcPin("set_photo", { p_code: code, p_photo: data });
+  if (error) { $("photoMsg").textContent = errText(error, "No se pudo guardar la foto. Intenta de nuevo."); return; }
   $("photoMsg").textContent = "";
   showPhoto(data);
 };
@@ -702,9 +767,9 @@ async function saveWa() {
     list.push({ name, phone });
   }
   $("waSave").disabled = true;
-  const { error } = await db.rpc("set_whatsapp", { p_code: code, p_list: list });
+  const { error } = await rpcPin("set_whatsapp", { p_code: code, p_list: list });
   $("waSave").disabled = false;
-  if (error) { console.error(error); $("waErr").textContent = "No se pudo guardar. Intenta de nuevo."; return; }
+  if (error) { $("waErr").textContent = errText(error, "No se pudo guardar. Intenta de nuevo."); return; }
   contacts = list;
   cancelWa();
 }
@@ -715,6 +780,7 @@ function offerWa(kind, e, slot) {
     ? `🐾 ${n} ya comió a las ${hora} (lo registró ${e.who}).`
     : `💧 Le cambiaron el agua a ${n} a las ${hora} (lo registró ${e.who}).`;
   if (slot) msg += ` ${diffText(e.t, slot)} (${fmt(slot)}).`;
+  if (e.note) msg += ` Nota: “${e.note}”`;
   const t = encodeURIComponent(msg);
   $("waBtns").innerHTML = contacts.map(c =>
     `<a class="wa" target="_blank" rel="noopener" href="https://wa.me/${c.phone}?text=${t}">Avisar a ${esc(c.name)}</a>`
@@ -723,9 +789,241 @@ function offerWa(kind, e, slot) {
 }
 
 async function updatePlate(name, schedule) {
-  const { error } = await db.rpc("update_plate", { p_code: code, p_pet_name: name, p_schedule: schedule });
-  if (error) console.error(error);
-  return !error;
+  const { error } = await rpcPin("update_plate", { p_code: code, p_pet_name: name, p_schedule: schedule });
+  return error ? errText(error, "No se pudo guardar. Intenta de nuevo.") : true;
+}
+
+// ================= Ventana reutilizable =================
+let modalResolve = null;
+function openModal(html, resolve) {
+  if (modalResolve) { const r = modalResolve; modalResolve = null; r(null); }
+  $("modalBody").innerHTML = html;
+  $("modal").classList.remove("hidden");
+  document.body.style.overflow = "hidden";
+  modalResolve = resolve || null;
+}
+function closeModal(value) {
+  $("modal").classList.add("hidden");
+  document.body.style.overflow = "";
+  const r = modalResolve; modalResolve = null;
+  if (r) r(value ?? null);
+}
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && !$("modal").classList.contains("hidden")) closeModal();
+});
+
+// ================= PIN familiar =================
+// Se pide para cambiar nombre, horarios, contactos, foto o borrar registros.
+// Marcar comida o agua (y deshacer lo propio) nunca lo pide.
+let hasPin = false;
+const PIN_RE = /^[0-9]{4,6}$/;
+const pinKey = () => "comitag_pin_" + code;
+function getPin() { try { return localStorage.getItem(pinKey()) || ""; } catch { return ""; } }
+function savePin(p) { try { p ? localStorage.setItem(pinKey(), p) : localStorage.removeItem(pinKey()); } catch {} }
+function errText(e, fallback) { return e.cancelled ? "" : (e.friendly || fallback); }
+// Supabase responde "PIN requerido", "PIN incorrecto" o "PIN bloqueado" como texto
+const pinStatus = r => !r.error && typeof r.data === "string" && r.data.startsWith("PIN") ? r.data : "";
+function updatePinLink() { $("pinLink").textContent = hasPin ? "🔒 PIN familiar: activado" : "🔓 Poner PIN familiar"; }
+async function loadPin() {
+  const { data, error } = await db.rpc("has_pin", { p_code: code });
+  if (!error) { hasPin = data === true; cachePut({ hasPin }); } else hasPin = !!cacheGet().hasPin;
+  updatePinLink();
+}
+async function rpcPin(fn, args) {
+  let pin = getPin(), remember = true;
+  for (let i = 0; i < 6; i++) {
+    let r = await db.rpc(fn, { ...args, p_pin: pin || null });
+    if (r.error && r.error.code === "PGRST202") r = await db.rpc(fn, args);  // Supabase aún sin el SQL del PIN
+    if (r.error) {
+      console.error(r.error);
+      return { error: { ...r.error, friendly: netErr(r.error) ? "No hay internet. Intenta cuando vuelva la conexión." : "" } };
+    }
+    const st = pinStatus(r);
+    if (!st) { if (pin && remember) savePin(pin); return r; }
+    if (st === "PIN bloqueado") return { error: { friendly: "Demasiados intentos con PIN incorrecto. Espera 15 minutos." } };
+    savePin("");
+    if (!hasPin) { hasPin = true; updatePinLink(); }
+    const ans = await askPin(st === "PIN incorrecto" ? "PIN incorrecto. Intenta de nuevo." : "");
+    if (!ans) return { error: { cancelled: true } };
+    ({ pin, remember } = ans);
+  }
+  return { error: { friendly: "No se pudo guardar." } };
+}
+function askPin(msg) {
+  return new Promise(res => {
+    openModal(`<p style="font-size:18px;margin-top:4px"><b>🔒 PIN familiar</b></p>
+      <p class="muted">Para hacer cambios en ${esc(plate.pet_name)} se necesita el PIN de la familia.</p>
+      <input id="pinIn" class="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="6" style="margin-top:12px" aria-label="PIN">
+      <label class="muted" style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="pinRem" checked style="width:auto"> Recordar en este teléfono</label>
+      <p id="pinErr" class="muted warn" style="margin-top:8px">${esc(msg || "")}</p>
+      <div class="grid" style="margin-top:12px"><button onclick="closeModal()">Cancelar</button><button class="primary" id="pinOk">Continuar</button></div>`, res);
+    const go = () => {
+      const v = $("pinIn").value.trim();
+      if (!PIN_RE.test(v)) { $("pinErr").textContent = "El PIN tiene de 4 a 6 números."; return; }
+      closeModal({ pin: v, remember: $("pinRem").checked });
+    };
+    $("pinOk").onclick = go;
+    $("pinIn").onkeydown = e => { if (e.key === "Enter") go(); };
+    setTimeout(() => $("pinIn") && $("pinIn").focus(), 50);
+  });
+}
+function openPinSettings() {
+  openModal(`<p style="font-size:18px;margin-top:4px"><b>${hasPin ? "🔒 PIN familiar" : "🔓 Poner PIN familiar"}</b></p>
+    <p class="muted">${hasPin
+      ? "Para cambiar el PIN escribe el actual y el nuevo. Para quitarlo, deja el nuevo en blanco."
+      : "Con un PIN, se pedirá para cambiar el nombre, los horarios, los contactos, la foto o para borrar registros. Marcar comida o agua sigue siendo con un toque."}</p>
+    ${hasPin ? '<p style="margin-top:12px"><b>PIN actual</b></p><input id="pinOld" class="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="6" aria-label="PIN actual">' : ""}
+    <p style="margin-top:12px"><b>${hasPin ? "PIN nuevo" : "PIN (4 a 6 números)"}</b></p>
+    <input id="pinNew" class="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="6" aria-label="PIN nuevo">
+    <p id="pinErr" class="muted warn" style="margin-top:8px"></p>
+    <div class="grid" style="margin-top:12px"><button onclick="closeModal()">Cancelar</button><button class="primary" id="pinSave">Guardar</button></div>`);
+  $("pinSave").onclick = async () => {
+    const old = hasPin ? $("pinOld").value.trim() : null, nw = $("pinNew").value.trim();
+    if (hasPin && !PIN_RE.test(old)) { $("pinErr").textContent = "Escribe el PIN actual."; return; }
+    if ((!hasPin || nw) && !PIN_RE.test(nw)) { $("pinErr").textContent = "El PIN tiene de 4 a 6 números."; return; }
+    $("pinSave").disabled = true;
+    const r = await db.rpc("set_pin", { p_code: code, p_old: old, p_new: nw || null });
+    $("pinSave").disabled = false;
+    if (r.error) {
+      $("pinErr").textContent = r.error.code === "PGRST202" ? "Falta agregar el PIN en Supabase (parte 1 del SQL)."
+        : netErr(r.error) ? "No hay internet." : "No se pudo guardar.";
+      return;
+    }
+    const st = pinStatus(r);
+    if (st === "PIN bloqueado") { $("pinErr").textContent = "Demasiados intentos. Espera 15 minutos."; return; }
+    if (st) { $("pinErr").textContent = "El PIN actual no es correcto."; return; }
+    hasPin = !!nw; savePin(nw || ""); cachePut({ hasPin }); updatePinLink(); closeModal();
+    showNote(nw ? "🔒 PIN familiar guardado. Compártelo solo con tu familia." : "🔓 PIN familiar quitado.");
+  };
+}
+
+// ================= Borrar un registro del historial =================
+function askDelete(i) {
+  const e = histShown[i];
+  if (!e) return;
+  const label = `${e.kind === "comida" ? "Comida" : "Agua"} · ${e.who} · ${e.t.toLocaleDateString("es-CL", {weekday:"short", day:"numeric"})} ${fmt(e.t)}`;
+  openModal(`<p style="font-size:18px;margin-top:4px"><b>¿Borrar este registro?</b></p>
+    <p class="muted">${esc(label)}${e.note ? ` · “${esc(e.note)}”` : ""}</p>
+    ${hasPin && !e.queued ? '<p class="muted" style="margin-top:6px">Se pedirá el PIN familiar.</p>' : ""}
+    <div class="grid" style="margin-top:16px"><button onclick="closeModal()">Cancelar</button><button class="danger" id="delOk">Borrar</button></div>`);
+  $("delOk").onclick = async () => {
+    closeModal();
+    if (e.queued) { queueSet(queueGet().filter(x => x.id !== e.qid)); await refresh(); showNote("🗑️ Registro borrado."); return; }
+    const r = await rpcPin("delete_entry", { p_code: code, p_kind: e.kind, p_at: e.created_at });
+    if (r.error) {
+      if (!r.error.cancelled) showNote(r.error.code === "PGRST202" ? "Falta agregar la función para borrar en Supabase (parte 1 del SQL)."
+        : errText(r.error, "No se pudo borrar. Intenta de nuevo."));
+      return;
+    }
+    await refresh();
+    showNote("🗑️ Registro borrado.");
+  };
+}
+
+// ================= Invitar a la familia con QR =================
+const QR_LIB = "https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js";
+function loadScript(src) {
+  return new Promise((ok, fail) => {
+    const s = document.createElement("script");
+    s.src = src; s.onload = ok; s.onerror = fail;
+    document.head.appendChild(s);
+  });
+}
+function qrSvg(text) {
+  const qr = qrcode(0, "M"); qr.addData(text); qr.make();
+  const n = qr.getModuleCount(); let d = "";
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) d += `M${c} ${r}h1v1h-1z`;
+  return `<svg viewBox="-2 -2 ${n + 4} ${n + 4}" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" role="img" aria-label="Código QR"><path d="${d}" fill="#111"/></svg>`;
+}
+async function openInvite() {
+  const url = `${location.origin}/p/${code}`, pet = plate.pet_name;
+  const text = `Registra aquí cuándo le das comida a ${pet} 🐾`;
+  openModal(`<p style="font-size:18px;margin-top:4px"><b>👨‍👩‍👧 Invitar a la familia</b></p>
+    <p class="muted">Que escaneen este código con la cámara del celular, o compárteles el link. Así ven a ${esc(pet)} sin acercarse al plato.</p>
+    <div class="qr" id="qrBox"><span class="muted">Cargando…</span></div>
+    <p class="muted" style="text-align:center;overflow-wrap:anywhere;font-size:12px">${esc(url)}</p>
+    <div class="grid" style="margin-top:12px"><button id="copyBtn">Copiar link</button><button class="primary" id="shareBtn">Compartir</button></div>
+    <p class="muted" style="margin-top:12px;font-size:12px">${hasPin
+      ? "Cualquiera con el link puede marcar comidas; para hacer cambios se pide el PIN."
+      : "Ojo: cualquiera con el link puede ver y cambiar todo. Si quieres, pon un PIN familiar."}</p>
+    <button class="link" style="display:block;margin:6px auto 0" onclick="closeModal()">Cerrar</button>`);
+  $("copyBtn").onclick = async () => {
+    try { await navigator.clipboard.writeText(url); $("copyBtn").textContent = "✓ Copiado"; }
+    catch { $("copyBtn").textContent = "Mantén presionado el link"; }
+  };
+  if (navigator.share) {
+    $("shareBtn").onclick = () => navigator.share({ title: `${pet} en Comitag`, text, url }).catch(() => {});
+  } else {
+    $("shareBtn").textContent = "Por WhatsApp";
+    $("shareBtn").onclick = () => window.open(`https://wa.me/?text=${encodeURIComponent(text + " " + url)}`, "_blank", "noopener");
+  }
+  try {
+    if (!window.qrcode) await loadScript(QR_LIB);
+    if ($("qrBox")) $("qrBox").innerHTML = qrSvg(url);
+  } catch {
+    if ($("qrBox")) $("qrBox").innerHTML = '<span class="muted" style="text-align:center">Se necesita internet para mostrar el código QR. Igual puedes compartir el link.</span>';
+  }
+}
+
+// ================= Tema (claro / oscuro / automático) =================
+const darkMQ = matchMedia("(prefers-color-scheme: dark)");
+function themeLabel() {
+  const t = document.documentElement.dataset.theme || "auto";
+  $("themeBtn").textContent = { auto: "🌓 Tema: automático", dark: "🌙 Tema: oscuro", light: "☀️ Tema: claro" }[t];
+  const dark = t === "dark" || (t === "auto" && darkMQ.matches);
+  document.querySelector('meta[name="theme-color"]').content = dark ? "#141413" : "#f4f3ef";
+}
+function cycleTheme() {
+  const order = ["auto", "dark", "light"];
+  const next = order[(order.indexOf(document.documentElement.dataset.theme || "auto") + 1) % 3];
+  if (next === "auto") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = next;
+  try { localStorage.setItem("comitag_tema", next); } catch {}
+  themeLabel();
+}
+darkMQ.addEventListener && darkMQ.addEventListener("change", themeLabel);
+themeLabel();
+
+// ================= Avisos cuando un horario queda pendiente =================
+const VAPID_PUBLIC = "BCFMLLdbNHMbvwnAqw_1p5K5GFEh2DrJbSxsN0CbNYHA_4Au_MFU4qem_UZ4tgp1k3eAIZrI9jDYg_N7ATMRoD4";
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const isStandalone = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const bellKey = () => "comitag_aviso_" + code;
+function b64u(s) {
+  const b = atob((s + "=".repeat((4 - s.length % 4) % 4)).replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from(b, c => c.charCodeAt(0));
+}
+function bellOn() { return lsGet(bellKey(), false) && typeof Notification !== "undefined" && Notification.permission === "granted"; }
+function bellUI() {
+  if (!plate) return;
+  const on = bellOn();
+  $("bellBtn").classList.toggle("hidden", !(plate.schedule || []).length && !on);
+  $("bellBtn").textContent = on ? "🔕 Dejar de avisarme" : "🔔 Avisarme si se olvida un horario";
+  if (on) { $("bellMsg").textContent = "Este teléfono recibirá un aviso si pasan 15 minutos de un horario y nadie registró la comida."; $("bellMsg").classList.remove("hidden"); }
+}
+async function toggleBell() {
+  const say = t => { $("bellMsg").textContent = t; $("bellMsg").classList.remove("hidden"); };
+  if (bellOn()) {
+    try {
+      const reg = await navigator.serviceWorker.ready, sub = await reg.pushManager.getSubscription();
+      if (sub) await db.rpc("remove_push", { p_code: code, p_endpoint: sub.endpoint });
+    } catch {}
+    lsSet(bellKey(), false); $("bellMsg").classList.add("hidden"); bellUI();
+    return;
+  }
+  if (isIOS && !isStandalone()) return say("En iPhone, primero agrega Comitag a la pantalla de inicio (botón Compartir → “Agregar a inicio”), ábrelo desde ese ícono y vuelve a tocar este botón.");
+  if (!("serviceWorker" in navigator) || !("PushManager" in window) || typeof Notification === "undefined")
+    return say("Este navegador no permite avisos. Prueba con Chrome o Safari actualizados.");
+  if (!navigator.onLine) return say("Necesitas internet para activar los avisos.");
+  const perm = await Notification.requestPermission();
+  if (perm !== "granted") return say("No se activaron: hay que permitir las notificaciones de Comitag en los ajustes del teléfono.");
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = (await reg.pushManager.getSubscription())
+      || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(VAPID_PUBLIC) });
+    const { error } = await db.rpc("save_push", { p_code: code, p_sub: sub.toJSON() });
+    if (error) return say(error.code === "PGRST202" ? "Falta configurar los avisos en Supabase (parte 2)." : "No se pudo activar. Intenta de nuevo.");
+    lsSet(bellKey(), true); bellUI();
+  } catch (e) { console.error(e); say("No se pudo activar los avisos en este teléfono."); }
 }
 
 function changeName() { me = null; localStorage.removeItem("comitag_nombre"); showName(); }
@@ -747,7 +1045,7 @@ async function saveSetup() {
   $("setBtn").disabled = true;
   const ok = await updatePlate(pet, times);
   $("setBtn").disabled = false;
-  if (!ok) { $("setErr").textContent = "No se pudo guardar. Intenta de nuevo."; return; }
+  if (ok !== true) { $("setErr").textContent = ok; return; }
   if (!me) { me = who; localStorage.setItem("comitag_nombre", who); }
   plate.pet_name = pet;
   plate.schedule = times;
