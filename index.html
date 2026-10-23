@@ -119,6 +119,9 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
     </div>
   </section>
   <p id="err" class="muted warn"></p>
+  <div id="addPetBox" class="hidden" style="text-align:center;margin-top:14px">
+    <button class="link" onclick="openAddPet()">🔗 Abrir una mascota con su link</button>
+  </div>
 
   <section id="setup" class="card hidden">
     <p class="muted">Este plato todavía no está configurado. Solo hay que hacerlo una vez y queda listo para toda la familia.</p>
@@ -199,7 +202,7 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
       </div>
     </div>
     <div class="card"><p><b>Últimos 7 días</b></p><div id="week"></div><div id="hist" style="margin-top:12px"></div></div>
-    <p class="muted" style="text-align:center;line-height:2"><a href="#" onclick="openInvite(); return false">👨‍👩‍👧 Invitar a la familia</a> · <a href="#" onclick="openPinSettings(); return false" id="pinLink">🔒 PIN familiar</a><br><a href="#" onclick="changeName()">Cambiar nombre</a> · <a href="#" onclick="askRemoveHere(); return false">Quitar de este teléfono</a></p>
+    <p class="muted" style="text-align:center;line-height:2"><a href="#" onclick="openInvite(); return false">👨‍👩‍👧 Invitar a la familia</a> · <a href="#" onclick="openPinSettings(); return false" id="pinLink">🔒 PIN familiar</a><br><a href="#" onclick="changeName()">Cambiar nombre</a> · <a href="#" onclick="askRemoveHere(); return false">Quitar de este teléfono</a><br><a href="#" onclick="openAddPet(); return false">＋ Agregar otra mascota</a></p>
     <div id="rmBox" class="overlay hidden" onclick="if (event.target === this) askRemoveHere()">
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="rmTitle">
         <p id="rmTitle" style="font-size:18px;margin-top:4px"><b>¿Quitar a <span id="rmName"></span> de este teléfono?</b></p>
@@ -311,6 +314,8 @@ async function load() {
     $("err").textContent = getPets().length
       ? "Elige una mascota, o acerca tu celular a la pegatina de otro plato."
       : "Acerca tu celular a la pegatina del plato para abrir la página de tu mascota.";
+    $("pets").after($("addPetBox"));
+    $("addPetBox").classList.remove("hidden");
     return;
   }
   let { data, error } = await db.rpc("get_plate", { p_code: code });
@@ -1024,6 +1029,30 @@ async function toggleBell() {
     if (error) return say(error.code === "PGRST202" ? "Falta configurar los avisos en Supabase (parte 2)." : "No se pudo activar. Intenta de nuevo.");
     lsSet(bellKey(), true); bellUI();
   } catch (e) { console.error(e); say("No se pudo activar los avisos en este teléfono."); }
+}
+
+// ================= Abrir una mascota con su link o código =================
+// Útil en la app de la pantalla de inicio del iPhone, que no comparte memoria con Safari.
+function codeFromText(t) {
+  t = String(t).trim();
+  const m = t.match(/\/p\/([A-Za-z0-9_-]{4,40})/);
+  if (m) return m[1];
+  return /^[A-Za-z0-9_-]{4,40}$/.test(t) ? t : "";
+}
+function openAddPet() {
+  openModal(`<p style="font-size:18px;margin-top:4px"><b>🔗 Abrir una mascota</b></p>
+    <p class="muted">Pega el link de la mascota (por ejemplo, el que te mandaron con “Invitar a la familia”) o su código.</p>
+    <input id="addIn" placeholder="https://comitag.vercel.app/p/…" autocomplete="off" autocapitalize="off" style="margin-top:12px">
+    <p id="addErr" class="muted warn" style="margin-top:8px"></p>
+    <div class="grid" style="margin-top:12px"><button onclick="closeModal()">Cancelar</button><button class="primary" id="addOk">Abrir</button></div>`);
+  const go = () => {
+    const c = codeFromText($("addIn").value);
+    if (!c) { $("addErr").textContent = "Ese link no parece de Comitag. Revisa que esté completo."; return; }
+    location.href = "/p/" + encodeURIComponent(c);
+  };
+  $("addOk").onclick = go;
+  $("addIn").onkeydown = e => { if (e.key === "Enter") go(); };
+  setTimeout(() => $("addIn") && $("addIn").focus(), 50);
 }
 
 function changeName() { me = null; localStorage.removeItem("comitag_nombre"); showName(); }
