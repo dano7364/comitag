@@ -46,12 +46,14 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .trow{display:flex;gap:8px;align-items:center;margin-bottom:8px}
 .trow input{flex:1;min-width:0}
 .trow select{flex:none;width:auto;max-width:42%;font-size:16px;padding:12px 8px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text)}
-.tqSteps{font-size:14px;line-height:1.5;color:var(--muted)}
-.tqSteps ol,.tqSteps ul{padding-left:22px;margin:4px 0 0}
-.tqSteps li{margin:3px 0}
-.tqSteps b{color:var(--text)}
-.tqH{margin:14px 0 0;font-weight:700;color:var(--text);font-size:15px}
 .modal{max-height:calc(100dvh - 32px);overflow-y:auto;-webkit-overflow-scrolling:touch}
+.autoSheet{position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));max-width:440px;margin:0 auto;z-index:45;padding:16px}
+#autoBox.autoSheet{background:var(--glass-strong);box-shadow:0 12px 40px rgba(0,0,0,.28)}
+.auN{display:inline-block;min-width:1.4em;text-align:center;font-weight:700;color:var(--blue)}
+.auBar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin:12px 0}
+.auBar i{display:block;height:100%;width:100%;background:var(--blue);transform-origin:left;animation:auFill linear forwards}
+@keyframes auFill{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.auCancel{width:100%;font-size:17px;padding:14px}
 .tqSel{font-size:16px;padding:12px 10px;width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text)}
 .trow .x{width:44px;padding:10px;color:var(--red)}
 .add{margin:4px 0 12px}
@@ -358,7 +360,7 @@ body::before{animation:drift 28s ease-in-out infinite alternate;will-change:tran
       </button>
       <div id="menuList" class="menuList hidden" role="menu">
         <button role="menuitem" onclick="menuDo(openInvite)"><i class="mi">👨‍👩‍👧</i><span>Invitar a la familia</span></button>
-        <button role="menuitem" onclick="menuDo(openToque)"><i class="mi">📲</i><span>Registrar con un toque</span></button>
+        <button role="menuitem" onclick="menuDo(openAuto)"><i class="mi">📲</i><span>Registrar al acercar</span></button>
         <button role="menuitem" onclick="menuDo(openPinSettings)"><i class="mi">🔒</i><span id="pinLink">PIN familiar</span></button>
         <button role="menuitem" onclick="menuDo(openAddPet)"><i class="mi">＋</i><span>Agregar otra mascota</span></button>
         <button role="menuitem" onclick="cycleTheme()"><i class="mi">🌓</i><span class="themeLbl">Tema</span></button>
@@ -531,6 +533,7 @@ async function start() {
   $("photoBox").classList.remove("hidden");
   loadPhoto();
   loadPin();
+  autoRun();
 }
 
 async function refresh() {
@@ -1327,81 +1330,100 @@ function qrSvg(text) {
   for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) d += `M${c} ${r}h1v1h-1z`;
   return `<svg viewBox="-2 -2 ${n + 4} ${n + 4}" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" role="img" aria-label="Código QR"><path d="${d}" fill="#111"/></svg>`;
 }
-// ================= Registrar con un toque (Atajos de iPhone) =================
-function toqueUrl(kind, pet) {
-  const p = new URLSearchParams({ c: code, k: kind, w: me || "" });
-  const pin = getPinFor(code); if (pin) p.set("pin", pin);
-  if (pet) p.set("m", pet);
-  return `${location.origin}/api/toque?${p}`;
-}
-function openToque() {
-  const pets = petsOf();
-  openModal(`<p style="font-size:18px;margin-top:4px"><b>📲 Registrar con un toque</b></p>
-    <p class="muted">Con la app <b>Atajos</b> del iPhone, al acercar el teléfono al plato se registra solo y te llega un aviso. No se abre nada. Si alguien ya le dio comida hace menos de 30 min, te avisa y no la registra de nuevo.</p>
-    <div class="grid" style="margin-top:10px">
-      <select id="tqKind" class="tqSel" aria-label="Qué registra"><option value="comida">🍽️ Comida</option><option value="agua">💧 Agua</option></select>
-      ${pets.length ? `<select id="tqPet" class="tqSel" aria-label="Para quién"><option value="">Para todas</option>${pets.map(p => `<option>${esc(p)}</option>`).join("")}</select>` : ""}
-    </div>
-    <div class="grid" style="margin-top:10px"><button id="tqCopy" class="primary">1 · Copiar enlace</button><button id="tqTest">Probar</button></div>
-    <p id="tqMsg" class="muted" style="font-size:13px;min-height:1em"></p>
-    <div class="tqSteps">
-      <p class="tqH">Paso 1 · Copia tu enlace</p>
-      <ol start="1">
-        <li>Arriba elige qué registra el tag (comida o agua)${pets.length ? " y para quién" : ""}.</li>
-        <li>Toca <b>Probar</b>. Debe decir <b>✅ Todo listo</b>.</li>
-        <li>Toca <b>Copiar enlace</b> (cambia a <b>✓ Copiado</b>).</li>
-      </ol>
-      <p class="tqH">Paso 2 · Crea la automatización</p>
-      <ol start="4">
-        <li>Abre la app <b>Atajos</b> (ícono de dos cuadrados de colores; ya viene en el iPhone).</li>
-        <li>Abajo toca la pestaña <b>Automatización</b>.</li>
-        <li>Toca <b>＋</b> arriba a la derecha (o <b>Nueva automatización</b>).</li>
-        <li>Baja en la lista y toca <b>NFC</b>.</li>
-        <li>Junto a <b>Etiqueta NFC</b> toca <b>Escanear</b> y acerca la <b>parte de arriba</b> del iPhone a la pegatina del plato.</li>
-        <li>Ponle un nombre, por ejemplo <b>Plato ${esc(plate.pet_name || "")}</b>, y toca <b>OK</b>.</li>
-        <li>Marca <b>Ejecutar inmediatamente</b> y apaga <b>Notificar al ejecutarse</b>. Toca <b>Siguiente</b>.</li>
-        <li>Toca <b>Nuevo atajo en blanco</b>.</li>
-      </ol>
-      <p class="tqH">Paso 3 · Pega el enlace</p>
-      <ol start="12">
-        <li>Toca la barra <b>Buscar</b> de abajo y escribe <b>URL</b>.</li>
-        <li>Elige <b>Obtener contenido de URL</b> (flechita verde).</li>
-        <li>En ese bloque toca la palabra azul <b>URL</b>, mantén presionado y elige <b>Pegar</b>. Debe verse <i>https://comitag.vercel.app/api/toque?…</i></li>
-      </ol>
-      <p class="tqH">Paso 4 · Agrega el aviso</p>
-      <ol start="15">
-        <li>Toca otra vez <b>Buscar</b>, escribe <b>notificación</b> y elige <b>Mostrar notificación</b> (campanita roja).</li>
-        <li>Toca el texto <b>Hola mundo</b> y bórralo.</li>
-        <li>En la barrita que aparece sobre el teclado toca <b>Contenido de URL</b>. Debe quedar como una burbuja azul.</li>
-        <li>Opcional: en <b>Título</b> escribe <b>Comitag 🐾</b>.</li>
-      </ol>
-      <p class="tqH">Paso 5 · Guarda y prueba</p>
-      <ol start="19">
-        <li>Toca la flecha <b>‹</b> arriba a la izquierda: queda guardado solo.</li>
-        <li>Sal de Atajos, con el iPhone desbloqueado acerca la parte de arriba al plato. Te llegará un aviso que empieza con <b>✅</b>.</li>
-      </ol>
-      <p class="tqH">¿Algo no funciona?</p>
-      <ul>
-        <li><b>No aparece NFC:</b> se necesita un iPhone XS o más nuevo.</li>
-        <li><b>Pregunta antes de ejecutarse:</b> entra a la automatización y activa <b>Ejecutar inmediatamente</b> (o el interruptor <b>Automatización</b>).</li>
-        <li><b>Llega “🔒 PIN…”:</b> cambiaron el PIN. Copia el enlace de nuevo y reemplázalo en el paso 14.</li>
-        <li><b>Además aparece “Abrir comitag.vercel.app”:</b> ignóralo, el registro ya se hizo.</li>
-      </ul>
-    </div>
-    <p class="muted" style="font-size:12px;margin-top:10px">Cada persona lo arma en su propio iPhone, porque el enlace lleva su nombre${getPinFor(code) ? " y el PIN familiar (no lo compartas)" : ""}.</p>
-    <button class="link" style="display:block;margin:6px auto 0" onclick="closeModal()">Cerrar</button>`);
-  const url = () => toqueUrl($("tqKind").value, $("tqPet") ? $("tqPet").value : "");
-  $("tqCopy").onclick = async () => {
-    try { await navigator.clipboard.writeText(url()); $("tqCopy").textContent = "✓ Copiado"; }
-    catch { $("tqMsg").textContent = url(); }
-  };
-  $("tqTest").onclick = async () => {
-    $("tqMsg").textContent = "Probando…";
-    try { const r = await fetch(url() + "&prueba=1", { cache: "no-store" }); $("tqMsg").textContent = await r.text(); }
-    catch { $("tqMsg").textContent = "Sin conexión: prueba de nuevo con internet."; }
+// ================= Registrar al acercar (modo un toque) =================
+// Si este teléfono lo activó, al abrir la página desde la pegatina se registra solo
+// tras una cuenta regresiva de 3 segundos (con botón Cancelar).
+const AUTO_SEG = 3, AUTO_REPETIDA_MIN = 30;
+const autoKey = () => "comitag_auto_" + code;
+function autoGet() { try { return JSON.parse(localStorage.getItem(autoKey())) || null; } catch { return null; } }
+function autoSet(v) { try { v ? localStorage.setItem(autoKey(), JSON.stringify(v)) : localStorage.removeItem(autoKey()); } catch {} }
+
+function openAuto() {
+  const cfg = autoGet() || {}, pets = petsOf();
+  openModal(`<p style="font-size:18px;margin-top:4px"><b>📲 Registrar al acercar</b></p>
+    <p class="muted">Al acercar <b>este teléfono</b> a la pegatina del plato se abre Comitag y, después de una cuenta de ${AUTO_SEG} segundos, se registra solo. Puedes tocar <b>Cancelar</b> antes.</p>
+    <p class="muted" style="margin-top:8px">Si alguien ya le dio comida hace menos de ${AUTO_REPETIDA_MIN} min, te avisa y no registra nada.</p>
+    <p class="muted" style="margin:14px 0 6px"><b>Al acercar este teléfono, registrar:</b></p>
+    <select id="auKind" class="tqSel" aria-label="Qué registrar">
+      <option value="">Nada (abrir la página como siempre)</option>
+      <option value="comida"${cfg.kind === "comida" ? " selected" : ""}>🍽️ Comida</option>
+      <option value="agua"${cfg.kind === "agua" ? " selected" : ""}>💧 Agua</option>
+    </select>
+    ${pets.length ? `<select id="auPet" class="tqSel" style="margin-top:8px" aria-label="Para quién">
+      <option value="">Para todas</option>${pets.map(p => `<option${cfg.pet === p ? " selected" : ""}>${esc(p)}</option>`).join("")}</select>` : ""}
+    <div class="grid" style="margin-top:14px"><button onclick="closeModal()">Cancelar</button><button class="primary" id="auSave">Guardar</button></div>
+    <p class="muted" style="font-size:12px;margin-top:12px">Se activa solo en este teléfono: cada persona lo elige en el suyo. En iPhone, al acercarlo aparece un aviso arriba: tócalo y se registra. Al abrir Comitag desde el ícono de la pantalla de inicio no se registra nada.</p>`);
+  $("auSave").onclick = () => {
+    const kind = $("auKind").value, pet = $("auPet") ? $("auPet").value : "";
+    autoSet(kind ? { kind, pet: pet || null } : null);
+    closeModal();
+    showNote(kind ? `📲 Listo: al acercar este teléfono se registrará ${kind === "comida" ? "comida" : "agua"}.` : "📲 Registrar al acercar: desactivado.");
   };
 }
 
+// ¿Esta vez se abrió desde la pegatina? (no desde el ícono, ni al recargar o volver atrás)
+function openedFromTag() {
+  const standalone = (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone;
+  if (standalone) return false;
+  const nav = performance.getEntriesByType && performance.getEntriesByType("navigation")[0];
+  if (nav && nav.type !== "navigate") return false;
+  try { if (sessionStorage.getItem("comitag_auto_hecho_" + code)) return false; } catch {}
+  return true;
+}
+
+let autoTimer = null;
+function autoSheet(html) {
+  let el = $("autoBox");
+  if (!el) { el = document.createElement("div"); el.id = "autoBox"; el.className = "card autoSheet"; el.setAttribute("role", "status"); document.body.appendChild(el); }
+  el.innerHTML = html; el.classList.remove("hidden");
+  return el;
+}
+function autoClose() { clearInterval(autoTimer); autoTimer = null; const el = $("autoBox"); if (el) el.classList.add("hidden"); }
+
+function autoRun() {
+  const cfg = autoGet();
+  if (!cfg || !me || !openedFromTag()) return;
+  try { sessionStorage.setItem("comitag_auto_hecho_" + code, "1"); } catch {}
+  const kind = cfg.kind, pets = petsOf();
+  let sel = [null];
+  if (kind === "comida") {
+    const targets = cfg.pet && pets.includes(cfg.pet) ? [cfg.pet] : (pets.length ? pets : [null]);
+    const fed = targets.map(p => ({ p, e: log.find(x => x.kind === "comida" && (p === null || !x.pet || x.pet === p)) }))
+                       .filter(x => x.e && Date.now() - x.e.t < AUTO_REPETIDA_MIN * 60000);
+    sel = targets.filter(p => !fed.some(f => f.p === p));
+    if (!sel.length) {
+      const f = fed[0], quien = f.e.who === me ? "Tú ya" : `${esc(f.e.who)} ya`;
+      const a = fed.length > 1 ? joinNames(fed.map(x => x.p)) : (f.p || plate.pet_name);
+      autoSheet(`<p style="margin:0 0 6px"><b>⚠️ ${quien} le dio comida a ${esc(a)}</b></p>
+        <p class="muted">A las ${fmt(f.e.t)} (${ago(f.e.t)}). No registré nada para no repetir.</p>
+        <div class="grid" style="margin-top:12px"><button onclick="autoClose()">Cerrar</button><button id="auForce">Registrar igual</button></div>`);
+      $("auForce").onclick = () => { autoClose(); autoSave(kind, targets); };
+      return;
+    }
+  }
+  const quien = sel[0] ? joinNames(sel) : plate.pet_name;
+  const lbl = kind === "comida" ? `🍽️ Registrando comida de ${esc(quien)}` : `💧 Registrando agua de ${esc(plate.pet_name)}`;
+  let n = AUTO_SEG;
+  autoSheet(`<p style="margin:0"><b>${lbl}…</b> <span id="auN" class="auN">${n}</span></p>
+    <div class="auBar"><i style="animation-duration:${AUTO_SEG}s"></i></div>
+    <button class="auCancel" onclick="autoClose(); showNote('Cancelado: no se registró nada.')">Cancelar</button>`);
+  autoTimer = setInterval(() => {
+    n--;
+    if (n > 0) { const el = $("auN"); if (el) el.textContent = n; return; }
+    autoClose();
+    autoSave(kind, sel);
+  }, 1000);
+}
+function autoSave(kind, sel) {
+  ask(kind);
+  if (kind === "comida" && petsOf().length) {
+    $("cPets").querySelectorAll(".chip").forEach(b => {
+      const on = sel.includes(b.dataset.p) || sel[0] === null;
+      b.classList.toggle("on", on); b.setAttribute("aria-pressed", on);
+    });
+  }
+  save();
+}
 async function openInvite() {
   const url = `${location.origin}/p/${code}`, pet = plate.pet_name;
   const text = `Registra aquí cuándo le das comida a ${pet} 🐾`;
