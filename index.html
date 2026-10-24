@@ -995,7 +995,56 @@ function removeThisPet() {
 }
 
 // ---- Foto de la mascota ----
+// ---- Colores del fondo según la foto de la mascota ----
+function rgb2hsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2;
+  if (mx === mn) return [0, 0, l];
+  const d = mx - mn, s = l > .5 ? d / (2 - mx - mn) : d / (mx + mn);
+  const h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [h * 60, s, l];
+}
+const hsl = (h, s, l, a) => `hsla(${Math.round(h)},${Math.round(s * 100)}%,${Math.round(l * 100)}%,${a})`;
+// Busca hasta 4 colores principales (agrupando por tono) en una versión chiquita de la foto
+function photoPalette(img) {
+  const c = document.createElement("canvas"); c.width = c.height = 36;
+  const x = c.getContext("2d", { willReadFrequently: true }); x.drawImage(img, 0, 0, 36, 36);
+  const px = x.getImageData(0, 0, 36, 36).data, bins = Array.from({ length: 12 }, () => ({ w: 0, h: 0, s: 0, l: 0 }));
+  let grayW = 0, grayL = 0;
+  for (let i = 0; i < px.length; i += 4) {
+    const [h, s, l] = rgb2hsl(px[i], px[i + 1], px[i + 2]);
+    if (l < .08 || l > .96) continue;
+    if (s < .12) { grayW++; grayL += l; continue; }
+    const w = s * (1 - Math.abs(l - .5)), b = bins[Math.floor(h / 30) % 12];
+    b.w += w; b.h += h * w; b.s += s * w; b.l += l * w;
+  }
+  const cols = bins.filter(b => b.w > 0).sort((a, b) => b.w - a.w).slice(0, 4).map(b => ({ h: b.h / b.w, s: b.s / b.w, l: b.l / b.w }));
+  if (!cols.length) return { cols: [{ h: 220, s: .1, l: grayW ? grayL / grayW : .5 }], gray: true };
+  return { cols, gray: false };
+}
+function applyPalette(pal) {
+  let el = document.getElementById("petPalette");
+  if (!pal) { if (el) el.remove(); return; }
+  const c = pal.cols, at = i => c[i % c.length];
+  // Claro: tonos pastel luminosos · Oscuro: tonos profundos (mismas transparencias que antes)
+  const L = i => { const k = at(i); return hsl(k.h, pal.gray ? .08 : Math.min(.85, Math.max(.45, k.s)), .68, [.55, .38, .38, .30][i]); };
+  const D = i => { const k = at(i); return hsl(k.h, pal.gray ? .08 : Math.min(.8, Math.max(.4, k.s)), .38, [.45, .30, .30, .22][i]); };
+  const vars = f => `--blob1:${f(0)};--blob2:${f(1)};--blob3:${f(2)};--blob4:${f(3)};`;
+  if (!el) { el = document.createElement("style"); el.id = "petPalette"; document.head.appendChild(el); }
+  el.textContent = `:root{${vars(L)}}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){${vars(D)}}}
+:root[data-theme=dark]{${vars(D)}}`;
+}
+function applyPhotoTheme(src) {
+  if (!src) { applyPalette(null); return; }
+  const cached = cacheGet().palette;
+  if (cached && cached.src === src.length) applyPalette(cached.pal);
+  const img = new Image();
+  img.onload = () => { try { const pal = photoPalette(img); applyPalette(pal); cachePut({ palette: { src: src.length, pal } }); } catch {} };
+  img.src = src;
+}
 function showPhoto(src) {
+  applyPhotoTheme(src);
   $("photoImg").src = src || "";
   $("photoImg").classList.toggle("hidden", !src);
   $("photoEmpty").classList.toggle("hidden", !!src);
