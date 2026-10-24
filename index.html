@@ -159,6 +159,58 @@ input,select{background:var(--glass-input)!important;border:1px solid var(--glas
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
   .card,.modal,.menuList,.prow,.pets a,#waBox{background:var(--card)}}
 
+/* ================= Movimiento estilo Apple (resortes) ================= */
+:root{--spring:cubic-bezier(.34,1.45,.55,1);--spring-soft:cubic-bezier(.22,1.15,.36,1);--ease-out:cubic-bezier(.2,.8,.2,1)}
+@supports (transition-timing-function:linear(0,1)){
+  :root{--spring:linear(0,.009,.035 2.1%,.141 4.4%,.723 12.9%,.938 16.7%,1.017,1.077 22.4%,1.099 24.6%,1.091 27.4%,1.035 33.6%,1.005 37.9%,.988 42.2%,.993 52.7%,1);
+        --spring-soft:linear(0,.028 1.9%,.124 4.2%,.554 12%,.784 17.1%,.937 22.6%,1.018 28.4%,1.044 33.5%,1.035 39.5%,1.006 50.4%,.998 62.6%,1)}}
+/* Cambio suave entre mascotas y páginas (navegadores que lo soportan) */
+@view-transition{navigation:auto}
+::view-transition-old(root),::view-transition-new(root){animation-duration:.35s;animation-timing-function:var(--ease-out)}
+/* Entrada escalonada al abrir */
+@keyframes rise{from{opacity:0;transform:translateY(18px) scale(.97)}to{opacity:1;transform:none}}
+.enter{animation:rise .75s var(--spring-soft) both;animation-delay:calc(var(--i,0) * 55ms)}
+/* Al presionar: se hunde un poco y rebota al soltar */
+button,.pets a,.photo,.wa{transition:transform .45s var(--spring),box-shadow .3s var(--ease-out),background-color .25s,color .25s,border-color .25s}
+button:active,.pets a:active,.wa:active{transform:scale(.95);transition-duration:.12s}
+.photo:active{transform:scale(.96)}
+.menuBtn:active{transform:scale(.88)}
+/* Ventanas emergentes: aparecen con resorte */
+@keyframes popIn{from{opacity:0;transform:translateY(10px) scale(.9)}to{opacity:1;transform:none}}
+@keyframes fadeIn{from{opacity:0}}
+.overlay{animation:fadeIn .25s var(--ease-out)}
+.modal{animation:popIn .55s var(--spring)}
+/* Menú: se despliega desde el ícono */
+@keyframes menuIn{from{opacity:0;transform:scale(.6) translate(-8px,-8px)}to{opacity:1;transform:none}}
+.menuList{transform-origin:20px 0;animation:menuIn .5s var(--spring)}
+.menuList button{animation:rise .5s var(--spring-soft) both}
+.menuList button:nth-child(1){animation-delay:30ms}.menuList button:nth-child(2){animation-delay:60ms}
+.menuList button:nth-child(3){animation-delay:90ms}.menuList button:nth-child(4){animation-delay:120ms}
+.menuList button:nth-child(5){animation-delay:150ms}.menuList button:nth-child(6){animation-delay:180ms}
+.menuBtn svg path{transition:d .35s var(--spring)}
+/* Avisos verdes/azules: bajan con rebote */
+@keyframes dropIn{from{opacity:0;transform:translateY(-14px) scale(.96)}to{opacity:1;transform:none}}
+#note:not(.hidden),#offline:not(.hidden),#waBox:not(.hidden),#confirm:not(.hidden),#gate:not(.hidden),#setup:not(.hidden),
+#petEdit:not(.hidden),#schedEdit:not(.hidden),#waEdit:not(.hidden){animation:dropIn .55s var(--spring)}
+/* Botones de mascotas al marcar la comida */
+.chip{transition:transform .4s var(--spring),background-color .2s,color .2s,border-color .2s}
+@keyframes chipOn{0%{transform:scale(1)}40%{transform:scale(1.12)}100%{transform:scale(1)}}
+.chip.on{animation:chipOn .45s var(--spring)}
+/* Al registrar: la tarjeta de "Última comida/agua" late una vez */
+@keyframes pulse{0%{transform:scale(1)}35%{transform:scale(1.045)}100%{transform:scale(1)}}
+.pulse{animation:pulse .6s var(--spring)}
+.big{transition:color .3s}
+/* Filas nuevas del historial y horarios entran suavemente */
+@keyframes rowIn{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:none}}
+.row.fresh{animation:rowIn .5s var(--spring-soft) both}
+/* El fondo de color se mueve muy lento, como en iOS */
+@keyframes drift{0%{transform:translate3d(0,0,0) scale(1)}50%{transform:translate3d(3%,-2%,0) scale(1.06)}100%{transform:translate3d(-2%,3%,0) scale(1.02)}}
+body::before{animation:drift 28s ease-in-out infinite alternate;will-change:transform}
+/* Respeta a quien prefiere menos movimiento (Ajustes → Accesibilidad) */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition-duration:.01ms!important}
+  @view-transition{navigation:none}}
+
 </style>
 </head>
 <body>
@@ -507,9 +559,25 @@ async function refresh() {
   if (ready) loadWa();
 }
 
+// Entrada escalonada (solo la primera vez)
+let entered = false;
+function animateIn() {
+  if (entered) return; entered = true;
+  const els = [$("photoBox"), $("petView"), ...$("app").querySelectorAll(":scope > .grid, :scope > .card, :scope > p")]
+    .filter(el => el && !el.classList.contains("hidden"));
+  els.forEach((el, i) => { el.style.setProperty("--i", i); el.classList.add("enter");
+    el.addEventListener("animationend", () => el.classList.remove("enter"), { once: true }); });
+}
+// Hace "latir" un elemento una vez
+function pulse(el) {
+  if (!el) return;
+  el.classList.remove("pulse"); void el.offsetWidth; el.classList.add("pulse");
+  el.addEventListener("animationend", () => el.classList.remove("pulse"), { once: true });
+}
 function showName() {
   $("nameBox").classList.toggle("hidden", !!me);
   $("app").classList.toggle("hidden", !me);
+  if (me) requestAnimationFrame(animateIn);
   $("hello").textContent = me ? `Hola, ${me}` : "";
 }
 
@@ -719,6 +787,8 @@ async function save() {
     showNote("✅ Agua registrada.", true);
   }
   if (e) offerWa(kind, e, s, names);
+  pulse($(kind === "comida" ? "fT" : "wT").closest(".card"));
+  const first = $("hist").querySelector(".row"); if (first) first.classList.add("fresh");
 }
 
 // ---- Deshacer lo recién marcado ----
