@@ -4,44 +4,91 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>Anuncios · Comitag</title>
+<title>Panel · Comitag</title>
 <link rel="icon" href="/icon.png">
 <style>
-:root{--bg:#f4f3ef;--card:#fff;--text:#222;--muted:#777;--line:#eee;--border:#ddd;--blue:#2563eb;--ok:#15803d;--warn:#b45309}
-@media (prefers-color-scheme:dark){:root{--bg:#141413;--card:#1f1e1c;--text:#ecebe7;--muted:#a19e97;--line:#2e2d2a;--border:#3a3935;--blue:#3b82f6;--ok:#4ade80;--warn:#fbbf24}}
+:root{--bg:#f4f3ef;--card:#fff;--text:#222;--text2:#555;--muted:#777;--line:#eee;--grid:#e6e4de;--border:#ddd;--blue:#2563eb;
+  --ok:#15803d;--okbg:#dcfce7;--warn:#b45309;--warnbg:#fef3c7;--bad:#b91c1c;--badbg:#fee2e2;--chip:#ebe9e3}
+@media (prefers-color-scheme:dark){:root{--bg:#141413;--card:#1f1e1c;--text:#ecebe7;--text2:#c9c6bf;--muted:#a19e97;--line:#2e2d2a;--grid:#34332f;--border:#3a3935;--blue:#3b82f6;
+  --ok:#4ade80;--okbg:#14301f;--warn:#fbbf24;--warnbg:#33290f;--bad:#f87171;--badbg:#3a1616;--chip:#2c2b28}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
-main{max-width:520px;margin:0 auto;padding:20px 16px 60px}
-.brand{text-align:center;letter-spacing:6px;color:var(--muted);font-size:13px;margin:6px 0 18px}
-h1{font-size:24px;margin:0 0 4px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;margin-top:14px}
+main{max-width:560px;margin:0 auto;padding:16px 16px 70px}
+.brand{text-align:center;letter-spacing:6px;color:var(--muted);font-size:13px;margin:6px 0 14px}
+h1{font-size:22px;margin:0 0 4px}
+h2{font-size:17px;margin:0 0 8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin-top:14px}
 .muted{color:var(--muted);font-size:14px;margin:0}
 label{display:block;font-weight:600;margin:14px 0 6px}
-input[type=text],input[type=password],input[type=url],textarea{width:100%;font:inherit;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--bg);color:var(--text)}
-textarea{min-height:110px;resize:vertical}
+input[type=text],input[type=password],input[type=url],input[type=number],input[type=search],input[type=datetime-local],textarea,select{
+  width:100%;font:inherit;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--bg);color:var(--text)}
+textarea{min-height:100px;resize:vertical}
 .count{float:right;font-weight:400;color:var(--muted);font-size:13px}
 .chk{display:flex;gap:10px;align-items:flex-start;margin-top:14px;font-weight:400}
-.chk input{width:20px;height:20px;margin-top:2px}
-button{font:inherit;border:1px solid var(--border);background:var(--card);color:var(--text);border-radius:12px;padding:12px 16px;cursor:pointer}
-button.primary{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600;width:100%;margin-top:16px}
+.chk input{width:20px;height:20px;margin-top:2px;flex:none}
+button{font:inherit;border:1px solid var(--border);background:var(--card);color:var(--text);border-radius:12px;padding:11px 15px;cursor:pointer}
+button.primary{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600}
+button.wide{width:100%;margin-top:16px}
+button.small{padding:7px 11px;font-size:14px;border-radius:10px}
+button.danger{color:var(--bad)}
 button:disabled{opacity:.5}
 button.link{border:none;background:none;color:var(--blue);padding:4px 0}
-.stats{display:flex;gap:10px;margin-top:12px}
-.stat{flex:1;background:var(--bg);border-radius:12px;padding:12px;text-align:center}
-.stat b{display:block;font-size:24px}
-.pv{margin-top:10px;border-radius:16px;padding:12px 14px;background:var(--bg);border:1px solid var(--line)}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding:2px;margin:0 -16px;padding:0 16px 4px;scrollbar-width:none}
+.tabs button{flex:none;border-radius:99px;padding:8px 14px;font-size:15px;background:var(--chip);border-color:transparent}
+.tabs button[aria-selected=true]{background:var(--text);color:var(--bg)}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{border-radius:99px;padding:7px 12px;font-size:14px;background:var(--chip);border-color:transparent}
+.seg button.on{background:var(--text);color:var(--bg)}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
+.stat b{display:block;font-size:26px;font-variant-numeric:tabular-nums}
+.stat span{color:var(--muted);font-size:13px}
+.pv{margin-top:10px;border-radius:14px;padding:12px 14px;background:var(--bg);border:1px solid var(--line)}
 .pv .t{font-weight:700}
 .pv .s{font-size:12px;color:var(--muted);margin-bottom:4px}
 .item{border-top:1px solid var(--line);padding:12px 0}
 .item:first-child{border-top:none}
-.tag{font-size:12px;border-radius:99px;padding:2px 8px;background:var(--bg);color:var(--muted)}
-.tag.on{color:var(--ok)}
+.row{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.tag{font-size:12px;border-radius:99px;padding:2px 9px;white-space:nowrap;background:var(--chip);color:var(--text2)}
+.tag.ok{background:var(--okbg);color:var(--ok)}
+.tag.warn{background:var(--warnbg);color:var(--warn)}
+.tag.bad{background:var(--badbg);color:var(--bad)}
 .msg{margin-top:10px;font-size:14px}
-.err{color:var(--warn)}
+.err{color:var(--bad)}
 .hidden{display:none!important}
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:20}
 .modal{background:var(--card);border-radius:18px;padding:20px;max-width:380px;width:100%}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+.links{font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;overflow-wrap:anywhere}
+.links button{flex:none;white-space:nowrap;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.plate{cursor:pointer}
+.plate .meta{color:var(--muted);font-size:13px;margin-top:2px}
+/* gráficos */
+.chart{position:relative;margin-top:8px}
+.chart svg{display:block;width:100%;height:150px;overflow:visible}
+.chart .gl{stroke:var(--grid);stroke-width:1}
+.chart .ax{fill:var(--muted);font-size:11px}
+.chart rect.b{fill:var(--blue)}
+.chart rect.hit{fill:transparent;cursor:pointer}
+.chart rect.hit:hover + rect.b,.chart rect.b.hl{opacity:.75}
+.tip{position:absolute;pointer-events:none;background:var(--text);color:var(--bg);font-size:12px;padding:5px 8px;border-radius:8px;white-space:nowrap;transform:translate(-50%,-110%)}
+table.tv{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+table.tv td,table.tv th{border-bottom:1px solid var(--line);padding:4px 2px;text-align:left}
+table.tv td:last-child,table.tv th:last-child{text-align:right;font-variant-numeric:tabular-nums}
+/* semáforo */
+.light{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-top:1px solid var(--line)}
+.light:first-child{border-top:none}
+.light .ic{font-size:20px;line-height:1.2}
+/* hoja para imprimir QR */
+#printSheet{display:none}
+@media print{
+  body{background:#fff;color:#000}
+  main,.overlay{display:none!important}
+  #printSheet{display:grid;grid-template-columns:repeat(3,1fr);gap:8mm;padding:6mm}
+  #printSheet .q{text-align:center;font:10pt/1.3 -apple-system,sans-serif;break-inside:avoid}
+  #printSheet svg{width:42mm;height:42mm}
+}
 </style>
 </head>
 <body>
@@ -50,75 +97,158 @@ button.link{border:none;background:none;color:var(--blue);padding:4px 0}
 
   <!-- Entrar con la clave de dueño -->
   <section id="login" class="card">
-    <h1>Anuncios</h1>
+    <h1>Panel del dueño</h1>
     <p class="muted">Solo para el dueño de Comitag. Escribe tu clave de dueño.</p>
     <label for="key">Clave de dueño</label>
     <input id="key" type="password" autocomplete="current-password">
     <p id="loginErr" class="msg err"></p>
-    <button class="primary" id="loginBtn">Entrar</button>
+    <button class="primary wide" id="loginBtn">Entrar</button>
   </section>
 
-  <!-- Panel -->
-  <section id="panel" class="hidden">
-    <h1>Mandar un anuncio</h1>
-    <p class="muted">Aparece arriba en la página de todas las familias y, si quieres, también llega como notificación.</p>
-    <div class="stats">
-      <div class="stat"><b id="nPlates">–</b><span class="muted">platos</span></div>
-      <div class="stat"><b id="nPhones">–</b><span class="muted">teléfonos con notificaciones</span></div>
-    </div>
+  <div id="panel" class="hidden">
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="anuncios" aria-selected="true">📣 Anuncios</button>
+      <button role="tab" data-tab="pegatinas" aria-selected="false">🏷️ Pegatinas</button>
+      <button role="tab" data-tab="platos" aria-selected="false">🍽️ Platos</button>
+      <button role="tab" data-tab="numeros" aria-selected="false">📊 Números</button>
+      <button role="tab" data-tab="sistema" aria-selected="false">🚦 Sistema</button>
+    </nav>
 
-    <div class="card">
-      <label for="title">Título <span class="count" id="cTitle">0/60</span></label>
-      <input id="title" type="text" maxlength="60" placeholder="Nueva función en Comitag">
-      <label for="body">Mensaje <span class="count" id="cBody">0/300</span></label>
-      <textarea id="body" maxlength="300" placeholder="Ahora cada mascota puede tener su propia foto. ¡Pruébalo!"></textarea>
-      <label for="link">Link (opcional)</label>
-      <input id="link" type="url" placeholder="https://…">
-      <label class="chk"><input type="checkbox" id="push" checked> <span>Mandar también como notificación al teléfono<br><span class="muted">Llega a los teléfonos que activaron 🔔 Avisarme.</span></span></label>
+    <!-- ===== Anuncios ===== -->
+    <section data-pane="anuncios">
+      <div class="card">
+        <h2>Mandar un anuncio</h2>
+        <p class="muted">Aparece arriba en la página y, si quieres, llega como notificación.</p>
+        <label for="to">¿Para quién?</label>
+        <select id="to"><option value="">Todas las familias</option></select>
+        <label for="title">Título <span class="count" id="cTitle">0/60</span></label>
+        <input id="title" type="text" maxlength="60" placeholder="Nueva función en Comitag">
+        <label for="body">Mensaje <span class="count" id="cBody">0/300</span></label>
+        <textarea id="body" maxlength="300" placeholder="Ahora cada mascota puede tener su propia foto. ¡Pruébalo!"></textarea>
+        <label for="link">Link (opcional)</label>
+        <input id="link" type="url" placeholder="https://…">
+        <label>¿Cuándo?</label>
+        <div class="seg" id="when"><button class="on" data-w="now">Ahora</button><button data-w="later">Programar</button></div>
+        <input id="sendAt" type="datetime-local" class="hidden" style="margin-top:8px">
+        <label class="chk"><input type="checkbox" id="push" checked> <span>Mandar también como notificación al teléfono<br><span class="muted">Llega a los teléfonos que activaron 🔔 Avisarme.</span></span></label>
+        <p class="muted" style="margin-top:16px"><b>Así se verá</b></p>
+        <div class="pv" id="pvNote"><div class="s">COMITAG · ahora</div><div class="t" id="pvT1">📣 Título</div><div id="pvB1">Mensaje</div></div>
+        <div class="pv"><div class="s">En la página</div><div class="t" id="pvT2">Título</div><div id="pvB2">Mensaje</div></div>
+        <button class="primary wide" id="sendBtn">Enviar</button>
+        <p id="sendMsg" class="msg"></p>
+      </div>
+      <div class="card">
+        <h2>Últimos anuncios</h2>
+        <div id="annList"><p class="muted">Cargando…</p></div>
+      </div>
+    </section>
 
-      <p class="muted" style="margin-top:16px"><b>Así se verá</b></p>
-      <div class="pv" id="pvNote"><div class="s">COMITAG · ahora</div><div class="t" id="pvT1">📣 Título</div><div id="pvB1">Mensaje</div></div>
-      <div class="pv"><div class="s">En la página</div><div class="t" id="pvT2">Título</div><div id="pvB2">Mensaje</div></div>
+    <!-- ===== Pegatinas ===== -->
+    <section data-pane="pegatinas" class="hidden">
+      <div class="card">
+        <h2>Crear pegatinas nuevas</h2>
+        <p class="muted">Cada pegatina es un plato nuevo. La familia lo configura la primera vez que acerca el teléfono.</p>
+        <label for="nNew">¿Cuántas?</label>
+        <input id="nNew" type="number" min="1" max="100" value="10" inputmode="numeric">
+        <button class="primary wide" id="createBtn">Crear pegatinas</button>
+        <p id="createMsg" class="msg"></p>
+      </div>
+      <div class="card" id="newBox">
+        <div class="row"><h2 style="margin:0">Pegatinas sin entregar</h2><span class="tag" id="nFree">–</span></div>
+        <p class="muted" style="margin-top:4px">Graba cada link en una pegatina con NFC Tools (Escribir → Agregar registro → URL). El QR sirve de respaldo.</p>
+        <div class="actions"><button class="small" id="copyAll">Copiar todos los links</button><button class="small" id="printQr">Imprimir QR</button></div>
+        <div id="freeList" class="links" style="margin-top:10px"></div>
+      </div>
+    </section>
 
-      <button class="primary" id="sendBtn">Enviar a todas las familias</button>
-      <p id="sendMsg" class="msg"></p>
-    </div>
+    <!-- ===== Platos ===== -->
+    <section data-pane="platos" class="hidden">
+      <div class="card">
+        <input id="q" type="search" placeholder="Buscar por mascota o código">
+        <div class="seg" id="pf" style="margin-top:10px">
+          <button class="on" data-f="all">Todos</button><button data-f="active">Activos</button>
+          <button data-f="sleep">Dormidos</button><button data-f="new">Sin configurar</button><button data-f="off">Desactivados</button>
+        </div>
+        <div id="plateList" style="margin-top:8px"><p class="muted">Cargando…</p></div>
+      </div>
+      <p class="muted" style="margin-top:10px;padding:0 4px">Por privacidad, aquí solo se ve lo necesario para dar soporte: no se ven notas ni quién registró cada comida.</p>
+    </section>
 
-    <div class="card">
-      <p style="margin:0"><b>Últimos anuncios</b></p>
-      <div id="list"><p class="muted">Cargando…</p></div>
-    </div>
+    <!-- ===== Números ===== -->
+    <section data-pane="numeros" class="hidden">
+      <div class="stats">
+        <div class="stat"><b id="sConf">–</b><span>platos configurados</span></div>
+        <div class="stat"><b id="sAct">–</b><span>activos esta semana</span></div>
+        <div class="stat"><b id="sPh">–</b><span>teléfonos con notificaciones</span></div>
+        <div class="stat"><b id="sFree">–</b><span>pegatinas sin entregar</span></div>
+      </div>
+      <div class="card"><div class="row"><h2 style="margin:0">Comidas registradas por día</h2><button class="link" data-tv="cMeals">Ver tabla</button></div>
+        <p class="muted">Últimos 30 días · una comida para varias mascotas cuenta una vez</p><div class="chart" id="cMeals"></div></div>
+      <div class="card"><div class="row"><h2 style="margin:0">Familias nuevas por día</h2><button class="link" data-tv="cNew">Ver tabla</button></div>
+        <p class="muted">Últimos 30 días · día de su primer registro</p><div class="chart" id="cNew"></div></div>
+      <div class="card"><div class="row"><h2 style="margin:0">Avisos “no ha comido” por día</h2><button class="link" data-tv="cAlerts">Ver tabla</button></div>
+        <p class="muted">Últimos 30 días · horarios que quedaron sin registrar</p><div class="chart" id="cAlerts"></div></div>
+    </section>
+
+    <!-- ===== Sistema ===== -->
+    <section data-pane="sistema" class="hidden">
+      <div class="card">
+        <div class="row"><h2 style="margin:0">Estado del sistema</h2><button class="small" id="healthBtn">Revisar</button></div>
+        <div id="health" style="margin-top:6px"><p class="muted">Cargando…</p></div>
+      </div>
+    </section>
+
     <p style="text-align:center;margin-top:18px"><button class="link" id="logout">Salir de este teléfono</button></p>
-  </section>
+  </div>
 </main>
 
 <div id="confirm" class="overlay hidden">
   <div class="modal">
-    <p style="font-size:18px;margin:0 0 8px"><b>¿Enviar el anuncio?</b></p>
+    <p style="font-size:18px;margin:0 0 8px"><b id="confirmTitle"></b></p>
     <p class="muted" id="confirmText"></p>
-    <div class="grid"><button id="cancelBtn">Cancelar</button><button class="primary" style="margin:0" id="okBtn">Enviar</button></div>
+    <div class="grid2"><button id="cancelBtn">Cancelar</button><button class="primary" id="okBtn">Sí</button></div>
   </div>
 </div>
+<div id="printSheet"></div>
 
 <script>
 const FN = "https://nwenbwkpvmfozzfwjsuq.supabase.co/functions/v1/anuncio";
 const PUB = "sb_publishable_bo4ntmZshkQk9lSiadueKg_ANPjpuRa";
+const SITE = "https://comitag.vercel.app";
+const QR_LIB = "https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js";
 const $ = id => document.getElementById(id);
-const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const plural = (n, a, b) => `${n} ${n === 1 ? a : b}`;
+const nfcLink = c => `${SITE}/p/${c}?nfc=1`;
+const fmtDate = d => new Date(d).toLocaleString("es-CL", { dateStyle: "medium", timeStyle: "short", hourCycle: "h23" });
+function ago(d) {
+  if (!d) return "nunca";
+  const m = Math.round((Date.now() - new Date(d)) / 60000);
+  if (m < 60) return m < 1 ? "recién" : `hace ${m} min`;
+  const h = Math.round(m / 60); if (h < 24) return `hace ${h} h`;
+  const days = Math.round(h / 24); return days < 60 ? `hace ${plural(days, "día", "días")}` : `hace ${Math.round(days / 30)} meses`;
+}
+
 let key = "";
 try { key = localStorage.getItem("comitag_admin") || ""; } catch {}
-let phones = 0;
+let phones = 0, plates = [];
 
 async function api(body) {
-  const r = await fetch(FN, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-admin-secret": key, apikey: PUB },
-    body: JSON.stringify(body),
-  });
+  const r = await fetch(FN, { method: "POST",
+    headers: { "Content-Type": "application/json", "x-admin-secret": key, apikey: PUB }, body: JSON.stringify(body) });
   let d = {}; try { d = await r.json(); } catch {}
   return { status: r.status, data: d };
 }
+function ask(title, text, okLabel = "Sí") {
+  return new Promise(ok => {
+    $("confirmTitle").textContent = title; $("confirmText").textContent = text; $("okBtn").textContent = okLabel;
+    $("confirm").classList.remove("hidden");
+    $("okBtn").onclick = () => { $("confirm").classList.add("hidden"); ok(true); };
+    $("cancelBtn").onclick = () => { $("confirm").classList.add("hidden"); ok(false); };
+  });
+}
 
+// ---------- Entrar ----------
 async function enter() {
   $("loginErr").textContent = "";
   let r;
@@ -126,9 +256,9 @@ async function enter() {
   catch { $("loginErr").textContent = "No hay conexión, o falta crear la función “anuncio” en Supabase."; return false; }
   if (r.status === 401) { $("loginErr").textContent = "Clave incorrecta."; return false; }
   if (r.status !== 200) { $("loginErr").textContent = "Algo falló. Intenta de nuevo."; return false; }
-  phones = r.data.phones; $("nPhones").textContent = phones; $("nPlates").textContent = r.data.plates;
+  phones = r.data.phones;
   $("login").classList.add("hidden"); $("panel").classList.remove("hidden");
-  loadList();
+  loadAnn(); loadPlates();
   return true;
 }
 $("loginBtn").onclick = async () => {
@@ -140,59 +270,275 @@ $("loginBtn").onclick = async () => {
 $("key").onkeydown = e => { if (e.key === "Enter") $("loginBtn").click(); };
 $("logout").onclick = () => { try { localStorage.removeItem("comitag_admin"); } catch {} location.reload(); };
 
+// ---------- Pestañas ----------
+const loaded = {};
+function showTab(t) {
+  document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === t));
+  document.querySelectorAll("[data-pane]").forEach(p => p.classList.toggle("hidden", p.dataset.pane !== t));
+  if (t === "numeros") loadStats();
+  if (t === "sistema" && !loaded.health) loadHealth();
+  if (t === "platos" || t === "pegatinas") loadPlates();
+  try { sessionStorage.setItem("comitag_admin_tab", t); } catch {}
+}
+document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => showTab(b.dataset.tab));
+
+// ---------- Anuncios ----------
+let when = "now";
 function preview() {
   const t = $("title").value.trim() || "Título", b = $("body").value.trim() || "Mensaje";
   $("cTitle").textContent = $("title").value.length + "/60"; $("cBody").textContent = $("body").value.length + "/300";
   $("pvT1").textContent = "📣 " + t; $("pvB1").textContent = b; $("pvT2").textContent = t; $("pvB2").textContent = b;
   $("pvNote").classList.toggle("hidden", !$("push").checked);
+  $("sendBtn").textContent = when === "later" ? "Programar anuncio" : $("to").value ? "Enviar a este plato" : "Enviar a todas las familias";
 }
-["title", "body", "push"].forEach(id => $(id).addEventListener("input", preview));
-$("push").addEventListener("change", preview);
+["title", "body", "push", "to"].forEach(id => $(id).addEventListener("input", preview));
+$("push").addEventListener("change", preview); $("to").addEventListener("change", preview);
+$("when").querySelectorAll("button").forEach(b => b.onclick = () => {
+  when = b.dataset.w;
+  $("when").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+  $("sendAt").classList.toggle("hidden", when !== "later");
+  if (when === "later" && !$("sendAt").value) {
+    const d = new Date(Date.now() + 86400000); d.setHours(10, 0, 0, 0);
+    $("sendAt").value = new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  }
+  preview();
+});
 preview();
 
-$("sendBtn").onclick = () => {
+$("sendBtn").onclick = async () => {
   $("sendMsg").textContent = "";
-  if (!$("title").value.trim() || !$("body").value.trim()) { $("sendMsg").innerHTML = '<span class="err">Escribe un título y un mensaje.</span>'; return; }
-  const l = $("link").value.trim();
-  if (l && !/^https:\/\//.test(l)) { $("sendMsg").innerHTML = '<span class="err">El link tiene que empezar con https://</span>'; return; }
-  $("confirmText").textContent = $("push").checked
-    ? `Aparecerá en la página de todas las familias y llegará como notificación a ${phones} teléfono${phones === 1 ? "" : "s"}.`
-    : "Aparecerá en la página de todas las familias (sin notificación).";
-  $("confirm").classList.remove("hidden");
-};
-$("cancelBtn").onclick = () => $("confirm").classList.add("hidden");
-$("okBtn").onclick = async () => {
-  $("confirm").classList.add("hidden");
+  const title = $("title").value.trim(), body = $("body").value.trim(), link = $("link").value.trim(), to = $("to").value;
+  if (!title || !body) { $("sendMsg").innerHTML = '<span class="err">Escribe un título y un mensaje.</span>'; return; }
+  if (link && !/^https:\/\//.test(link)) { $("sendMsg").innerHTML = '<span class="err">El link tiene que empezar con https://</span>'; return; }
+  let sendAt = null;
+  if (when === "later") {
+    const d = new Date($("sendAt").value);
+    if (isNaN(d) || d < Date.now() + 120000) { $("sendMsg").innerHTML = '<span class="err">Elige una fecha y hora en el futuro.</span>'; return; }
+    sendAt = d.toISOString();
+  }
+  const p = to ? plates.find(x => x.code === to) : null;
+  const n = to ? (p ? p.phones : 0) : phones;
+  const quien = to ? `la familia de ${p ? p.pet_name || to : to}` : "todas las familias";
+  const cuando = sendAt ? ` el ${fmtDate(sendAt)}` : "";
+  const ok = await ask(sendAt ? "¿Programar el anuncio?" : "¿Enviar el anuncio?",
+    `Aparecerá en la página de ${quien}${cuando}` + ($("push").checked ? ` y llegará como notificación a ${plural(n, "teléfono", "teléfonos")}.` : " (sin notificación)."),
+    sendAt ? "Programar" : "Enviar");
+  if (!ok) return;
   $("sendBtn").disabled = true; $("sendMsg").textContent = "Enviando…";
-  let r;
-  try { r = await api({ action: "send", title: $("title").value, body: $("body").value, link: $("link").value, push: $("push").checked }); }
-  catch { r = { status: 0, data: {} }; }
+  let r; try { r = await api({ action: "send", title, body, link, push: $("push").checked, plate_code: to || null, send_at: sendAt }); } catch { r = { status: 0, data: {} }; }
   $("sendBtn").disabled = false;
   if (r.status !== 200) { $("sendMsg").innerHTML = '<span class="err">No se pudo enviar. Intenta de nuevo.</span>'; return; }
   const d = r.data;
-  $("sendMsg").innerHTML = "✅ Enviado. Ya aparece en la página de todas las familias" +
-    ($("push").checked ? ` y llegó a <b>${d.sent}</b> teléfono${d.sent === 1 ? "" : "s"}` : "") + "." +
-    (d.failed ? ` <span class="muted">(${d.failed} ya no tenía${d.failed === 1 ? "" : "n"} las notificaciones activas)</span>` : "");
+  $("sendMsg").innerHTML = d.scheduled ? `🗓️ Programado para el <b>${esc(fmtDate(d.scheduled))}</b>.`
+    : `✅ Enviado. Ya aparece en la página de ${esc(quien)}` + ($("push").checked ? ` y llegó a <b>${plural(d.sent, "teléfono", "teléfonos")}</b>` : "") + "." +
+      (d.failed ? ` <span class="muted">(${d.failed} ya no tenía${d.failed === 1 ? "" : "n"} las notificaciones activas)</span>` : "");
   $("title").value = ""; $("body").value = ""; $("link").value = ""; preview();
-  loadList();
+  loadAnn();
 };
 
-async function loadList() {
+async function loadAnn() {
   let r; try { r = await api({ action: "list" }); } catch { return; }
   const items = (r.data && r.data.items) || [];
-  $("list").innerHTML = items.length ? items.map(a => `<div class="item">
-      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
-        <b>${esc(a.title)}</b><span class="tag ${a.active ? "on" : ""}">${a.active ? "En la página" : "Quitado"}</span></div>
+  $("annList").innerHTML = items.length ? items.map(a => {
+    const future = a.send_at && new Date(a.send_at) > Date.now();
+    const st = !a.active ? '<span class="tag">Quitado</span>' : future ? '<span class="tag warn">🗓️ Programado</span>' : '<span class="tag ok">En la página</span>';
+    const pl = a.plate_code ? plates.find(x => x.code === a.plate_code) : null;
+    return `<div class="item">
+      <div class="row"><b>${esc(a.title)}</b>${st}</div>
       <p class="muted" style="margin-top:4px">${esc(a.body)}</p>
-      <p class="muted" style="font-size:12px;margin-top:4px">${new Date(a.created_at).toLocaleString("es-CL", { dateStyle: "medium", timeStyle: "short", hourCycle: "h23" })} · notificación a ${a.sent_push} teléfono${a.sent_push === 1 ? "" : "s"}</p>
-      ${a.active ? `<button class="link" data-hide="${a.id}">Quitar de la página</button>` : ""}
-    </div>`).join("") : '<p class="muted" style="margin-top:8px">Todavía no has mandado anuncios.</p>';
-  $("list").querySelectorAll("[data-hide]").forEach(b => b.onclick = async () => {
-    b.disabled = true; await api({ action: "hide", id: +b.dataset.hide }); loadList();
+      <p class="muted" style="font-size:12px;margin-top:4px">${a.plate_code ? `Solo para ${esc(pl ? pl.pet_name || a.plate_code : a.plate_code)} · ` : ""}${
+        future ? `se publica el ${esc(fmtDate(a.send_at))}` : esc(fmtDate(a.send_at || a.created_at))}${
+        a.want_push ? (a.pushed ? ` · notificación a ${plural(a.sent_push, "teléfono", "teléfonos")}` : " · con notificación") : ""}</p>
+      ${a.active ? `<button class="link" data-hide="${a.id}">${future ? "Cancelar" : "Quitar de la página"}</button>` : ""}
+    </div>`; }).join("") : '<p class="muted">Todavía no has mandado anuncios.</p>';
+  $("annList").querySelectorAll("[data-hide]").forEach(b => b.onclick = async () => {
+    b.disabled = true; await api({ action: "hide", id: +b.dataset.hide }); loadAnn();
   });
 }
 
-if (key) enter().then(ok => { if (!ok) $("key").value = ""; });
+// ---------- Platos y pegatinas ----------
+function stateOf(p) {
+  if (p.disabled) return { k: "off", label: "Desactivado", cls: "bad" };
+  if (!p.pet_name) return { k: "new", label: "Sin configurar", cls: "" };
+  if (p.entries_7d > 0) return { k: "active", label: "Activo", cls: "ok" };
+  return { k: "sleep", label: "Dormido", cls: "warn" };
+}
+let filter = "all", openCode = null, platesAt = 0;
+async function loadPlates(force) {
+  if (!force && Date.now() - platesAt < 15000 && plates.length) { renderPlates(); renderFree(); return; }
+  let r; try { r = await api({ action: "plates" }); } catch { return; }
+  if (r.status !== 200) { $("plateList").innerHTML = '<p class="muted err">No se pudo cargar. ¿Corriste admin.sql en Supabase?</p>'; return; }
+  plates = r.data.items || []; platesAt = Date.now();
+  const sel = $("to").value;
+  $("to").innerHTML = '<option value="">Todas las familias</option>' + plates.filter(p => p.pet_name && !p.disabled)
+    .map(p => `<option value="${esc(p.code)}">Solo ${esc(p.pet_name)} (${esc(p.code)})</option>`).join("");
+  $("to").value = sel;
+  renderPlates(); renderFree();
+}
+$("q").addEventListener("input", renderPlates);
+$("pf").querySelectorAll("button").forEach(b => b.onclick = () => {
+  filter = b.dataset.f; $("pf").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); renderPlates();
+});
+function renderPlates() {
+  const q = $("q").value.trim().toLowerCase();
+  const list = plates.filter(p => (filter === "all" || stateOf(p).k === filter) &&
+    (!q || (p.pet_name || "").toLowerCase().includes(q) || p.code.toLowerCase().includes(q)));
+  $("plateList").innerHTML = list.length ? list.map(p => { const s = stateOf(p);
+    return `<div class="item plate" data-code="${esc(p.code)}">
+      <div class="row"><b>${esc(p.pet_name || "Pegatina sin configurar")}</b><span class="tag ${s.cls}">${s.label}</span></div>
+      <div class="meta">${esc(p.code)} · último registro ${ago(p.last_entry)} · ${plural(p.phones, "teléfono", "teléfonos")} con avisos${p.has_pin ? " · 🔒 PIN" : ""}${p.has_email ? " · 📧 correo" : ""}</div>
+      ${openCode === p.code ? `<div class="actions">
+        <button class="small" data-a="copy">Copiar link</button>
+        ${p.pet_name && !p.disabled ? '<button class="small" data-a="msg">📣 Mandar anuncio</button>' : ""}
+        ${p.has_pin ? '<button class="small" data-a="pin">Borrar PIN</button>' : ""}
+        <button class="small ${p.disabled ? "" : "danger"}" data-a="dis">${p.disabled ? "Reactivar" : "Desactivar"}</button>
+      </div><p class="muted" style="font-size:12px;margin-top:6px">${p.first_entry ? `Usa Comitag desde el ${esc(new Date(p.first_entry).toLocaleDateString("es-CL", { dateStyle: "medium" }))} · ${plural(p.entries_7d, "registro", "registros")} esta semana` : "Todavía no tiene registros"}</p>` : ""}
+    </div>`; }).join("") : '<p class="muted" style="margin-top:8px">No hay platos con ese filtro.</p>';
+  $("plateList").querySelectorAll(".plate").forEach(el => el.onclick = e => {
+    const code = el.dataset.code, p = plates.find(x => x.code === code), a = e.target.dataset && e.target.dataset.a;
+    if (!a) { openCode = openCode === code ? null : code; renderPlates(); return; }
+    e.stopPropagation(); plateAction(a, p, e.target);
+  });
+}
+async function plateAction(a, p, btn) {
+  const name = p.pet_name || p.code;
+  if (a === "copy") {
+    try { await navigator.clipboard.writeText(nfcLink(p.code)); btn.textContent = "✓ Copiado"; } catch { btn.textContent = nfcLink(p.code); }
+    return;
+  }
+  if (a === "msg") { showTab("anuncios"); $("to").value = p.code; preview(); $("title").focus(); return; }
+  if (a === "pin") {
+    if (!await ask(`¿Borrar el PIN de ${name}?`, "La familia podrá entrar sin PIN y crear uno nuevo. Hazlo solo si te lo pidió la familia.", "Borrar PIN")) return;
+    await api({ action: "reset_pin", code: p.code });
+  }
+  if (a === "dis") {
+    const off = !p.disabled;
+    if (!await ask(off ? `¿Desactivar ${name}?` : `¿Reactivar ${name}?`,
+      off ? "La pegatina deja de funcionar: nadie podrá ver ni registrar nada, y sus teléfonos dejan de recibir avisos. Puedes reactivarla después."
+          : "La pegatina vuelve a funcionar como antes. Los teléfonos tendrán que activar los avisos de nuevo.", off ? "Desactivar" : "Reactivar")) return;
+    await api({ action: "set_disabled", code: p.code, disabled: off });
+  }
+  await loadPlates(true);
+}
+function freePlates() { return plates.filter(p => !p.pet_name && !p.disabled); }
+function renderFree() {
+  const f = freePlates();
+  $("nFree").textContent = f.length;
+  $("freeList").innerHTML = f.length ? f.map(p => `<div class="row" style="padding:6px 0;border-top:1px solid var(--line)"><span>${esc(nfcLink(p.code))}</span><button class="small" data-c="${esc(p.code)}">Copiar</button></div>`).join("")
+    : '<p class="muted">No hay pegatinas sin entregar. Crea nuevas arriba.</p>';
+  $("freeList").querySelectorAll("[data-c]").forEach(b => b.onclick = async () => {
+    try { await navigator.clipboard.writeText(nfcLink(b.dataset.c)); b.textContent = "✓"; } catch {}
+  });
+}
+$("createBtn").onclick = async () => {
+  const n = Math.min(100, Math.max(1, parseInt($("nNew").value, 10) || 0));
+  if (!await ask(`¿Crear ${plural(n, "pegatina", "pegatinas")}?`, "Se crean platos nuevos sin mascota, listos para grabar en pegatinas.", "Crear")) return;
+  $("createBtn").disabled = true; $("createMsg").textContent = "Creando…";
+  let r; try { r = await api({ action: "create_plates", n }); } catch { r = { status: 0 }; }
+  $("createBtn").disabled = false;
+  if (r.status !== 200) { $("createMsg").innerHTML = '<span class="err">No se pudo. ¿Corriste admin.sql en Supabase?</span>'; return; }
+  $("createMsg").textContent = `✅ ${plural(r.data.codes.length, "pegatina creada", "pegatinas creadas")}. Están abajo en “Pegatinas sin entregar”.`;
+  await loadPlates(true);
+};
+$("copyAll").onclick = async () => {
+  const t = freePlates().map(p => nfcLink(p.code)).join("\n"); if (!t) return;
+  try { await navigator.clipboard.writeText(t); $("copyAll").textContent = "✓ Copiados"; } catch {}
+};
+function loadScript(src) { return new Promise((ok, fail) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = fail; document.head.appendChild(s); }); }
+function qrSvg(text) {
+  const qr = qrcode(0, "M"); qr.addData(text); qr.make();
+  const n = qr.getModuleCount(); let d = "";
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) d += `M${c} ${r}h1v1h-1z`;
+  return `<svg viewBox="-2 -2 ${n + 4} ${n + 4}" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges"><path d="${d}" fill="#000"/></svg>`;
+}
+$("printQr").onclick = async () => {
+  const f = freePlates(); if (!f.length) return;
+  try { if (!window.qrcode) await loadScript(QR_LIB); } catch { alert("No se pudo cargar el generador de QR. Revisa la conexión."); return; }
+  $("printSheet").innerHTML = f.map(p => `<div class="q">${qrSvg(nfcLink(p.code))}<div>Comitag · ${esc(p.code)}</div></div>`).join("");
+  window.print();
+};
+
+// ---------- Números ----------
+function barChart(el, days, vals, unit) {
+  const W = 320, H = 150, L = 26, B = 22, T = 8, n = vals.length, mx = Math.max(1, ...vals);
+  const top = mx <= 4 ? mx : Math.ceil(mx / 4) * 4, slot = (W - L) / n, bw = Math.min(24, slot - 2);
+  const y = v => T + (H - T - B) * (1 - v / top);
+  const lbl = d => new Date(d + "T12:00:00").toLocaleDateString("es-CL", { day: "numeric", month: "short" });
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(unit)} por día">`;
+  [0, top / 2, top].forEach(v => { s += `<line class="gl" x1="${L}" x2="${W}" y1="${y(v)}" y2="${y(v)}"/><text class="ax" x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${Math.round(v)}</text>`; });
+  vals.forEach((v, i) => {
+    const x = L + i * slot + (slot - bw) / 2, h = Math.max(0, y(0) - y(v)), r = Math.min(4, h, bw / 2);
+    s += `<rect class="hit" x="${L + i * slot}" y="${T}" width="${slot}" height="${H - T - B}" data-i="${i}"/>`;
+    if (v > 0) s += `<path class="b" d="M${x} ${y(0)}V${y(v) + r}q0 -${r} ${r} -${r}H${x + bw - r}q${r} 0 ${r} ${r}V${y(0)}Z" fill="var(--blue)" data-i="${i}"/>`;
+  });
+  [0, Math.floor(n / 2), n - 1].forEach(i => { s += `<text class="ax" x="${L + i * slot + slot / 2}" y="${H - 6}" text-anchor="middle">${lbl(days[i])}</text>`; });
+  s += "</svg>";
+  el.innerHTML = s + `<div class="tip hidden"></div>`;
+  el.dataset.days = JSON.stringify(days); el.dataset.vals = JSON.stringify(vals); el.dataset.unit = unit;
+  const tip = el.querySelector(".tip"), svg = el.querySelector("svg");
+  el.querySelectorAll("rect.hit").forEach(h => {
+    const show = () => { const i = +h.dataset.i, bb = h.getBoundingClientRect(), eb = el.getBoundingClientRect();
+      tip.textContent = `${lbl(days[i])}: ${vals[i]} ${unit}`; tip.classList.remove("hidden");
+      tip.style.left = (bb.left - eb.left + bb.width / 2) + "px"; tip.style.top = (svg.getBoundingClientRect().top - eb.top + (y(vals[i]) / H) * svg.getBoundingClientRect().height) + "px";
+      el.querySelectorAll("path.b").forEach(p => p.style.opacity = p.dataset.i == i ? ".7" : ""); };
+    h.addEventListener("mouseenter", show); h.addEventListener("touchstart", show, { passive: true });
+    h.addEventListener("mouseleave", () => { tip.classList.add("hidden"); el.querySelectorAll("path.b").forEach(p => p.style.opacity = ""); });
+  });
+}
+document.querySelectorAll("[data-tv]").forEach(b => b.onclick = () => {
+  const el = $(b.dataset.tv);
+  if (el.querySelector("table")) { barChart(el, JSON.parse(el.dataset.days), JSON.parse(el.dataset.vals), el.dataset.unit); b.textContent = "Ver tabla"; return; }
+  const days = JSON.parse(el.dataset.days || "[]"), vals = JSON.parse(el.dataset.vals || "[]");
+  el.innerHTML = `<table class="tv"><tr><th>Día</th><th>${esc(el.dataset.unit)}</th></tr>` + days.map((d, i) => `<tr><td>${new Date(d + "T12:00:00").toLocaleDateString("es-CL", { weekday: "short", day: "numeric", month: "short" })}</td><td>${vals[i]}</td></tr>`).reverse().join("") + "</table>";
+  b.textContent = "Ver gráfico";
+});
+async function loadStats() {
+  let r; try { r = await api({ action: "stats" }); } catch { return; }
+  if (r.status !== 200 || !r.data.days) return;
+  const d = r.data;
+  $("sConf").textContent = d.plates_configured; $("sAct").textContent = d.plates_active; $("sPh").textContent = d.phones;
+  $("sFree").textContent = d.plates_total - d.plates_configured;
+  barChart($("cMeals"), d.days, d.meals, "comidas");
+  barChart($("cNew"), d.days, d.new, "familias nuevas");
+  barChart($("cAlerts"), d.days, d.alerts, "avisos");
+}
+
+// ---------- Sistema ----------
+function light(state, title, text) {
+  const ic = { ok: "🟢", warn: "🟡", bad: "🔴" }[state], lab = { ok: "Bien", warn: "Revisar", bad: "Falla" }[state];
+  return `<div class="light"><span class="ic" aria-hidden="true">${ic}</span><div style="flex:1"><div class="row"><b>${esc(title)}</b><span class="tag ${state}">${lab}</span></div><p class="muted" style="margin-top:2px">${text}</p></div></div>`;
+}
+async function loadHealth() {
+  loaded.health = true; $("health").innerHTML = '<p class="muted">Revisando…</p>';
+  let r; try { r = await api({ action: "health" }); } catch { $("health").innerHTML = light("bad", "Sin conexión", "No se pudo hablar con Supabase."); return; }
+  if (r.status !== 200) { $("health").innerHTML = light("bad", "Panel", "No se pudo revisar. ¿Corriste admin.sql en Supabase?"); return; }
+  const d = r.data, jobs = d.jobs, out = [light("ok", "Panel del dueño", "La función “anuncio” responde bien.")];
+  const job = (name, title, everyMin, what) => {
+    if (!jobs) return light("warn", title, "No se pudo leer el estado de las tareas programadas.");
+    const j = jobs.find(x => x.name === name);
+    if (!j) return light("bad", title, `No está programada. ${what}`);
+    if (!j.active) return light("bad", title, "Está programada pero desactivada.");
+    if (!j.last_run) return light("warn", title, "Todavía no ha corrido ninguna vez.");
+    const late = Date.now() - new Date(j.last_run) > everyMin * 60000 * 3;
+    if (j.last_status !== "succeeded") return light("bad", title, `La última vez falló (${esc(ago(j.last_run))}).`);
+    return light(late ? "warn" : "ok", title, `Última vez: ${esc(ago(j.last_run))}.`);
+  };
+  out.push(job("comitag-avisos", "Avisos “no ha comido”", 5, "Corre programar_avisos.sql."));
+  out.push(job("comitag-anuncios", "Anuncios programados", 5, "Corre programar_anuncios.sql."));
+  out.push(job("comitag-brevo-semanal", "Llave de Brevo (uso semanal)", 60 * 24 * 7 / 3, "Corre programar_ping_brevo.sql."));
+  const h = d.http_24h;
+  if (!h) out.push(light("warn", "Llamadas a las funciones", "No se pudo leer."));
+  else if (!h.fail) out.push(light("ok", "Llamadas a las funciones (24 h)", `${plural(h.ok, "llamada", "llamadas")} sin errores.`));
+  else out.push(light(h.fail > h.ok / 5 ? "bad" : "warn", "Llamadas a las funciones (24 h)", `${plural(h.fail, "llamada falló", "llamadas fallaron")} de ${h.ok + h.fail}. Si sigue pasando, revisa Edge Functions → Logs en Supabase.`));
+  $("health").innerHTML = out.join("");
+}
+$("healthBtn").onclick = loadHealth;
+
+if (key) enter().then(ok => {
+  if (!ok) { $("key").value = ""; return; }
+  let t = "anuncios"; try { t = sessionStorage.getItem("comitag_admin_tab") || t; } catch {}
+  showTab(t);
+});
 </script>
 </body>
 </html>

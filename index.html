@@ -557,6 +557,14 @@ async function load() {
     cachePut({ plate: data });
   }
   plate = data;
+  if (plate.disabled) {
+    // El dueño de Comitag desactivó esta pegatina
+    $("pet").textContent = plate.pet_name || "Comitag";
+    $("err").classList.remove("warn");
+    $("err").style.textAlign = "center";
+    $("err").textContent = "Esta pegatina está desactivada. Si crees que es un error, escríbele a quien te la entregó.";
+    return;
+  }
   plate.schedule = sortTimes(plate.schedule || []);
   if (!plate.pet_name || !String(plate.pet_name).trim()) { showSetup(); return; }
   if (RESET_TOKEN && !offline) { showGate("reset"); return; }
@@ -586,7 +594,8 @@ async function start() {
 // ---- Anuncios del dueño de Comitag ----
 async function loadAnnouncement() {
   let seen = 0; try { seen = +localStorage.getItem("comitag_anuncio_visto") || 0; } catch {}
-  const r = await db.rpc("latest_announcement");
+  let r = await db.rpc("latest_announcement2", { p_code: code });
+  if (r.error && r.error.code === "PGRST202") r = await db.rpc("latest_announcement");
   const a = !r.error && r.data;
   if (!a || !a.id || a.id <= seen) { $("annBox").classList.add("hidden"); return; }
   const safe = a.link && /^https:\/\//.test(a.link) ? a.link : "";
