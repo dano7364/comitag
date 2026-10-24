@@ -57,6 +57,12 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .pinSaved{display:flex;align-items:center;gap:10px;margin-top:10px;padding:12px 14px;border-radius:12px;background:var(--glass-input);border:1px solid var(--glass-border)}
 .pinSaved .muted{flex:1}
 .pinShow{font-size:22px;font-weight:700;letter-spacing:4px;font-variant-numeric:tabular-nums}
+.ann{padding:16px 18px;margin-bottom:14px}
+.ann .annH{font-size:12px;letter-spacing:1.5px;color:var(--muted);margin:0 0 6px}
+.ann .annT{font-weight:700;font-size:17px;margin:0 0 4px}
+.ann .annB{margin:0;line-height:1.45;white-space:pre-line}
+.ann .annF{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
+.ann .annF a{color:var(--blue);text-decoration:none;font-weight:600}
 .tqSel{font-size:16px;padding:12px 10px;width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text)}
 .trow .x{width:44px;padding:10px;color:var(--red)}
 .add{margin:4px 0 12px}
@@ -318,6 +324,7 @@ body::before{animation:drift 28s ease-in-out infinite alternate;will-change:tran
 
   <section id="app" class="hidden">
     <p class="muted" id="hello" style="margin-bottom:10px"></p>
+    <div id="annBox" class="card ann hidden" role="status"></div>
     <div id="offline" class="offline hidden"></div>
     <div id="note" class="note hidden"></div>
     <div id="waBox" class="card hidden">
@@ -573,6 +580,23 @@ async function start() {
   loadPhoto();
   loadPin();
   autoRun();
+  loadAnnouncement();
+}
+
+// ---- Anuncios del dueño de Comitag ----
+async function loadAnnouncement() {
+  let seen = 0; try { seen = +localStorage.getItem("comitag_anuncio_visto") || 0; } catch {}
+  const r = await db.rpc("latest_announcement");
+  const a = !r.error && r.data;
+  if (!a || !a.id || a.id <= seen) { $("annBox").classList.add("hidden"); return; }
+  const safe = a.link && /^https:\/\//.test(a.link) ? a.link : "";
+  $("annBox").innerHTML = `<p class="annH">📣 COMITAG</p><p class="annT">${esc(a.title)}</p><p class="annB">${esc(a.body)}</p>
+    <div class="annF">${safe ? `<a href="${esc(safe)}" target="_blank" rel="noopener">Ver más →</a>` : "<span></span>"}<button class="link" id="annOk">Entendido</button></div>`;
+  $("annBox").classList.remove("hidden");
+  $("annOk").onclick = () => {
+    try { localStorage.setItem("comitag_anuncio_visto", a.id); } catch {}
+    $("annBox").classList.add("hidden");
+  };
 }
 
 async function refresh() {

@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Anuncios · Comitag</title>
+<link rel="icon" href="/icon.png">
+<style>
+:root{--bg:#f4f3ef;--card:#fff;--text:#222;--muted:#777;--line:#eee;--border:#ddd;--blue:#2563eb;--ok:#15803d;--warn:#b45309}
+@media (prefers-color-scheme:dark){:root{--bg:#141413;--card:#1f1e1c;--text:#ecebe7;--muted:#a19e97;--line:#2e2d2a;--border:#3a3935;--blue:#3b82f6;--ok:#4ade80;--warn:#fbbf24}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+main{max-width:520px;margin:0 auto;padding:20px 16px 60px}
+.brand{text-align:center;letter-spacing:6px;color:var(--muted);font-size:13px;margin:6px 0 18px}
+h1{font-size:24px;margin:0 0 4px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;margin-top:14px}
+.muted{color:var(--muted);font-size:14px;margin:0}
+label{display:block;font-weight:600;margin:14px 0 6px}
+input[type=text],input[type=password],input[type=url],textarea{width:100%;font:inherit;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--bg);color:var(--text)}
+textarea{min-height:110px;resize:vertical}
+.count{float:right;font-weight:400;color:var(--muted);font-size:13px}
+.chk{display:flex;gap:10px;align-items:flex-start;margin-top:14px;font-weight:400}
+.chk input{width:20px;height:20px;margin-top:2px}
+button{font:inherit;border:1px solid var(--border);background:var(--card);color:var(--text);border-radius:12px;padding:12px 16px;cursor:pointer}
+button.primary{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600;width:100%;margin-top:16px}
+button:disabled{opacity:.5}
+button.link{border:none;background:none;color:var(--blue);padding:4px 0}
+.stats{display:flex;gap:10px;margin-top:12px}
+.stat{flex:1;background:var(--bg);border-radius:12px;padding:12px;text-align:center}
+.stat b{display:block;font-size:24px}
+.pv{margin-top:10px;border-radius:16px;padding:12px 14px;background:var(--bg);border:1px solid var(--line)}
+.pv .t{font-weight:700}
+.pv .s{font-size:12px;color:var(--muted);margin-bottom:4px}
+.item{border-top:1px solid var(--line);padding:12px 0}
+.item:first-child{border-top:none}
+.tag{font-size:12px;border-radius:99px;padding:2px 8px;background:var(--bg);color:var(--muted)}
+.tag.on{color:var(--ok)}
+.msg{margin-top:10px;font-size:14px}
+.err{color:var(--warn)}
+.hidden{display:none!important}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px}
+.modal{background:var(--card);border-radius:18px;padding:20px;max-width:380px;width:100%}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+</style>
+</head>
+<body>
+<main>
+  <p class="brand">COMITAG 🐾</p>
+
+  <!-- Entrar con la clave de dueño -->
+  <section id="login" class="card">
+    <h1>Anuncios</h1>
+    <p class="muted">Solo para el dueño de Comitag. Escribe tu clave de dueño.</p>
+    <label for="key">Clave de dueño</label>
+    <input id="key" type="password" autocomplete="current-password">
+    <p id="loginErr" class="msg err"></p>
+    <button class="primary" id="loginBtn">Entrar</button>
+  </section>
+
+  <!-- Panel -->
+  <section id="panel" class="hidden">
+    <h1>Mandar un anuncio</h1>
+    <p class="muted">Aparece arriba en la página de todas las familias y, si quieres, también llega como notificación.</p>
+    <div class="stats">
+      <div class="stat"><b id="nPlates">–</b><span class="muted">platos</span></div>
+      <div class="stat"><b id="nPhones">–</b><span class="muted">teléfonos con notificaciones</span></div>
+    </div>
+
+    <div class="card">
+      <label for="title">Título <span class="count" id="cTitle">0/60</span></label>
+      <input id="title" type="text" maxlength="60" placeholder="Nueva función en Comitag">
+      <label for="body">Mensaje <span class="count" id="cBody">0/300</span></label>
+      <textarea id="body" maxlength="300" placeholder="Ahora cada mascota puede tener su propia foto. ¡Pruébalo!"></textarea>
+      <label for="link">Link (opcional)</label>
+      <input id="link" type="url" placeholder="https://…">
+      <label class="chk"><input type="checkbox" id="push" checked> <span>Mandar también como notificación al teléfono<br><span class="muted">Llega a los teléfonos que activaron 🔔 Avisarme.</span></span></label>
+
+      <p class="muted" style="margin-top:16px"><b>Así se verá</b></p>
+      <div class="pv" id="pvNote"><div class="s">COMITAG · ahora</div><div class="t" id="pvT1">📣 Título</div><div id="pvB1">Mensaje</div></div>
+      <div class="pv"><div class="s">En la página</div><div class="t" id="pvT2">Título</div><div id="pvB2">Mensaje</div></div>
+
+      <button class="primary" id="sendBtn">Enviar a todas las familias</button>
+      <p id="sendMsg" class="msg"></p>
+    </div>
+
+    <div class="card">
+      <p style="margin:0"><b>Últimos anuncios</b></p>
+      <div id="list"><p class="muted">Cargando…</p></div>
+    </div>
+    <p style="text-align:center;margin-top:18px"><button class="link" id="logout">Salir de este teléfono</button></p>
+  </section>
+</main>
+
+<div id="confirm" class="overlay hidden">
+  <div class="modal">
+    <p style="font-size:18px;margin:0 0 8px"><b>¿Enviar el anuncio?</b></p>
+    <p class="muted" id="confirmText"></p>
+    <div class="grid"><button id="cancelBtn">Cancelar</button><button class="primary" style="margin:0" id="okBtn">Enviar</button></div>
+  </div>
+</div>
+
+<script>
+const FN = "https://nwenbwkpvmfozzfwjsuq.supabase.co/functions/v1/anuncio";
+const PUB = "sb_publishable_bo4ntmZshkQk9lSiadueKg_ANPjpuRa";
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+let key = "";
+try { key = localStorage.getItem("comitag_admin") || ""; } catch {}
+let phones = 0;
+
+async function api(body) {
+  const r = await fetch(FN, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-admin-secret": key, apikey: PUB },
+    body: JSON.stringify(body),
+  });
+  let d = {}; try { d = await r.json(); } catch {}
+  return { status: r.status, data: d };
+}
+
+async function enter() {
+  $("loginErr").textContent = "";
+  let r;
+  try { r = await api({ action: "count" }); }
+  catch { $("loginErr").textContent = "No hay conexión, o falta crear la función “anuncio” en Supabase."; return false; }
+  if (r.status === 401) { $("loginErr").textContent = "Clave incorrecta."; return false; }
+  if (r.status !== 200) { $("loginErr").textContent = "Algo falló. Intenta de nuevo."; return false; }
+  phones = r.data.phones; $("nPhones").textContent = phones; $("nPlates").textContent = r.data.plates;
+  $("login").classList.add("hidden"); $("panel").classList.remove("hidden");
+  loadList();
+  return true;
+}
+$("loginBtn").onclick = async () => {
+  key = $("key").value.trim(); if (!key) return;
+  $("loginBtn").disabled = true;
+  if (await enter()) { try { localStorage.setItem("comitag_admin", key); } catch {} }
+  $("loginBtn").disabled = false;
+};
+$("key").onkeydown = e => { if (e.key === "Enter") $("loginBtn").click(); };
+$("logout").onclick = () => { try { localStorage.removeItem("comitag_admin"); } catch {} location.reload(); };
+
+function preview() {
+  const t = $("title").value.trim() || "Título", b = $("body").value.trim() || "Mensaje";
+  $("cTitle").textContent = $("title").value.length + "/60"; $("cBody").textContent = $("body").value.length + "/300";
+  $("pvT1").textContent = "📣 " + t; $("pvB1").textContent = b; $("pvT2").textContent = t; $("pvB2").textContent = b;
+  $("pvNote").classList.toggle("hidden", !$("push").checked);
+}
+["title", "body", "push"].forEach(id => $(id).addEventListener("input", preview));
+$("push").addEventListener("change", preview);
+preview();
+
+$("sendBtn").onclick = () => {
+  $("sendMsg").textContent = "";
+  if (!$("title").value.trim() || !$("body").value.trim()) { $("sendMsg").innerHTML = '<span class="err">Escribe un título y un mensaje.</span>'; return; }
+  const l = $("link").value.trim();
+  if (l && !/^https:\/\//.test(l)) { $("sendMsg").innerHTML = '<span class="err">El link tiene que empezar con https://</span>'; return; }
+  $("confirmText").textContent = $("push").checked
+    ? `Aparecerá en la página de todas las familias y llegará como notificación a ${phones} teléfono${phones === 1 ? "" : "s"}.`
+    : "Aparecerá en la página de todas las familias (sin notificación).";
+  $("confirm").classList.remove("hidden");
+};
+$("cancelBtn").onclick = () => $("confirm").classList.add("hidden");
+$("okBtn").onclick = async () => {
+  $("confirm").classList.add("hidden");
+  $("sendBtn").disabled = true; $("sendMsg").textContent = "Enviando…";
+  let r;
+  try { r = await api({ action: "send", title: $("title").value, body: $("body").value, link: $("link").value, push: $("push").checked }); }
+  catch { r = { status: 0, data: {} }; }
+  $("sendBtn").disabled = false;
+  if (r.status !== 200) { $("sendMsg").innerHTML = '<span class="err">No se pudo enviar. Intenta de nuevo.</span>'; return; }
+  const d = r.data;
+  $("sendMsg").innerHTML = "✅ Enviado. Ya aparece en la página de todas las familias" +
+    ($("push").checked ? ` y llegó a <b>${d.sent}</b> teléfono${d.sent === 1 ? "" : "s"}` : "") + "." +
+    (d.failed ? ` <span class="muted">(${d.failed} ya no tenía${d.failed === 1 ? "" : "n"} las notificaciones activas)</span>` : "");
+  $("title").value = ""; $("body").value = ""; $("link").value = ""; preview();
+  loadList();
+};
+
+async function loadList() {
+  let r; try { r = await api({ action: "list" }); } catch { return; }
+  const items = (r.data && r.data.items) || [];
+  $("list").innerHTML = items.length ? items.map(a => `<div class="item">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+        <b>${esc(a.title)}</b><span class="tag ${a.active ? "on" : ""}">${a.active ? "En la página" : "Quitado"}</span></div>
+      <p class="muted" style="margin-top:4px">${esc(a.body)}</p>
+      <p class="muted" style="font-size:12px;margin-top:4px">${new Date(a.created_at).toLocaleString("es-CL", { dateStyle: "medium", timeStyle: "short", hourCycle: "h23" })} · notificación a ${a.sent_push} teléfono${a.sent_push === 1 ? "" : "s"}</p>
+      ${a.active ? `<button class="link" data-hide="${a.id}">Quitar de la página</button>` : ""}
+    </div>`).join("") : '<p class="muted" style="margin-top:8px">Todavía no has mandado anuncios.</p>';
+  $("list").querySelectorAll("[data-hide]").forEach(b => b.onclick = async () => {
+    b.disabled = true; await api({ action: "hide", id: +b.dataset.hide }); loadList();
+  });
+}
+
+if (key) enter().then(ok => { if (!ok) $("key").value = ""; });
+</script>
+</body>
+</html>
