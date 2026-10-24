@@ -46,6 +46,12 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .trow{display:flex;gap:8px;align-items:center;margin-bottom:8px}
 .trow input{flex:1;min-width:0}
 .trow select{flex:none;width:auto;max-width:42%;font-size:16px;padding:12px 8px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text)}
+.tqSteps{font-size:14px;line-height:1.5;color:var(--muted)}
+.tqSteps ol,.tqSteps ul{padding-left:22px;margin:4px 0 0}
+.tqSteps li{margin:3px 0}
+.tqSteps b{color:var(--text)}
+.tqH{margin:14px 0 0;font-weight:700;color:var(--text);font-size:15px}
+.modal{max-height:calc(100dvh - 32px);overflow-y:auto;-webkit-overflow-scrolling:touch}
 .tqSel{font-size:16px;padding:12px 10px;width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text)}
 .trow .x{width:44px;padding:10px;color:var(--red)}
 .add{margin:4px 0 12px}
@@ -1338,14 +1344,51 @@ function openToque() {
     </div>
     <div class="grid" style="margin-top:10px"><button id="tqCopy" class="primary">1 · Copiar enlace</button><button id="tqTest">Probar</button></div>
     <p id="tqMsg" class="muted" style="font-size:13px;min-height:1em"></p>
-    <ol class="muted" style="padding-left:20px;font-size:14px;line-height:1.5;margin:6px 0 0">
-      <li>Toca <b>Copiar enlace</b>.</li>
-      <li>Abre <b>Atajos</b> → <b>Automatización</b> → <b>＋</b> → <b>NFC</b> → <b>Escanear</b> y acerca el teléfono al tag del plato.</li>
-      <li>Elige <b>Ejecutar inmediatamente</b>, apaga <b>Notificar al ejecutarse</b> y toca <b>Siguiente</b> → <b>Nuevo atajo en blanco</b>.</li>
-      <li>Agrega <b>Obtener contenido de URL</b> y pega el enlace donde dice URL.</li>
-      <li>Agrega <b>Mostrar notificación</b> y en el texto elige <b>Contenido de URL</b>. Toca <b>OK</b>.</li>
-    </ol>
-    <p class="muted" style="font-size:12px;margin-top:10px">Cada persona lo arma en su propio iPhone (el enlace lleva su nombre${getPinFor(code) ? " y el PIN familiar: no lo compartas" : ""}). Si cambian el PIN, hay que copiarlo de nuevo.</p>
+    <div class="tqSteps">
+      <p class="tqH">Paso 1 · Copia tu enlace</p>
+      <ol start="1">
+        <li>Arriba elige qué registra el tag (comida o agua)${pets.length ? " y para quién" : ""}.</li>
+        <li>Toca <b>Probar</b>. Debe decir <b>✅ Todo listo</b>.</li>
+        <li>Toca <b>Copiar enlace</b> (cambia a <b>✓ Copiado</b>).</li>
+      </ol>
+      <p class="tqH">Paso 2 · Crea la automatización</p>
+      <ol start="4">
+        <li>Abre la app <b>Atajos</b> (ícono de dos cuadrados de colores; ya viene en el iPhone).</li>
+        <li>Abajo toca la pestaña <b>Automatización</b>.</li>
+        <li>Toca <b>＋</b> arriba a la derecha (o <b>Nueva automatización</b>).</li>
+        <li>Baja en la lista y toca <b>NFC</b>.</li>
+        <li>Junto a <b>Etiqueta NFC</b> toca <b>Escanear</b> y acerca la <b>parte de arriba</b> del iPhone a la pegatina del plato.</li>
+        <li>Ponle un nombre, por ejemplo <b>Plato ${esc(plate.pet_name || "")}</b>, y toca <b>OK</b>.</li>
+        <li>Marca <b>Ejecutar inmediatamente</b> y apaga <b>Notificar al ejecutarse</b>. Toca <b>Siguiente</b>.</li>
+        <li>Toca <b>Nuevo atajo en blanco</b>.</li>
+      </ol>
+      <p class="tqH">Paso 3 · Pega el enlace</p>
+      <ol start="12">
+        <li>Toca la barra <b>Buscar</b> de abajo y escribe <b>URL</b>.</li>
+        <li>Elige <b>Obtener contenido de URL</b> (flechita verde).</li>
+        <li>En ese bloque toca la palabra azul <b>URL</b>, mantén presionado y elige <b>Pegar</b>. Debe verse <i>https://comitag.vercel.app/api/toque?…</i></li>
+      </ol>
+      <p class="tqH">Paso 4 · Agrega el aviso</p>
+      <ol start="15">
+        <li>Toca otra vez <b>Buscar</b>, escribe <b>notificación</b> y elige <b>Mostrar notificación</b> (campanita roja).</li>
+        <li>Toca el texto <b>Hola mundo</b> y bórralo.</li>
+        <li>En la barrita que aparece sobre el teclado toca <b>Contenido de URL</b>. Debe quedar como una burbuja azul.</li>
+        <li>Opcional: en <b>Título</b> escribe <b>Comitag 🐾</b>.</li>
+      </ol>
+      <p class="tqH">Paso 5 · Guarda y prueba</p>
+      <ol start="19">
+        <li>Toca la flecha <b>‹</b> arriba a la izquierda: queda guardado solo.</li>
+        <li>Sal de Atajos, con el iPhone desbloqueado acerca la parte de arriba al plato. Te llegará un aviso que empieza con <b>✅</b>.</li>
+      </ol>
+      <p class="tqH">¿Algo no funciona?</p>
+      <ul>
+        <li><b>No aparece NFC:</b> se necesita un iPhone XS o más nuevo.</li>
+        <li><b>Pregunta antes de ejecutarse:</b> entra a la automatización y activa <b>Ejecutar inmediatamente</b> (o el interruptor <b>Automatización</b>).</li>
+        <li><b>Llega “🔒 PIN…”:</b> cambiaron el PIN. Copia el enlace de nuevo y reemplázalo en el paso 14.</li>
+        <li><b>Además aparece “Abrir comitag.vercel.app”:</b> ignóralo, el registro ya se hizo.</li>
+      </ul>
+    </div>
+    <p class="muted" style="font-size:12px;margin-top:10px">Cada persona lo arma en su propio iPhone, porque el enlace lleva su nombre${getPinFor(code) ? " y el PIN familiar (no lo compartas)" : ""}.</p>
     <button class="link" style="display:block;margin:6px auto 0" onclick="closeModal()">Cerrar</button>`);
   const url = () => toqueUrl($("tqKind").value, $("tqPet") ? $("tqPet").value : "");
   $("tqCopy").onclick = async () => {
