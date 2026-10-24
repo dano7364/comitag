@@ -396,6 +396,16 @@ const db = window.supabase ? supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
   : { rpc: async () => ({ data: null, error: { message: "sin conexión", code: "" } }) };
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 const code = (location.pathname.split("/p/")[1] || "").replace(/\/$/, "");
+// ¿Se abrió desde la pegatina? Las pegatinas grabadas con "?nfc=1" lo dicen seguro.
+// Se quita de la dirección al tiro, para que no quede al recargar ni al agregar al inicio.
+const FROM_NFC = (() => {
+  const q = new URLSearchParams(location.search);
+  if (!q.has("nfc")) return false;
+  q.delete("nfc");
+  try { history.replaceState(history.state, "", location.pathname + (q.toString() ? "?" + q : "") + location.hash); } catch {}
+  try { localStorage.setItem("comitag_nfc_" + code, "1"); } catch {}
+  return true;
+})();
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt = t => t.toLocaleTimeString("es-CL", {hour:"2-digit", minute:"2-digit", hourCycle:"h23"});
@@ -1352,7 +1362,7 @@ function openAuto() {
     ${pets.length ? `<select id="auPet" class="tqSel" style="margin-top:8px" aria-label="Para quién">
       <option value="">Para todas</option>${pets.map(p => `<option${cfg.pet === p ? " selected" : ""}>${esc(p)}</option>`).join("")}</select>` : ""}
     <div class="grid" style="margin-top:14px"><button onclick="closeModal()">Cancelar</button><button class="primary" id="auSave">Guardar</button></div>
-    <p class="muted" style="font-size:12px;margin-top:12px">Se activa solo en este teléfono: cada persona lo elige en el suyo. En iPhone, al acercarlo aparece un aviso arriba: tócalo y se registra. Al abrir Comitag desde el ícono de la pantalla de inicio no se registra nada.</p>`);
+    <p class="muted" style="font-size:12px;margin-top:12px">Se activa solo en este teléfono: cada persona lo elige en el suyo. En iPhone, al acercarlo aparece un aviso arriba: tócalo y se registra.</p>`);
   $("auSave").onclick = () => {
     const kind = $("auKind").value, pet = $("auPet") ? $("auPet").value : "";
     autoSet(kind ? { kind, pet: pet || null } : null);
@@ -1363,6 +1373,10 @@ function openAuto() {
 
 // ¿Esta vez se abrió desde la pegatina? (no desde el ícono, ni al recargar o volver atrás)
 function openedFromTag() {
+  if (FROM_NFC) return true;                         // pegatina con marca: seguro
+  // Si la pegatina de este plato ya tiene la marca, sin ella no vino de la pegatina
+  try { if (localStorage.getItem("comitag_nfc_" + code)) return false; } catch {}
+  // Pegatinas antiguas (sin marca): se adivina. No desde el ícono, ni al recargar o volver atrás.
   const standalone = (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone;
   if (standalone) return false;
   const nav = performance.getEntriesByType && performance.getEntriesByType("navigation")[0];
