@@ -82,6 +82,12 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .photoBox .link{display:block;margin:4px auto 0;font-size:13px}
 .photoBox .muted:empty{display:none}
 .petHead{position:relative;text-align:center;margin:8px 0 14px}
+.petRow{display:flex;flex-wrap:wrap;justify-content:center;gap:12px 18px;max-width:360px;margin:0 auto}
+.pp{width:auto!important;flex:none;display:flex;flex-direction:column;align-items:center;gap:6px;background:none!important;border:none!important;padding:0!important;box-shadow:none!important;cursor:pointer;color:var(--text)}
+.pp .photo{width:var(--s);height:var(--s);display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.2}
+.pp b{font-size:15px}
+.petHead.multi h1{display:none}
+.petHead.multi .link{position:static;transform:none;display:block;margin:-4px auto 0}
 .petHead h1{font-size:32px;margin:0;padding:0 72px;overflow-wrap:anywhere}
 .petHead .link{position:absolute;right:0;top:50%;transform:translateY(-50%)}
 .wa{display:block;text-align:center;text-decoration:none;background:#25d366;color:#fff;border-radius:12px;padding:13px;margin-bottom:8px;font-size:16px}
@@ -230,10 +236,11 @@ body::before{animation:drift 28s ease-in-out infinite alternate;will-change:tran
   <div class="brand">COMITAG<svg class="logo" viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="42" fill="none" stroke="var(--blue)" stroke-width="9"/><g fill="var(--blue)"><ellipse cx="60" cy="70" rx="13" ry="11"/><circle cx="42" cy="55" r="6.5"/><circle cx="52" cy="43.5" r="6.5"/><circle cx="68" cy="43.5" r="6.5"/><circle cx="78" cy="55" r="6.5"/></g></svg></div>
   <nav id="pets" class="pets hidden" aria-label="Mis mascotas"></nav>
   <div id="photoBox" class="photoBox hidden">
-    <button class="photo" id="photoBtn" onclick="$('photoIn').click()" aria-label="Agregar o cambiar la foto de la mascota" title="Toca para agregar o cambiar la foto">
+    <button class="photo" id="photoBtn" onclick="photoTarget = null; $('photoIn').click()" aria-label="Agregar o cambiar la foto de la mascota" title="Toca para agregar o cambiar la foto">
       <img id="photoImg" class="hidden" alt="">
       <span id="photoEmpty"><span style="font-size:34px">🐾</span><br>Agregar foto</span>
     </button>
+    <div id="petRow" class="petRow hidden"></div>
     <p id="photoMsg" class="muted"></p>
     <input type="file" id="photoIn" accept="image/*" class="hidden">
   </div>
@@ -714,6 +721,7 @@ function addNameRow(box, val) {
   if ($(box).children.length >= MAX_PETS) return;
   const r = document.createElement("div");
   r.className = "trow";
+  if (val) r.dataset.orig = val;
   r.innerHTML = `<input maxlength="20" placeholder="Nombre" value="${esc(val)}"><button class="x" title="Quitar" onclick="this.parentNode.remove(); nameRowsUI('${box}')">✕</button>`;
   $(box).appendChild(r);
   nameRowsUI(box);
@@ -887,8 +895,9 @@ async function savePet() {
   if (!names.length) { $("petErr").textContent = "Escribe un nombre"; return; }
   const title = joinNames(names), pets = names.length > 1 ? names : [];
   // Los horarios de una mascota siguen a su nombre (se compara por posición en la lista)
-  const before = readNamesBefore, rename = {};
-  before.forEach((n, i) => { if (names[i]) rename[n] = names[i]; });
+  const rename = {}, oldFirst = petsOf()[0] || plate.pet_name;
+  $("petRows").querySelectorAll(".trow").forEach(r => { const v = r.querySelector("input").value.trim().slice(0, 20);
+    if (r.dataset.orig && v) rename[r.dataset.orig] = v; });
   const schedule = sortTimes((plate.schedule || []).map(x => {
     const { t, p } = parseSlot(x);
     if (!p) return t;
@@ -905,6 +914,10 @@ async function savePet() {
   rememberPet(code, title);
   cancelPet();
   render();
+  // Las fotos siguen a cada mascota (y se borran las de las que ya no están)
+  const rr = await rpcP("rename_pet_photos", { p_code: code, p_map: rename, p_names: names, p_old_first: oldFirst });
+  if (rr.error && rr.error.code !== "PGRST202") console.error(rr.error);
+  loadPhoto();
 }
 
 // ---- Editar horarios de comida ----
@@ -1092,10 +1105,50 @@ function showPhoto(src) {
   $("photoImg").alt = src ? `Foto de ${plate.pet_name}` : "";
 }
 async function loadPhoto() {
-  const { data, error } = await rpcP("get_photo", { p_code: code });
-  if (pinStatus({ data, error })) return;
-  if (!error) { showPhoto(data); cachePut({ photo: data }); }
-  else showPhoto(cacheGet().photo);
+  const many = petsOf().length > 0;
+  const [r, rp] = await Promise.all([rpcP("get_photo", { p_code: code }),
+    many ? rpcP("get_pet_photos", { p_code: code }) : Promise.resolve(null)]);
+  if (pinStatus(r)) return;
+  const photo = r.error ? cacheGet().photo : r.data;
+  if (!r.error) cachePut({ photo });
+  if (!many) { showPhotoMode(false); showPhoto(photo); return; }
+  let map = {};
+  if (rp && !rp.error && rp.data && typeof rp.data === "object") { map = rp.data; cachePut({ petPhotos: map }); }
+  else map = cacheGet().petPhotos || {};
+  petPhotos = map; platePhoto = photo || null;
+  renderPetPhotos();
+}
+
+// ---- Varias mascotas: una foto por mascota ----
+let petPhotos = {}, platePhoto = null, photoTarget = null;
+const photoOf = p => petPhotos[p] || (p === petsOf()[0] ? platePhoto : null);
+function showPhotoMode(many) {
+  $("photoBtn").classList.toggle("hidden", many);
+  $("petRow").classList.toggle("hidden", !many);
+  $("petView").classList.toggle("multi", many);
+}
+function renderPetPhotos() {
+  const pets = petsOf();
+  showPhotoMode(true);
+  const s = pets.length === 2 ? 116 : pets.length === 3 ? 96 : 86;
+  $("petRow").innerHTML = pets.map((p, i) => { const src = photoOf(p);
+    return `<button class="pp" data-i="${i}" aria-label="Agregar o cambiar la foto de ${esc(p)}"><span class="photo" style="--s:${s}px">${src
+      ? `<img src="${src}" alt="Foto de ${esc(p)}">` : `<span><span style="font-size:26px">🐾</span><br>Agregar foto</span>`}</span><b>${esc(p)}</b></button>`; }).join("");
+  $("petRow").querySelectorAll(".pp").forEach(b => b.onclick = () => { photoTarget = pets[+b.dataset.i]; $("photoIn").click(); });
+  applyMultiTheme(pets.map(photoOf).filter(Boolean));
+}
+// Colores del fondo con los tonos de todas las fotos
+function applyMultiTheme(srcs) {
+  if (srcs.length < 2) { applyPhotoTheme(srcs[0] || null); return; }
+  const key = srcs.reduce((a, x) => a + x.length, 0), cached = cacheGet().palette;
+  if (cached && cached.src === key) applyPalette(cached.pal);
+  Promise.all(srcs.map(src => new Promise(ok => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => ok(null); im.src = src; })))
+    .then(ims => {
+      ims = ims.filter(Boolean); if (!ims.length) return;
+      const c = document.createElement("canvas"), w = 36; c.width = w * ims.length; c.height = w;
+      ims.forEach((im, i) => c.getContext("2d").drawImage(im, i * w, 0, w, w));
+      try { const pal = photoPalette(c); applyPalette(pal); cachePut({ palette: { src: key, pal } }); } catch {}
+    });
 }
 // Recorta al centro en cuadrado y achica a 480 px en JPEG (~40 KB).
 function shrink(file) {
@@ -1116,10 +1169,21 @@ function shrink(file) {
 $("photoIn").onchange = async () => {
   const f = $("photoIn").files[0];
   $("photoIn").value = "";
-  if (!f) return;
+  if (!f) { photoTarget = null; return; }
   $("photoMsg").textContent = "Subiendo foto…";
   let data;
   try { data = await shrink(f); } catch { $("photoMsg").textContent = "No se pudo leer esa imagen. Prueba con otra."; return; }
+  const pet = photoTarget; photoTarget = null;
+  if (pet && petsOf().includes(pet)) {
+    const r = await rpcPin("set_pet_photo", { p_code: code, p_pet: pet, p_photo: data });
+    if (r.error) { $("photoMsg").textContent = r.error.code === "PGRST202" ? "Falta correr fotos_por_mascota.sql en Supabase." : errText(r.error, "No se pudo guardar la foto. Intenta de nuevo."); return; }
+    if (r.data !== "ok") { $("photoMsg").textContent = "No se pudo guardar la foto. Intenta de nuevo."; return; }
+    $("photoMsg").textContent = "";
+    petPhotos = { ...petPhotos, [pet]: data }; if (pet === petsOf()[0]) platePhoto = data;
+    cachePut({ petPhotos, photo: platePhoto });
+    renderPetPhotos();
+    return;
+  }
   const { error } = await rpcPin("set_photo", { p_code: code, p_photo: data });
   if (error) { $("photoMsg").textContent = errText(error, "No se pudo guardar la foto. Intenta de nuevo."); return; }
   $("photoMsg").textContent = "";
@@ -1762,6 +1826,7 @@ async function forgotPin() {
 let gateMode = "enter";
 function showGate(mode, msg) {
   gateMode = mode;
+  $("petView").classList.remove("multi");
   const pet = plate.pet_name;
   $("pet").textContent = pet;
   document.title = `${pet} · Comitag`;
