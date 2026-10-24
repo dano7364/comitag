@@ -54,6 +54,9 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .auBar i{display:block;height:100%;width:100%;background:var(--blue);transform-origin:left;animation:auFill linear forwards}
 @keyframes auFill{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 .auCancel{width:100%;font-size:17px;padding:14px}
+.pinSaved{display:flex;align-items:center;gap:10px;margin-top:10px;padding:12px 14px;border-radius:12px;background:var(--glass-input);border:1px solid var(--glass-border)}
+.pinSaved .muted{flex:1}
+.pinShow{font-size:22px;font-weight:700;letter-spacing:4px;font-variant-numeric:tabular-nums}
 .tqSel{font-size:16px;padding:12px 10px;width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text)}
 .trow .x{width:44px;padding:10px;color:var(--red)}
 .add{margin:4px 0 12px}
@@ -1226,7 +1229,7 @@ function savePin(p) { try { p ? localStorage.setItem(pinKey(), p) : localStorage
 function errText(e, fallback) { return e.cancelled ? "" : (e.friendly || fallback); }
 // Supabase responde "PIN requerido", "PIN incorrecto" o "PIN bloqueado" como texto
 const pinStatus = r => !r.error && typeof r.data === "string" && r.data.startsWith("PIN") ? r.data : "";
-function updatePinLink() { $("pinLink").textContent = hasPin ? "Cambiar PIN familiar" : "Crear PIN familiar"; }
+function updatePinLink() { $("pinLink").textContent = !hasPin ? "Crear PIN familiar" : getPinFor(code) ? "Ver o cambiar PIN" : "Cambiar PIN familiar"; }
 async function loadPin() {
   const { data, error } = await db.rpc("has_pin", { p_code: code });
   if (!error) { hasPin = data === true; cachePut({ hasPin }); } else hasPin = !!cacheGet().hasPin;
@@ -1270,19 +1273,33 @@ function askPin(msg) {
   });
 }
 function openPinSettings() {
+  // Si este teléfono ya tiene el PIN guardado, se puede ver y cambiar sin escribir el actual
+  const saved = hasPin ? getPinFor(code) : "";
   openModal(`<p style="font-size:18px;margin-top:4px"><b>${hasPin ? "🔒 PIN familiar" : "🔓 Poner PIN familiar"}</b></p>
-    <p class="muted">${hasPin
-      ? "Escribe el PIN actual y el nuevo. Los demás teléfonos tendrán que escribir el nuevo la próxima vez que entren."
+    ${saved ? `<div class="pinSaved"><span class="muted">PIN de la familia</span>
+        <span id="pinShow" class="pinShow" aria-live="polite">${"•".repeat(saved.length)}</span>
+        <button class="link" id="pinEye" aria-pressed="false">Mostrar</button></div>
+      <p class="muted" style="margin-top:8px">¿Alguien lo olvidó? Muéstraselo desde aquí. Solo se puede ver en los teléfonos que ya entraron con él.</p>` : ""}
+    <p class="muted" style="margin-top:${saved ? 14 : 0}px">${hasPin
+      ? (saved ? "<b>Cambiar el PIN:</b> escribe el nuevo. Los demás teléfonos tendrán que escribirlo la próxima vez que entren."
+               : "Escribe el PIN actual y el nuevo. Los demás teléfonos tendrán que escribir el nuevo la próxima vez que entren.")
       : "Con un PIN, se pedirá para cambiar el nombre, los horarios, los contactos, la foto o para borrar registros. Marcar comida o agua sigue siendo con un toque."}</p>
-    ${hasPin ? '<p style="margin-top:12px"><b>PIN actual</b></p><input id="pinOld" class="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="6" aria-label="PIN actual">' : ""}
+    ${hasPin ? `<div id="pinOldBox" class="${saved ? "hidden" : ""}"><p style="margin-top:12px"><b>PIN actual</b></p><input id="pinOld" class="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="6" aria-label="PIN actual"></div>` : ""}
     <p style="margin-top:12px"><b>${hasPin ? "PIN nuevo" : "PIN (4 a 6 números)"}</b></p>
     <input id="pinNew" class="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="6" aria-label="PIN nuevo">
     <p id="pinErr" class="muted warn" style="margin-top:8px"></p>
-    <div class="grid" style="margin-top:12px"><button onclick="closeModal()">Cancelar</button><button class="primary" id="pinSave">Guardar</button></div>`);
+    <div class="grid" style="margin-top:12px"><button onclick="closeModal()">${saved ? "Cerrar" : "Cancelar"}</button><button class="primary" id="pinSave">${saved ? "Cambiar PIN" : "Guardar"}</button></div>`);
+  if (saved) $("pinEye").onclick = () => {
+    const show = $("pinEye").getAttribute("aria-pressed") !== "true";
+    $("pinShow").textContent = show ? saved : "•".repeat(saved.length);
+    $("pinEye").textContent = show ? "Ocultar" : "Mostrar";
+    $("pinEye").setAttribute("aria-pressed", show);
+  };
+  let useSaved = !!saved;
   $("pinSave").onclick = async () => {
-    const old = hasPin ? $("pinOld").value.trim() : null, nw = $("pinNew").value.trim();
+    const old = hasPin ? (useSaved ? saved : $("pinOld").value.trim()) : null, nw = $("pinNew").value.trim();
     if (hasPin && !PIN_RE.test(old)) { $("pinErr").textContent = "Escribe el PIN actual."; return; }
-    if (!PIN_RE.test(nw)) { $("pinErr").textContent = "El PIN nuevo tiene que ser de 4 a 6 números."; return; }
+    if (!PIN_RE.test(nw)) { $("pinErr").textContent = hasPin ? "El PIN nuevo tiene que ser de 4 a 6 números." : "El PIN tiene que ser de 4 a 6 números."; return; }
     $("pinSave").disabled = true;
     const r = await db.rpc("set_pin", { p_code: code, p_old: old, p_new: nw || null });
     $("pinSave").disabled = false;
@@ -1293,6 +1310,12 @@ function openPinSettings() {
     }
     const st = pinStatus(r);
     if (st === "PIN bloqueado") { $("pinErr").textContent = "Demasiados intentos. Espera 15 minutos."; return; }
+    if (st && useSaved) {
+      // Alguien lo cambió desde otro teléfono: el guardado aquí ya no sirve
+      useSaved = false; $("pinOldBox").classList.remove("hidden"); $("pinOld").focus();
+      $("pinErr").textContent = "Alguien cambió el PIN desde otro teléfono. Escribe el PIN actual.";
+      return;
+    }
     if (st) { $("pinErr").textContent = "El PIN actual no es correcto."; return; }
     hasPin = !!nw; savePin(nw || ""); cachePut({ hasPin }); updatePinLink(); closeModal();
     showNote("🔒 PIN familiar guardado. Compártelo solo con tu familia.");
@@ -1674,7 +1697,7 @@ function showGate(mode, msg) {
     : `Para entrar a ${pet} desde este teléfono. Se pide una sola vez y queda guardado.`;
   $("gate2Box").classList.toggle("hidden", mode !== "create");
   $("gateBtn").textContent = mode === "create" ? "Guardar PIN" : "Entrar";
-  $("gateHint").textContent = mode === "create" ? "Usa de 4 a 6 números." : "¿No lo sabes? Pídeselo a quien configuró el plato.";
+  $("gateHint").textContent = mode === "create" ? "Usa de 4 a 6 números." : "¿Lo olvidaste? Cualquiera de la familia que ya use Comitag puede verlo en su teléfono: menú ☰ → Ver o cambiar PIN.";
   $("gateErr").textContent = msg || "";
   $("gatePin").value = ""; $("gatePin2").value = "";
   $("gate").classList.remove("hidden");
