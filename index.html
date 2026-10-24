@@ -1360,7 +1360,7 @@ function openAuto() {
       <option value="agua"${cfg.kind === "agua" ? " selected" : ""}>💧 Agua</option>
     </select>
     ${pets.length ? `<select id="auPet" class="tqSel" style="margin-top:8px" aria-label="Para quién">
-      <option value="">Para todas</option>${pets.map(p => `<option${cfg.pet === p ? " selected" : ""}>${esc(p)}</option>`).join("")}</select>` : ""}
+      <option value="">Para todas (según sus horarios)</option>${pets.map(p => `<option${cfg.pet === p ? " selected" : ""}>${esc(p)}</option>`).join("")}</select>` : ""}
     <div class="grid" style="margin-top:14px"><button onclick="closeModal()">Cancelar</button><button class="primary" id="auSave">Guardar</button></div>
     <p class="muted" style="font-size:12px;margin-top:12px">Se activa solo en este teléfono: cada persona lo elige en el suyo. En iPhone, al acercarlo aparece un aviso arriba: tócalo y se registra.</p>`);
   $("auSave").onclick = () => {
@@ -1394,33 +1394,87 @@ function autoSheet(html) {
 }
 function autoClose() { clearInterval(autoTimer); autoTimer = null; const el = $("autoBox"); if (el) el.classList.add("hidden"); }
 
+// ¿Le toca comer a esta mascota ahora, según sus horarios? (mismas ventanas que "Horarios de comida")
+// due = le toca y aún no come · fed = le toca pero ya comió en este horario · none = no le toca ahora
+function slotNow(p) {
+  const pets = petsOf(), now = Date.now(), W = 3 * 3600000;
+  const toMs = h => { const [hh, mm] = h.split(":").map(Number); const d = new Date(); d.setHours(hh, mm || 0, 0, 0); return d.getTime(); };
+  const mine = [...new Set((plate.schedule || []).map(parseSlot)
+    .filter(x => /^\d\d:\d\d$/.test(x.t) && (!x.p || !pets.includes(x.p) || x.p === p))
+    .flatMap(x => { const t = toMs(x.t); return [t - 864e5, t, t + 864e5]; }))].sort((a, b) => a - b); // ayer, hoy y mañana (cruza la medianoche)
+  for (let k = 0; k < mine.length; k++) {
+    const t = mine[k];
+    const from = Math.max(k ? (mine[k - 1] + t) / 2 : 0, t - W);
+    const to = Math.min(k < mine.length - 1 ? (t + mine[k + 1]) / 2 : Infinity, t + W);
+    if (now < from || now >= to) continue;
+    const e = log.find(x => x.kind === "comida" && (!x.pet || x.pet === p) && x.t >= from && x.t < to);
+    return e ? { st: "fed", e } : { st: "due" };
+  }
+  return { st: "none" };
+}
+const hasPetSlots = () => { const pets = petsOf(); return (plate.schedule || []).some(x => pets.includes(parseSlot(x).p)); };
+
+function autoWarn(kind, fed) {
+  const f = fed[0], quien = f.e.who === me ? "Tú ya" : `${esc(f.e.who)} ya`;
+  const a = fed.length > 1 ? joinNames(fed.map(x => x.p)) : (f.p || plate.pet_name);
+  autoSheet(`<p style="margin:0 0 6px"><b>⚠️ ${quien} le dio comida a ${esc(a)}</b></p>
+    <p class="muted">A las ${fmt(f.e.t)} (${ago(f.e.t)}). No registré nada para no repetir.</p>
+    <div class="grid" style="margin-top:12px"><button onclick="autoClose()">Cerrar</button><button id="auForce">Registrar igual</button></div>`);
+  $("auForce").onclick = () => { autoClose(); petsOf().length ? autoChoose(kind, "", fed.map(x => x.p)) : autoSave(kind, [null]); };
+}
+// Elegir a mano a quién se le dio (platos con varias mascotas)
+function autoChoose(kind, msg, pre) {
+  clearInterval(autoTimer); autoTimer = null;
+  autoSheet(`<p style="margin:0 0 6px"><b>🍽️ ¿A quién le diste comida?</b></p>
+    ${msg ? `<p class="muted" style="margin-bottom:8px">${msg}</p>` : ""}
+    <div id="auChips">${petsOf().map(p => { const on = pre.includes(p);
+      return `<button type="button" class="chip${on ? " on" : ""}" data-p="${esc(p)}" aria-pressed="${on}" onclick="this.classList.toggle('on'); this.setAttribute('aria-pressed', this.classList.contains('on'))">${esc(p)}</button>`; }).join("")}</div>
+    <p id="auErr" class="muted warn" style="min-height:0"></p>
+    <div class="grid" style="margin-top:10px"><button onclick="autoClose(); showNote('Cancelado: no se registró nada.')">Cancelar</button><button class="primary" id="auGo">Registrar</button></div>`);
+  $("auGo").onclick = () => {
+    const sel = [...$("auChips").querySelectorAll(".chip.on")].map(b => b.dataset.p);
+    if (!sel.length) { $("auErr").textContent = "Elige al menos una."; return; }
+    autoClose(); autoSave(kind, sel);
+  };
+}
+
 function autoRun() {
   const cfg = autoGet();
   if (!cfg || !me || !openedFromTag()) return;
   try { sessionStorage.setItem("comitag_auto_hecho_" + code, "1"); } catch {}
   const kind = cfg.kind, pets = petsOf();
-  let sel = [null];
+  let sel = [null], extra = "";
   if (kind === "comida") {
-    const targets = cfg.pet && pets.includes(cfg.pet) ? [cfg.pet] : (pets.length ? pets : [null]);
-    const fed = targets.map(p => ({ p, e: log.find(x => x.kind === "comida" && (p === null || !x.pet || x.pet === p)) }))
-                       .filter(x => x.e && Date.now() - x.e.t < AUTO_REPETIDA_MIN * 60000);
-    sel = targets.filter(p => !fed.some(f => f.p === p));
-    if (!sel.length) {
-      const f = fed[0], quien = f.e.who === me ? "Tú ya" : `${esc(f.e.who)} ya`;
-      const a = fed.length > 1 ? joinNames(fed.map(x => x.p)) : (f.p || plate.pet_name);
-      autoSheet(`<p style="margin:0 0 6px"><b>⚠️ ${quien} le dio comida a ${esc(a)}</b></p>
-        <p class="muted">A las ${fmt(f.e.t)} (${ago(f.e.t)}). No registré nada para no repetir.</p>
-        <div class="grid" style="margin-top:12px"><button onclick="autoClose()">Cerrar</button><button id="auForce">Registrar igual</button></div>`);
-      $("auForce").onclick = () => { autoClose(); autoSave(kind, targets); };
-      return;
+    if (pets.length && !(cfg.pet && pets.includes(cfg.pet)) && hasPetSlots()) {
+      // Varias mascotas con horarios distintos: solo a las que les toca ahora
+      const st = pets.map(p => ({ p, ...slotNow(p) }));
+      const due = st.filter(x => x.st === "due").map(x => x.p), fed = st.filter(x => x.st === "fed");
+      if (!due.length && fed.length) { autoWarn(kind, fed); return; }
+      if (!due.length) { autoChoose(kind, "Según los horarios, ahora no le toca comer a ninguna.", []); return; }
+      sel = due;
+      const otras = pets.filter(p => !due.includes(p));
+      if (otras.length) extra = otras.map(p => { const x = st.find(y => y.p === p);
+        return x.st === "fed" ? `${esc(p)} ya comió (${esc(x.e.who)}, ${fmt(x.e.t)})` : `a ${esc(p)} no le toca ahora`; }).join(" · ");
+    } else {
+      // Una mascota, una elegida, o todas con los mismos horarios
+      const targets = cfg.pet && pets.includes(cfg.pet) ? [cfg.pet] : (pets.length ? pets : [null]);
+      const fed = targets.map(p => ({ p, e: log.find(x => x.kind === "comida" && (p === null || !x.pet || x.pet === p)) }))
+                         .filter(x => x.e && Date.now() - x.e.t < AUTO_REPETIDA_MIN * 60000);
+      sel = targets.filter(p => !fed.some(f => f.p === p));
+      if (!sel.length) { autoWarn(kind, fed); return; }
+      if (fed.length) extra = fed.map(f => `${esc(f.p)} ya comió (${esc(f.e.who)}, ${fmt(f.e.t)})`).join(" · ");
     }
   }
   const quien = sel[0] ? joinNames(sel) : plate.pet_name;
   const lbl = kind === "comida" ? `🍽️ Registrando comida de ${esc(quien)}` : `💧 Registrando agua de ${esc(plate.pet_name)}`;
+  const many = kind === "comida" && pets.length;
   let n = AUTO_SEG;
   autoSheet(`<p style="margin:0"><b>${lbl}…</b> <span id="auN" class="auN">${n}</span></p>
+    ${extra ? `<p class="muted" style="margin-top:4px">${extra.charAt(0).toUpperCase() + extra.slice(1)}.</p>` : ""}
     <div class="auBar"><i style="animation-duration:${AUTO_SEG}s"></i></div>
-    <button class="auCancel" onclick="autoClose(); showNote('Cancelado: no se registró nada.')">Cancelar</button>`);
+    ${many ? `<div class="grid"><button class="auCancel" onclick="autoClose(); showNote('Cancelado: no se registró nada.')">Cancelar</button><button class="auCancel" id="auPick">Elegir otras</button></div>`
+           : `<button class="auCancel" onclick="autoClose(); showNote('Cancelado: no se registró nada.')">Cancelar</button>`}`);
+  if (many) $("auPick").onclick = () => autoChoose(kind, "", sel);
   autoTimer = setInterval(() => {
     n--;
     if (n > 0) { const el = $("auN"); if (el) el.textContent = n; return; }
