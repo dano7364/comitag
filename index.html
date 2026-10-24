@@ -87,7 +87,8 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .pp .photo{width:var(--s);height:var(--s);display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.2}
 .pp b{font-size:15px}
 .petHead.multi h1{display:none}
-.petHead.multi .link{position:static;transform:none;display:block;margin:-4px auto 0}
+.petHead.multi .link{position:static;transform:none;display:block;margin:2px auto 0;color:var(--muted);font-size:15px;font-weight:500;letter-spacing:.3px;padding:6px 14px}
+.petHead.multi .link:active{opacity:.6}
 .petHead h1{font-size:32px;margin:0;padding:0 72px;overflow-wrap:anywhere}
 .petHead .link{position:absolute;right:0;top:50%;transform:translateY(-50%)}
 .wa{display:block;text-align:center;text-decoration:none;background:#25d366;color:#fff;border-radius:12px;padding:13px;margin-bottom:8px;font-size:16px}
@@ -141,7 +142,8 @@ body{background:transparent;min-height:100vh}
 /* manchas de color detrás del vidrio */
 body::before{content:"";position:fixed;inset:-15%;z-index:-1;pointer-events:none;
   background:radial-gradient(circle at 12% 18%,var(--blob1),transparent 38%),radial-gradient(circle at 88% 12%,var(--blob2),transparent 36%),
-             radial-gradient(circle at 78% 78%,var(--blob3),transparent 42%),radial-gradient(circle at 18% 88%,var(--blob4),transparent 38%),var(--bg);
+             radial-gradient(circle at 78% 78%,var(--blob3),transparent 42%),radial-gradient(circle at 18% 88%,var(--blob4),transparent 38%),
+             radial-gradient(circle at 30% 50%,var(--blob5,transparent),transparent 32%),radial-gradient(circle at 75% 42%,var(--blob6,transparent),transparent 30%),var(--bg);
   filter:blur(18px)}
 .card,.modal,.menuList,.prow,.pets a,#waBox{background:var(--glass);border:1px solid var(--glass-border);
   -webkit-backdrop-filter:blur(22px) saturate(180%);backdrop-filter:blur(22px) saturate(180%);
@@ -1081,9 +1083,12 @@ function applyPalette(pal) {
   if (!pal) { if (el) el.remove(); return; }
   const c = pal.cols, at = i => c[i % c.length];
   // Claro: tonos pastel luminosos · Oscuro: tonos profundos (mismas transparencias que antes)
-  const L = i => { const k = at(i); return hsl(k.h, pal.gray ? .08 : Math.min(.85, Math.max(.45, k.s)), .68, [.55, .38, .38, .30][i]); };
-  const D = i => { const k = at(i); return hsl(k.h, pal.gray ? .08 : Math.min(.8, Math.max(.4, k.s)), .38, [.45, .30, .30, .22][i]); };
-  const vars = f => `--blob1:${f(0)};--blob2:${f(1)};--blob3:${f(2)};--blob4:${f(3)};`;
+  const g = k => pal.gray || k.gray;
+  const L = i => { const k = at(i); return hsl(k.h, g(k) ? .08 : Math.min(.85, Math.max(.45, k.s)), .68, [.55, .38, .38, .30, .30, .26][i]); };
+  const D = i => { const k = at(i); return hsl(k.h, g(k) ? .08 : Math.min(.8, Math.max(.4, k.s)), .38, [.45, .30, .30, .22, .22, .18][i]); };
+  // Con 5 o 6 fotos hay 2 manchas más, para que todas aporten su color
+  const vars = f => `--blob1:${f(0)};--blob2:${f(1)};--blob3:${f(2)};--blob4:${f(3)};`
+    + (c.length > 4 ? `--blob5:${f(4)};` : "--blob5:transparent;") + (c.length > 5 ? `--blob6:${f(5)};` : "--blob6:transparent;");
   if (!el) { el = document.createElement("style"); el.id = "petPalette"; document.head.appendChild(el); }
   el.textContent = `:root{${vars(L)}}
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]){${vars(D)}}}
@@ -1126,6 +1131,16 @@ function showPhotoMode(many) {
   $("photoBtn").classList.toggle("hidden", many);
   $("petRow").classList.toggle("hidden", !many);
   $("petView").classList.toggle("multi", many);
+  const full = petsOf().length >= MAX_PETS;
+  $("petEditBtn").textContent = !many ? "✏️ Editar" : full ? "Editar mascotas" : "Agregar mascota";
+  $("petEditBtn").onclick = !many || full ? editPet : addPetRow;
+}
+// Abre la edición con una fila nueva lista para escribir
+function addPetRow() {
+  editPet();
+  addNameRow("petRows", "");
+  const ins = $("petRows").querySelectorAll("input");
+  setTimeout(() => ins[ins.length - 1] && ins[ins.length - 1].focus(), 50);
 }
 function renderPetPhotos() {
   const pets = petsOf();
@@ -1137,17 +1152,23 @@ function renderPetPhotos() {
   $("petRow").querySelectorAll(".pp").forEach(b => b.onclick = () => { photoTarget = pets[+b.dataset.i]; $("photoIn").click(); });
   applyMultiTheme(pets.map(photoOf).filter(Boolean));
 }
-// Colores del fondo con los tonos de todas las fotos
+// Colores del fondo: cada foto aporta su propio color (repartidos en las esquinas)
 function applyMultiTheme(srcs) {
   if (srcs.length < 2) { applyPhotoTheme(srcs[0] || null); return; }
-  const key = srcs.reduce((a, x) => a + x.length, 0), cached = cacheGet().palette;
+  const key = "m" + srcs.map(x => x.length).join("-"), cached = cacheGet().palette;
   if (cached && cached.src === key) applyPalette(cached.pal);
   Promise.all(srcs.map(src => new Promise(ok => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => ok(null); im.src = src; })))
     .then(ims => {
-      ims = ims.filter(Boolean); if (!ims.length) return;
-      const c = document.createElement("canvas"), w = 36; c.width = w * ims.length; c.height = w;
-      ims.forEach((im, i) => c.getContext("2d").drawImage(im, i * w, 0, w, w));
-      try { const pal = photoPalette(c); applyPalette(pal); cachePut({ palette: { src: key, pal } }); } catch {}
+      let pals = [];
+      ims.forEach(im => { if (im) try { pals.push(photoPalette(im)); } catch {} });
+      if (!pals.length) return;
+      const n = pals.length, cols = [];
+      for (let i = 0; i < Math.max(4, Math.min(6, n)); i++) {
+        const p = pals[i % n], k = p.cols[Math.floor(i / n)] || p.cols[0];
+        cols.push({ ...k, gray: p.gray });
+      }
+      const pal = { cols, gray: false };
+      applyPalette(pal); cachePut({ palette: { src: key, pal } });
     });
 }
 // Recorta al centro en cuadrado y achica a 480 px en JPEG (~40 KB).
