@@ -46,6 +46,7 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .trow{display:flex;gap:8px;align-items:center;margin-bottom:8px}
 .trow input{flex:1;min-width:0}
 .trow select{flex:none;width:auto;max-width:42%;font-size:16px;padding:12px 8px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text)}
+.tqSel{font-size:16px;padding:12px 10px;width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text)}
 .trow .x{width:44px;padding:10px;color:var(--red)}
 .add{margin:4px 0 12px}
 .brand{text-align:center;font-size:12px;font-weight:600;letter-spacing:.42em;color:var(--brand);margin:10px 0 4px;padding-left:.42em}
@@ -351,6 +352,7 @@ body::before{animation:drift 28s ease-in-out infinite alternate;will-change:tran
       </button>
       <div id="menuList" class="menuList hidden" role="menu">
         <button role="menuitem" onclick="menuDo(openInvite)"><i class="mi">👨‍👩‍👧</i><span>Invitar a la familia</span></button>
+        <button role="menuitem" onclick="menuDo(openToque)"><i class="mi">📲</i><span>Registrar con un toque</span></button>
         <button role="menuitem" onclick="menuDo(openPinSettings)"><i class="mi">🔒</i><span id="pinLink">PIN familiar</span></button>
         <button role="menuitem" onclick="menuDo(openAddPet)"><i class="mi">＋</i><span>Agregar otra mascota</span></button>
         <button role="menuitem" onclick="cycleTheme()"><i class="mi">🌓</i><span class="themeLbl">Tema</span></button>
@@ -1319,6 +1321,44 @@ function qrSvg(text) {
   for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) d += `M${c} ${r}h1v1h-1z`;
   return `<svg viewBox="-2 -2 ${n + 4} ${n + 4}" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" role="img" aria-label="Código QR"><path d="${d}" fill="#111"/></svg>`;
 }
+// ================= Registrar con un toque (Atajos de iPhone) =================
+function toqueUrl(kind, pet) {
+  const p = new URLSearchParams({ c: code, k: kind, w: me || "" });
+  const pin = getPinFor(code); if (pin) p.set("pin", pin);
+  if (pet) p.set("m", pet);
+  return `${location.origin}/api/toque?${p}`;
+}
+function openToque() {
+  const pets = petsOf();
+  openModal(`<p style="font-size:18px;margin-top:4px"><b>📲 Registrar con un toque</b></p>
+    <p class="muted">Con la app <b>Atajos</b> del iPhone, al acercar el teléfono al plato se registra solo y te llega un aviso. No se abre nada. Si alguien ya le dio comida hace menos de 30 min, te avisa y no la registra de nuevo.</p>
+    <div class="grid" style="margin-top:10px">
+      <select id="tqKind" class="tqSel" aria-label="Qué registra"><option value="comida">🍽️ Comida</option><option value="agua">💧 Agua</option></select>
+      ${pets.length ? `<select id="tqPet" class="tqSel" aria-label="Para quién"><option value="">Para todas</option>${pets.map(p => `<option>${esc(p)}</option>`).join("")}</select>` : ""}
+    </div>
+    <div class="grid" style="margin-top:10px"><button id="tqCopy" class="primary">1 · Copiar enlace</button><button id="tqTest">Probar</button></div>
+    <p id="tqMsg" class="muted" style="font-size:13px;min-height:1em"></p>
+    <ol class="muted" style="padding-left:20px;font-size:14px;line-height:1.5;margin:6px 0 0">
+      <li>Toca <b>Copiar enlace</b>.</li>
+      <li>Abre <b>Atajos</b> → <b>Automatización</b> → <b>＋</b> → <b>NFC</b> → <b>Escanear</b> y acerca el teléfono al tag del plato.</li>
+      <li>Elige <b>Ejecutar inmediatamente</b>, apaga <b>Notificar al ejecutarse</b> y toca <b>Siguiente</b> → <b>Nuevo atajo en blanco</b>.</li>
+      <li>Agrega <b>Obtener contenido de URL</b> y pega el enlace donde dice URL.</li>
+      <li>Agrega <b>Mostrar notificación</b> y en el texto elige <b>Contenido de URL</b>. Toca <b>OK</b>.</li>
+    </ol>
+    <p class="muted" style="font-size:12px;margin-top:10px">Cada persona lo arma en su propio iPhone (el enlace lleva su nombre${getPinFor(code) ? " y el PIN familiar: no lo compartas" : ""}). Si cambian el PIN, hay que copiarlo de nuevo.</p>
+    <button class="link" style="display:block;margin:6px auto 0" onclick="closeModal()">Cerrar</button>`);
+  const url = () => toqueUrl($("tqKind").value, $("tqPet") ? $("tqPet").value : "");
+  $("tqCopy").onclick = async () => {
+    try { await navigator.clipboard.writeText(url()); $("tqCopy").textContent = "✓ Copiado"; }
+    catch { $("tqMsg").textContent = url(); }
+  };
+  $("tqTest").onclick = async () => {
+    $("tqMsg").textContent = "Probando…";
+    try { const r = await fetch(url() + "&prueba=1", { cache: "no-store" }); $("tqMsg").textContent = await r.text(); }
+    catch { $("tqMsg").textContent = "Sin conexión: prueba de nuevo con internet."; }
+  };
+}
+
 async function openInvite() {
   const url = `${location.origin}/p/${code}`, pet = plate.pet_name;
   const text = `Registra aquí cuándo le das comida a ${pet} 🐾`;
