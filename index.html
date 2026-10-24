@@ -1422,17 +1422,28 @@ function autoWarn(kind, fed) {
     <div class="grid" style="margin-top:12px"><button onclick="autoClose()">Cerrar</button><button id="auForce">Registrar igual</button></div>`);
   $("auForce").onclick = () => { autoClose(); petsOf().length ? autoChoose(kind, "", fed.map(x => x.p)) : autoSave(kind, [null]); };
 }
+// Botón "Todos": marca todas (o las desmarca si ya estaban todas)
+function autoAll() {
+  const chips = [...$("auChips").querySelectorAll(".chip[data-p]")], all = chips.every(b => b.classList.contains("on"));
+  chips.forEach(b => { b.classList.toggle("on", !all); b.setAttribute("aria-pressed", !all); });
+  autoAllSync();
+}
+function autoAllSync() {
+  const chips = [...$("auChips").querySelectorAll(".chip[data-p]")], all = chips.length && chips.every(b => b.classList.contains("on"));
+  $("auAll").classList.toggle("on", !!all); $("auAll").setAttribute("aria-pressed", !!all);
+}
 // Elegir a mano a quién se le dio (platos con varias mascotas)
 function autoChoose(kind, msg, pre) {
   clearInterval(autoTimer); autoTimer = null;
   autoSheet(`<p style="margin:0 0 6px"><b>🍽️ ¿A quién le diste comida?</b></p>
     ${msg ? `<p class="muted" style="margin-bottom:8px">${msg}</p>` : ""}
-    <div id="auChips">${petsOf().map(p => { const on = pre.includes(p);
-      return `<button type="button" class="chip${on ? " on" : ""}" data-p="${esc(p)}" aria-pressed="${on}" onclick="this.classList.toggle('on'); this.setAttribute('aria-pressed', this.classList.contains('on'))">${esc(p)}</button>`; }).join("")}</div>
+    <div id="auChips"><button type="button" class="chip" id="auAll" aria-pressed="false" onclick="autoAll()">Todos</button>${petsOf().map(p => { const on = pre.includes(p);
+      return `<button type="button" class="chip${on ? " on" : ""}" data-p="${esc(p)}" aria-pressed="${on}" onclick="this.classList.toggle('on'); this.setAttribute('aria-pressed', this.classList.contains('on')); autoAllSync()">${esc(p)}</button>`; }).join("")}</div>
     <p id="auErr" class="muted warn" style="min-height:0"></p>
     <div class="grid" style="margin-top:10px"><button onclick="autoClose(); showNote('Cancelado: no se registró nada.')">Cancelar</button><button class="primary" id="auGo">Registrar</button></div>`);
+  autoAllSync();
   $("auGo").onclick = () => {
-    const sel = [...$("auChips").querySelectorAll(".chip.on")].map(b => b.dataset.p);
+    const sel = [...$("auChips").querySelectorAll(".chip.on[data-p]")].map(b => b.dataset.p);
     if (!sel.length) { $("auErr").textContent = "Elige al menos una."; return; }
     autoClose(); autoSave(kind, sel);
   };
