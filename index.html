@@ -159,55 +159,6 @@ input,select{background:var(--glass-input)!important;border:1px solid var(--glas
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
   .card,.modal,.menuList,.prow,.pets a,#waBox{background:var(--card)}}
 
-/* ================= Vidrio líquido v2: colores de la foto + reflejos ================= */
-:root{--tint:96,165,250;--photo-op:.55}
-:root[data-theme=dark]{--photo-op:.38}
-@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--photo-op:.38}}
-/* La foto de la mascota, muy difuminada, detrás de todo (como Apple Music) */
-body::after{content:"";position:fixed;inset:-25%;z-index:-1;pointer-events:none;opacity:0;
-  background:var(--pet-photo,none) center/cover no-repeat;filter:blur(60px) saturate(1.6);
-  transform:scale(1.1);transition:opacity 1.2s var(--ease-out)}
-html.has-photo body::after{opacity:var(--photo-op)}
-/* Vidrio: degradado con brillo, tinte del color de la mascota y sombra teñida */
-.card,.modal,.menuList,.prow,.pets a,#waBox{position:relative;
-  background:linear-gradient(140deg,color-mix(in srgb,var(--glass) 100%,transparent) 0%,
-             color-mix(in srgb,rgb(var(--tint)) 7%,var(--glass)) 55%,
-             color-mix(in srgb,var(--glass) 70%,transparent) 100%);
-  -webkit-backdrop-filter:blur(26px) saturate(190%);backdrop-filter:blur(26px) saturate(190%);
-  border:1px solid transparent;
-  box-shadow:0 12px 36px rgba(var(--tint),.16),0 2px 8px rgba(0,0,0,.05),inset 0 1px 0 var(--glass-hl),inset 0 -1px 0 rgba(255,255,255,.12)}
-.pets a.on{background:linear-gradient(180deg,#5a8dff,var(--blue))}
-/* Borde con reflejo de luz (arriba a la izquierda brilla, abajo a la derecha se apaga) */
-.card::before,.modal::before,.menuList::before,.prow::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;
-  background:linear-gradient(145deg,rgba(255,255,255,.95),rgba(255,255,255,.25) 35%,rgba(255,255,255,.06) 60%,rgba(255,255,255,.45));
-  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;
-  mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0)}
-:root[data-theme=dark] .card::before,:root[data-theme=dark] .modal::before,:root[data-theme=dark] .menuList::before,:root[data-theme=dark] .prow::before{
-  background:linear-gradient(145deg,rgba(255,255,255,.35),rgba(255,255,255,.08) 35%,rgba(255,255,255,.02) 60%,rgba(255,255,255,.18))}
-@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .card::before,:root:not([data-theme=light]) .modal::before,
-  :root:not([data-theme=light]) .menuList::before,:root:not([data-theme=light]) .prow::before{
-  background:linear-gradient(145deg,rgba(255,255,255,.35),rgba(255,255,255,.08) 35%,rgba(255,255,255,.02) 60%,rgba(255,255,255,.18))}}
-/* Brillo suave en la parte de arriba de cada tarjeta, como una gota */
-.card::after{content:"";position:absolute;left:8%;right:8%;top:0;height:42%;border-radius:22px 22px 50% 50%/22px 22px 18px 18px;pointer-events:none;
-  background:linear-gradient(180deg,rgba(255,255,255,.28),rgba(255,255,255,0));opacity:.7}
-:root[data-theme=dark] .card::after{opacity:.18}
-@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .card::after{opacity:.18}}
-.card > *{position:relative;z-index:1}
-.card::after{z-index:0}
-/* La foto con un aro de vidrio del color de la mascota */
-.photo{border:4px solid rgba(255,255,255,.55);box-shadow:0 10px 34px rgba(var(--tint),.38),0 0 0 6px rgba(var(--tint),.12),inset 0 1px 0 var(--glass-hl)}
-/* Botones secundarios con el mismo vidrio */
-button:not(.primary):not(.danger):not(.link):not(.hx):not(.menuBtn):not(.chip):not(.rm.sure){
-  background:linear-gradient(180deg,rgba(255,255,255,.5),rgba(255,255,255,.22));border-color:rgba(255,255,255,.6)}
-:root[data-theme=dark] button:not(.primary):not(.danger):not(.link):not(.hx):not(.menuBtn):not(.chip){
-  background:linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.03));border-color:rgba(255,255,255,.12)}
-@media (prefers-color-scheme:dark){:root:not([data-theme=light]) button:not(.primary):not(.danger):not(.link):not(.hx):not(.menuBtn):not(.chip){
-  background:linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.03));border-color:rgba(255,255,255,.12)}}
-.primary{box-shadow:0 8px 22px rgba(37,99,235,.38),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -2px 6px rgba(0,0,0,.12)}
-
-/* Con foto de fondo, COMITAG y textos suaves con más contraste */
-html.has-photo .brand{color:var(--text);opacity:.55}
-html.has-photo #hello{color:var(--text);opacity:.65}
 /* ================= Movimiento estilo Apple (resortes) ================= */
 :root{--spring:cubic-bezier(.34,1.45,.55,1);--spring-soft:cubic-bezier(.22,1.15,.36,1);--ease-out:cubic-bezier(.2,.8,.2,1)}
 @supports (transition-timing-function:linear(0,1)){
@@ -267,11 +218,10 @@ body::before{animation:drift 28s ease-in-out infinite alternate;will-change:tran
   <div class="brand">COMITAG<svg class="logo" viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="42" fill="none" stroke="var(--blue)" stroke-width="9"/><g fill="var(--blue)"><ellipse cx="60" cy="70" rx="13" ry="11"/><circle cx="42" cy="55" r="6.5"/><circle cx="52" cy="43.5" r="6.5"/><circle cx="68" cy="43.5" r="6.5"/><circle cx="78" cy="55" r="6.5"/></g></svg></div>
   <nav id="pets" class="pets hidden" aria-label="Mis mascotas"></nav>
   <div id="photoBox" class="photoBox hidden">
-    <button class="photo" id="photoBtn" onclick="$('photoIn').click()" aria-label="Foto de la mascota">
+    <button class="photo" id="photoBtn" onclick="$('photoIn').click()" aria-label="Agregar o cambiar la foto de la mascota" title="Toca para agregar o cambiar la foto">
       <img id="photoImg" class="hidden" alt="">
       <span id="photoEmpty"><span style="font-size:34px">🐾</span><br>Agregar foto</span>
     </button>
-    <button class="link hidden" id="photoChange" onclick="$('photoIn').click()">📷 Cambiar foto</button>
     <p id="photoMsg" class="muted"></p>
     <input type="file" id="photoIn" accept="image/*" class="hidden">
   </div>
@@ -1045,66 +995,10 @@ function removeThisPet() {
 }
 
 // ---- Foto de la mascota ----
-// ---- Colores de la foto: fondo y tinte del vidrio ----
-function rgb2hsl(r, g, b) {
-  r /= 255; g /= 255; b /= 255;
-  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2;
-  if (mx === mn) return [0, 0, l];
-  const d = mx - mn, s = l > .5 ? d / (2 - mx - mn) : d / (mx + mn);
-  const h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
-  return [h * 60, s, l];
-}
-const hsl = (h, s, l, a) => `hsla(${Math.round(h)},${Math.round(s * 100)}%,${Math.round(l * 100)}%,${a})`;
-// Busca hasta 4 colores principales (agrupando por tono) en una versión chiquita de la foto
-function photoPalette(img) {
-  const c = document.createElement("canvas"); c.width = c.height = 36;
-  const x = c.getContext("2d", { willReadFrequently: true }); x.drawImage(img, 0, 0, 36, 36);
-  const px = x.getImageData(0, 0, 36, 36).data, bins = Array.from({ length: 12 }, () => ({ w: 0, h: 0, s: 0, l: 0 }));
-  let grayW = 0, grayL = 0;
-  for (let i = 0; i < px.length; i += 4) {
-    const [h, s, l] = rgb2hsl(px[i], px[i + 1], px[i + 2]);
-    if (l < .08 || l > .96) continue;
-    if (s < .12) { grayW++; grayL += l; continue; }
-    const w = s * (1 - Math.abs(l - .5)), b = bins[Math.floor(h / 30) % 12];
-    b.w += w; b.h += h * w; b.s += s * w; b.l += l * w;
-  }
-  const cols = bins.filter(b => b.w > 0).sort((a, b) => b.w - a.w).slice(0, 4).map(b => ({ h: b.h / b.w, s: b.s / b.w, l: b.l / b.w }));
-  if (!cols.length) return { cols: [{ h: 220, s: .1, l: grayW ? grayL / grayW : .5 }], gray: true };
-  return { cols, gray: false };
-}
-function applyPalette(pal) {
-  let el = document.getElementById("petPalette");
-  if (!pal) { if (el) el.remove(); return; }
-  const c = pal.cols, at = i => c[i % c.length];
-  // Claro: tonos pastel luminosos · Oscuro: tonos profundos
-  const L = i => { const k = at(i); return hsl(k.h, pal.gray ? .08 : Math.min(.85, Math.max(.45, k.s)), .68, .62); };
-  const D = i => { const k = at(i); return hsl(k.h, pal.gray ? .08 : Math.min(.8, Math.max(.4, k.s)), .38, .50); };
-  const m = c[0], t = `hsl(${Math.round(m.h)},${Math.round(Math.min(.8, m.s) * 100)}%,55%)`;
-  const tmp = document.createElement("div"); tmp.style.color = t; document.body.appendChild(tmp);
-  const rgb = getComputedStyle(tmp).color.match(/\d+/g).slice(0, 3).join(","); tmp.remove();
-  const vars = f => `--blob1:${f(0)};--blob2:${f(1)};--blob3:${f(2)};--blob4:${f(3)};`;
-  if (!el) { el = document.createElement("style"); el.id = "petPalette"; document.head.appendChild(el); }
-  el.textContent = `:root{${vars(L)}--tint:${rgb}}
-@media (prefers-color-scheme:dark){:root:not([data-theme=light]){${vars(D)}}}
-:root[data-theme=dark]{${vars(D)}}`;
-}
-function applyPhotoTheme(src) {
-  const root = document.documentElement;
-  if (!src) { root.classList.remove("has-photo"); root.style.removeProperty("--pet-photo"); applyPalette(null); return; }
-  root.style.setProperty("--pet-photo", `url("${src}")`);
-  root.classList.add("has-photo");
-  const cached = cacheGet().palette;
-  if (cached && cached.src === src.length) applyPalette(cached.pal);
-  const img = new Image();
-  img.onload = () => { try { const pal = photoPalette(img); applyPalette(pal); cachePut({ palette: { src: src.length, pal } }); } catch {} };
-  img.src = src;
-}
 function showPhoto(src) {
-  applyPhotoTheme(src);
   $("photoImg").src = src || "";
   $("photoImg").classList.toggle("hidden", !src);
   $("photoEmpty").classList.toggle("hidden", !!src);
-  $("photoChange").classList.toggle("hidden", !src);
   $("photoImg").alt = src ? `Foto de ${plate.pet_name}` : "";
 }
 async function loadPhoto() {
