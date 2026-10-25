@@ -94,6 +94,9 @@ table.tv td:last-child,table.tv th:last-child{text-align:right;font-variant-nume
   #printSheet .q{text-align:center;font:10pt/1.3 -apple-system,sans-serif;break-inside:avoid}
   #printSheet svg{width:42mm;height:42mm}
 }
+.annBtns{display:flex;gap:18px;flex-wrap:wrap;margin-top:6px}
+.annBtns .link{padding:0}
+.annDel{color:#dc2626!important}
 </style>
 </head>
 <body>
@@ -366,10 +369,23 @@ async function loadAnn() {
       <p class="muted" style="font-size:12px;margin-top:4px">${a.plate_code ? `Solo para ${esc(pl ? pl.pet_name || a.plate_code : a.plate_code)} · ` : ""}${
         future ? `se publica el ${esc(fmtDate(a.send_at))}` : esc(fmtDate(a.send_at || a.created_at))}${
         a.want_push ? (a.pushed ? ` · notificación a ${plural(a.sent_push, "teléfono", "teléfonos")}` : " · con notificación") : ""}</p>
-      ${a.active ? `<button class="link" data-hide="${a.id}">${future ? "Cancelar" : "Quitar de la página"}</button>` : ""}
+      <div class="annBtns">${a.active ? `<button class="link" data-hide="${a.id}">${future ? "Cancelar" : "Quitar de la página"}</button>` : ""}<button class="link annDel" data-del="${a.id}">Borrar</button></div>
+      <p class="muted err hidden" data-delerr="${a.id}" style="font-size:13px;margin-top:4px"></p>
     </div>`; }).join("") : '<p class="muted">Todavía no has mandado anuncios.</p>';
   $("annList").querySelectorAll("[data-hide]").forEach(b => b.onclick = async () => {
     b.disabled = true; await api({ action: "hide", id: +b.dataset.hide }); loadAnn();
+  });
+  $("annList").querySelectorAll("[data-del]").forEach(b => b.onclick = async () => {
+    const a = items.find(x => x.id === +b.dataset.del);
+    if (!await ask("¿Borrar este anuncio?", `“${a ? a.title : ""}” se borra para siempre: deja de verse en la página y en la campana de las familias. Las notificaciones que ya llegaron a los teléfonos no se pueden quitar.`, "Borrar")) return;
+    b.disabled = true;
+    let r; try { r = await api({ action: "delete", id: +b.dataset.del }); } catch { r = { status: 0 }; }
+    if (r.status !== 200) {
+      const e = $("annList").querySelector(`[data-delerr="${b.dataset.del}"]`);
+      e.textContent = r.status === 400 ? "Falta actualizar la función “anuncio” en Supabase." : "No se pudo borrar. Intenta de nuevo.";
+      e.classList.remove("hidden"); b.disabled = false; return;
+    }
+    loadAnn();
   });
 }
 
