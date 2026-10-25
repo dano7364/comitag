@@ -176,13 +176,13 @@ button:disabled{opacity:.4;cursor:default;box-shadow:none}
 .menuModal .menuList button,.profHead,.pfPhoto{-webkit-backdrop-filter:none!important;backdrop-filter:none!important;box-shadow:none!important}
 .menuModal .menuList button{border-radius:0!important;border-left:none!important;border-right:none!important;border-bottom:none!important;border-top:1px solid var(--line)!important;background:transparent!important}
 .menuModal .menuList button:first-child{border-top:none!important}
-.profHead{display:flex;align-items:center;gap:14px;width:100%;padding:4px 2px;border:none!important;background:none!important;box-shadow:none!important;text-align:left;cursor:pointer;color:var(--text)}
+.profHead{display:flex;align-items:center;gap:14px;width:100%;padding:4px 2px;color:var(--text)}
+.profPicBtn{width:auto;padding:0;border:none!important;background:none!important;box-shadow:none!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;border-radius:50%;cursor:pointer;flex:none}
 .profPic,.avP{flex:none;border-radius:50%;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:700;background-size:cover;background-position:center}
 .profPic{width:64px;height:64px;font-size:26px;box-shadow:0 4px 14px var(--shadow)}
 .profTxt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
 .profTxt b{font-size:20px;font-family:ui-rounded,-apple-system,system-ui,sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .profTxt small{font-size:14px;color:var(--muted)}
-.profEdit{font-size:14px;color:var(--blue);flex:none}
 .pfPhoto{display:block;margin:6px auto 4px;position:relative;width:104px;height:104px;border:none!important;background:none!important;box-shadow:none!important;padding:0;cursor:pointer}
 .pfPhoto .profPic{width:104px;height:104px;font-size:40px}
 .pfPhoto i{position:absolute;right:0;bottom:2px;width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;font-style:normal;display:flex;align-items:center;justify-content:center;font-size:15px;border:3px solid var(--card)}
@@ -482,16 +482,14 @@ body::before{animation:drift 28s ease-in-out infinite alternate;will-change:tran
     </div>
     <div id="menuSheet" class="overlay hidden" onclick="if (event.target === this) toggleMenu(false)">
       <div class="modal menuModal" role="dialog" aria-modal="true" aria-label="Menú">
-      <button class="profHead" onclick="menuDo(openProfile)" aria-label="Editar mi perfil">
-        <span class="profPic" id="profPic"></span>
+      <div class="profHead">
+        <button class="profPicBtn" onclick="menuDo(openProfile)" aria-label="Editar mi perfil"><span class="profPic" id="profPic"></span></button>
         <span class="profTxt"><b id="profName"></b><small id="profRole"></small></span>
-        <span class="profEdit">Editar</span>
-      </button>
+      </div>
       <div id="menuList" class="menuList" role="menu">
         <button role="menuitem" onclick="menuDo(openAuto)"><i class="mi">📲</i><span>Registrar al acercar</span></button>
         <button role="menuitem" onclick="menuDo(openInvite)"><i class="mi">👨‍👩‍👧</i><span>Invitar a la familia</span></button>
         <button role="menuitem" onclick="menuDo(openWaMenu)"><i class="mi">💬</i><span>Avisos por WhatsApp</span></button>
-        <button role="menuitem" onclick="menuDo(openProfile)"><i class="mi">👤</i><span>Editar mi perfil</span></button>
         <button role="menuitem" onclick="menuDo(openAddPet)"><i class="mi">＋</i><span>Agregar otra mascota</span></button>
         <button role="menuitem" onclick="menuDo(openPinSettings)"><i class="mi">🔒</i><span id="pinLink">PIN familiar</span></button>
         <button role="menuitem" onclick="menuDo(() => startTour(true))"><i class="mi">💡</i><span>Ver tutorial</span></button>
@@ -2368,7 +2366,7 @@ function renderProfHead() {
   const p = profileOf(me);
   $("profPic").outerHTML = avatarHtml(me, p.photo, "profPic").replace('class="profPic"', 'class="profPic" id="profPic"');
   $("profName").textContent = me || "Sin nombre";
-  $("profRole").textContent = p.role || (p.photo ? "Toca para decir quién eres" : "Toca para agregar tu foto y quién eres");
+  $("profRole").textContent = p.role || (p.photo ? "Toca tu foto para decir quién eres" : "Toca el círculo para agregar tu foto");
 }
 async function loadMembers() {
   const r = await rpcP("get_members", { p_code: code });
