@@ -1,11 +1,12 @@
 // Comitag: guarda una copia de la página para que abra aunque no haya internet.
 // Los datos (comidas, horarios) NO pasan por aquí: los maneja la página.
-const CACHE = "comitag-v2";
+const CACHE = "comitag-v3";   // al cambiar el nombre, los teléfonos botan la copia antigua
 const LIB = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c =>
-    Promise.all(["/index.html", LIB].map(u => c.add(u).catch(() => {})))
+    // "reload": trae la versión nueva de verdad, sin usar copias intermedias
+    Promise.all(["/index.html", LIB].map(u => c.add(new Request(u, { cache: "reload" })).catch(() => {})))
   ));
   self.skipWaiting();
 });
@@ -21,7 +22,8 @@ self.addEventListener("activate", e => {
 // Pide a internet, pero si tarda más de 4 s o no hay conexión, usa la copia guardada.
 function networkFirst(req, key) {
   const net = fetch(req).then(res => {
-    if (res.ok) caches.open(CACHE).then(c => c.put(key, res.clone()));
+    // La copia se saca AL TIRO: si se espera, la página ya leyó la respuesta y la copia falla
+    if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(key, copy)).catch(() => {}); }
     return res;
   });
   const slow = new Promise(r => setTimeout(r, 4000)).then(() => caches.match(key));
@@ -55,6 +57,11 @@ self.addEventListener("notificationclick", e => {
 self.addEventListener("fetch", e => {
   const req = e.request;
   if (req.method !== "GET") return;
-  if (req.mode === "navigate") return e.respondWith(networkFirst(req, "/index.html"));
+  if (req.mode === "navigate") {
+    const path = new URL(req.url).pathname;
+    // Solo la página de las mascotas se guarda para usarla sin internet (no el panel del dueño)
+    if (path === "/" || path === "/index.html" || path.startsWith("/p/")) return e.respondWith(networkFirst(req, "/index.html"));
+    return;
+  }
   if (req.url.startsWith(LIB)) return e.respondWith(networkFirst(req, LIB));
 });
