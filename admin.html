@@ -97,6 +97,9 @@ table.tv td:last-child,table.tv th:last-child{text-align:right;font-variant-nume
 .annAll{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 10px}
 .annAll button{width:auto;flex:1;min-width:150px;font-size:14px;padding:10px 12px}
 .dangerBtn{color:#dc2626!important;border-color:#f3c4c4!important}
+.tabBadge{display:inline-block;min-width:17px;height:17px;line-height:17px;padding:0 4px;margin-left:5px;border-radius:9px;background:#ef4444;color:#fff;font-size:11px;font-weight:700;text-align:center;vertical-align:1px}
+.item.msg a{color:var(--blue);text-decoration:none;font-weight:600}
+.lbl{display:block;font-size:14px;font-weight:600;margin:12px 0 6px}
 .annBtns{display:flex;gap:18px;flex-wrap:wrap;margin-top:6px}
 .annBtns .link{padding:0}
 .annDel{color:#dc2626!important}
@@ -122,6 +125,7 @@ table.tv td:last-child,table.tv th:last-child{text-align:right;font-variant-nume
       <button role="tab" data-tab="pegatinas" aria-selected="false">🏷️ Pegatinas</button>
       <button role="tab" data-tab="platos" aria-selected="false">🍽️ Platos</button>
       <button role="tab" data-tab="numeros" aria-selected="false">📊 Números</button>
+      <button role="tab" data-tab="mensajes" aria-selected="false">💬 Mensajes<span class="tabBadge hidden" id="msgBadge"></span></button>
       <button role="tab" data-tab="sistema" aria-selected="false">🚦 Sistema</button>
     </nav>
 
@@ -211,6 +215,29 @@ table.tv td:last-child,table.tv th:last-child{text-align:right;font-variant-nume
         <p class="muted">Últimos 30 días · horarios que quedaron sin registrar</p><div class="chart" id="cAlerts"></div></div>
     </section>
 
+    <!-- ===== Mensajes ===== -->
+    <section data-pane="mensajes" class="hidden">
+      <div class="card">
+        <h2>Mensajes de las familias</h2>
+        <p class="muted">Sugerencias y pedidos de ayuda que mandan desde el menú de su página.</p>
+        <div class="seg" id="mf" style="margin-top:10px">
+          <button class="on" data-f="all">Todos</button><button data-f="unread">Sin leer</button>
+          <button data-f="ayuda">🆘 Ayuda</button><button data-f="sugerencia">💡 Sugerencias</button>
+        </div>
+        <div id="msgList" style="margin-top:8px"><p class="muted">Cargando…</p></div>
+      </div>
+      <div class="card">
+        <h2>Tus datos de contacto</h2>
+        <p class="muted">Aparecen en “Contacto y ayuda” de la página. Si dejas uno vacío, ese botón no se muestra.</p>
+        <label class="lbl" for="cWa">WhatsApp (con código de país)</label>
+        <input id="cWa" type="text" inputmode="tel" maxlength="20" placeholder="56912345678">
+        <label class="lbl" for="cMail" style="margin-top:10px">Correo</label>
+        <input id="cMail" type="text" inputmode="email" autocapitalize="off" spellcheck="false" maxlength="120" placeholder="tucorreo@gmail.com">
+        <button class="primary wide" id="cSave" style="margin-top:12px">Guardar contacto</button>
+        <p id="cMsg" class="msg"></p>
+      </div>
+    </section>
+
     <!-- ===== Sistema ===== -->
     <section data-pane="sistema" class="hidden">
       <div class="card">
@@ -286,7 +313,7 @@ async function enter() {
   if (r.status !== 200) { $("loginErr").textContent = "Algo falló. Intenta de nuevo."; return false; }
   phones = r.data.phones;
   $("login").classList.add("hidden"); $("panel").classList.remove("hidden");
-  loadAnn(); loadPlates();
+  loadAnn(); loadPlates(); loadMsgs();
   return true;
 }
 $("loginBtn").onclick = async () => {
@@ -305,6 +332,7 @@ function showTab(t) {
   document.querySelectorAll("[data-pane]").forEach(p => p.classList.toggle("hidden", p.dataset.pane !== t));
   if (t === "numeros") loadStats();
   if (t === "sistema" && !loaded.health) loadHealth();
+  if (t === "mensajes") { loadMsgs(); if (!loaded.contact) loadContact(); }
   if (t === "platos" || t === "pegatinas") loadPlates();
   try { sessionStorage.setItem("comitag_admin_tab", t); } catch {}
 }
@@ -417,6 +445,71 @@ $("hideAllBtn").onclick = async () => {
 $("delAllBtn").onclick = async () => {
   if (!await ask("¿Borrar todos los anuncios?", "Se borran para siempre todos los anuncios, también los programados y los quitados. Las notificaciones que ya llegaron a los teléfonos no se pueden quitar.", "Borrar todos", "BORRAR")) return;
   annBulk("delete_all", "🗑️ Se borraron todos los anuncios.");
+};
+
+// ---------- Mensajes de las familias ----------
+let msgs = [], msgFilter = "all", msgOld = false;
+async function loadMsgs() {
+  let r; try { r = await api({ action: "messages" }); } catch { return; }
+  if (r.status !== 200) {
+    msgOld = true; $("msgBadge").classList.add("hidden");
+    $("msgList").innerHTML = '<p class="muted err">No se pudo cargar. ¿Corriste mensajes.sql y actualizaste la función “anuncio” en Supabase?</p>';
+    return;
+  }
+  msgOld = false; msgs = r.data.items || [];
+  renderMsgs();
+}
+function renderMsgs() {
+  const unread = msgs.filter(m => !m.read).length;
+  $("msgBadge").textContent = unread > 9 ? "9+" : unread; $("msgBadge").classList.toggle("hidden", !unread);
+  const list = msgs.filter(m => msgFilter === "all" || (msgFilter === "unread" ? !m.read : m.kind === msgFilter));
+  $("msgList").innerHTML = list.length ? list.map(m => {
+    const rep = m.reply_to || "", digits = rep.replace(/[^0-9]/g, "");
+    const replyLink = /@/.test(rep) ? `<a href="mailto:${esc(rep)}?subject=${encodeURIComponent("Comitag")}">✉️ Responder a ${esc(rep)}</a>`
+      : digits.length >= 8 ? `<a href="https://wa.me/${digits}" target="_blank" rel="noopener">💬 Responder a ${esc(rep)}</a>`
+      : rep ? `<span>Contacto: ${esc(rep)}</span>` : "";
+    return `<div class="item msg${m.read ? "" : " unread"}">
+      <div class="row"><b>${m.kind === "ayuda" ? "🆘 Pide ayuda" : "💡 Sugerencia"}</b><span class="tag${m.read ? "" : " warn"}">${m.read ? "Leído" : "Nuevo"}</span></div>
+      <p style="margin:6px 0 0;white-space:pre-wrap">${esc(m.body)}</p>
+      <p class="muted" style="font-size:12px;margin-top:6px">${esc(m.who || "Sin nombre")} · ${m.pet_name ? esc(m.pet_name) + " · " : ""}${esc(m.plate_code || "")} · ${esc(fmtDate(m.created_at))}</p>
+      ${replyLink ? `<p style="font-size:14px;margin-top:4px">${replyLink}</p>` : ""}
+      <div class="annBtns"><button class="link" data-mread="${m.id}">${m.read ? "Marcar como no leído" : "Marcar como leído"}</button><button class="link annDel" data-mdel="${m.id}">Borrar</button></div>
+    </div>`; }).join("") : `<p class="muted">${msgs.length ? "No hay mensajes con este filtro." : "Todavía no llegan mensajes."}</p>`;
+  $("msgList").querySelectorAll("[data-mread]").forEach(b => b.onclick = async () => {
+    const m = msgs.find(x => x.id === +b.dataset.mread); b.disabled = true;
+    const r = await api({ action: "message_read", id: m.id, read: !m.read }).catch(() => ({ status: 0 }));
+    if (r.status === 200) m.read = !m.read;
+    renderMsgs();
+  });
+  $("msgList").querySelectorAll("[data-mdel]").forEach(b => b.onclick = async () => {
+    if (!await ask("¿Borrar este mensaje?", "Se borra para siempre.", "Borrar")) return;
+    b.disabled = true;
+    const r = await api({ action: "message_delete", id: +b.dataset.mdel }).catch(() => ({ status: 0 }));
+    if (r.status === 200) msgs = msgs.filter(x => x.id !== +b.dataset.mdel);
+    renderMsgs();
+  });
+}
+document.querySelectorAll("#mf button").forEach(b => b.onclick = () => {
+  msgFilter = b.dataset.f;
+  document.querySelectorAll("#mf button").forEach(x => x.classList.toggle("on", x === b));
+  renderMsgs();
+});
+async function loadContact() {
+  let r; try { r = await api({ action: "contact_get" }); } catch { return; }
+  if (r.status !== 200) return;
+  loaded.contact = true;
+  $("cWa").value = r.data.contact_whatsapp || ""; $("cMail").value = r.data.contact_email || "";
+}
+$("cSave").onclick = async () => {
+  const wa = $("cWa").value.replace(/[^0-9]/g, ""), mail = $("cMail").value.trim();
+  if (wa && wa.length < 8) { $("cMsg").innerHTML = '<span class="err">Revisa el número: incluye el código de país, por ejemplo 56912345678.</span>'; return; }
+  if (mail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) { $("cMsg").innerHTML = '<span class="err">Revisa el correo.</span>'; return; }
+  $("cSave").disabled = true; $("cMsg").textContent = "Guardando…";
+  let r; try { r = await api({ action: "contact_set", whatsapp: wa, email: mail }); } catch { r = { status: 0 }; }
+  $("cSave").disabled = false;
+  $("cMsg").innerHTML = r.status === 200 ? "✅ Contacto guardado. Ya aparece en la página."
+    : `<span class="err">${r.status === 400 ? "Falta actualizar la función “anuncio” en Supabase." : "No se pudo guardar. ¿Corriste mensajes.sql?"}</span>`;
+  if (r.status === 200) $("cWa").value = wa;
 };
 
 // ---------- Platos y pegatinas ----------

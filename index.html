@@ -201,6 +201,10 @@ button:disabled{opacity:.4;cursor:default;box-shadow:none}
 .lastRow{grid-template-rows:auto auto auto auto}
 .lastRow .card{display:grid;grid-row:span 4;grid-template-rows:subgrid;align-content:start}
 .lastRow .card > p:first-child{align-self:start}
+#hpDirect{display:flex;flex-direction:column;gap:8px}
+#hpDirect:empty{display:none}
+#hpDirect .wa{margin:0}
+.hpMail{display:block;text-align:center;padding:13px;border-radius:12px;text-decoration:none;color:var(--text);border:1px solid var(--glass-border,var(--border));background:var(--glass-input,var(--card))}
 .hav{display:inline-flex;align-items:center}
 .hav img,.hav b{width:30px;height:30px;border-radius:50%;border:2px solid var(--card);object-fit:cover;margin-left:-8px;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;box-sizing:border-box}
 .hav img:first-child,.hav b:first-child{margin-left:0}
@@ -431,6 +435,7 @@ body::before{animation:drift 28s ease-in-out infinite alternate;will-change:tran
     <p id="gateErr" class="muted warn" style="margin-top:8px"></p>
     <button class="primary" id="gateBtn" onclick="submitGate()" style="margin-top:8px"></button>
     <button class="link hidden" id="gateForgot" onclick="forgotPin()" style="display:block;margin:12px auto 0">¿Olvidaste el PIN?</button>
+    <button class="link" onclick="openHelp()" style="display:block;margin:6px auto 0;font-size:14px;color:var(--muted)">¿Necesitas ayuda? Contáctanos</button>
     <p id="gateHint" class="muted" style="margin-top:12px;font-size:12px"></p>
   </section>
 
@@ -509,6 +514,8 @@ body::before{animation:drift 28s ease-in-out infinite alternate;will-change:tran
         <button role="menuitem" onclick="menuDo(openAddPet)"><i class="mi">＋</i><span>Agregar otra mascota</span></button>
         <button role="menuitem" onclick="menuDo(openPinSettings)"><i class="mi">🔒</i><span id="pinLink">PIN familiar</span></button>
         <button role="menuitem" onclick="menuDo(() => startTour(true))"><i class="mi">💡</i><span>Ver tutorial</span></button>
+        <button role="menuitem" onclick="menuDo(openSuggest)"><i class="mi">💡</i><span>Enviar sugerencia</span></button>
+        <button role="menuitem" onclick="menuDo(openHelp)"><i class="mi">🆘</i><span>Contacto y ayuda</span></button>
         <button role="menuitem" onclick="cycleTheme()"><i class="mi">🌓</i><span class="themeLbl">Tema</span></button>
         <button role="menuitem" class="mdanger" onclick="menuDo(askRemoveHere)"><i class="mi">🗑️</i><span>Quitar de este teléfono</span></button>
       </div>
@@ -2415,6 +2422,62 @@ function openAddPet() {
   $("addOk").onclick = go;
   $("addIn").onkeydown = e => { if (e.key === "Enter") go(); };
   setTimeout(() => $("addIn") && $("addIn").focus(), 50);
+}
+
+// ================= Sugerencias y contacto =================
+async function sendMsg(kind, body, reply) {
+  const r = await db.rpc("send_message", { p_code: code, p_kind: kind, p_who: me || null, p_body: body, p_reply: reply || null });
+  if (r.error) return r.error.code === "PGRST202" ? "Esta opción aún no está activa. Intenta más tarde."
+    : netErr(r.error) ? "No hay internet. Intenta cuando vuelva la conexión." : "No se pudo enviar. Intenta de nuevo.";
+  if (r.data === "demasiados") return "Ya mandaste varios mensajes hoy. Intenta de nuevo mañana.";
+  return r.data === "ok" ? true : "No se pudo enviar. Intenta de nuevo.";
+}
+function openSuggest() {
+  openModal(`<p style="font-size:18px;margin-top:4px"><b>💡 Enviar sugerencia</b></p>
+    <p class="muted">¿Qué te gustaría que tuviera Comitag, o qué mejorarías? Lo leemos todo.</p>
+    <textarea id="sgIn" maxlength="600" rows="5" placeholder="Ej: que se pueda anotar cuánta comida le di" style="margin-top:12px;width:100%;box-sizing:border-box;font:inherit;padding:12px;border-radius:12px;border:1px solid var(--border);resize:vertical"></textarea>
+    <p id="sgErr" class="muted warn" style="margin-top:8px"></p>
+    <div class="grid" style="margin-top:8px"><button onclick="closeModal()">Cancelar</button><button class="primary" id="sgOk">Enviar</button></div>`);
+  setTimeout(() => $("sgIn") && $("sgIn").focus(), 50);
+  $("sgOk").onclick = async () => {
+    const t = $("sgIn").value.trim();
+    if (!t) { $("sgErr").textContent = "Escribe tu sugerencia primero."; return; }
+    $("sgOk").disabled = true; $("sgErr").textContent = "Enviando…";
+    const ok = await sendMsg("sugerencia", t);
+    $("sgOk").disabled = false;
+    if (ok !== true) { $("sgErr").textContent = ok; return; }
+    closeModal(); showNote("💡 ¡Gracias! Tu sugerencia llegó.");
+  };
+}
+async function openHelp() {
+  openModal(`<p style="font-size:18px;margin-top:4px"><b>🆘 Contacto y ayuda</b></p>
+    <p class="muted">¿Tienes un problema o una duda? Escríbenos.</p>
+    <div id="hpDirect" style="margin-top:12px"></div>
+    <p class="eLbl" style="margin-top:14px">O cuéntanos aquí qué pasó</p>
+    <textarea id="hpIn" maxlength="600" rows="4" placeholder="Ej: no me llegan los avisos, olvidé el PIN…" style="width:100%;box-sizing:border-box;font:inherit;padding:12px;border-radius:12px;border:1px solid var(--border);resize:vertical"></textarea>
+    <input id="hpReply" maxlength="120" autocomplete="email" placeholder="Tu WhatsApp o correo para responderte" style="margin-top:8px">
+    <p class="muted" style="font-size:12px;margin-top:6px">Junto con tu mensaje llega a qué mascota corresponde, para poder ayudarte.</p>
+    <p id="hpErr" class="muted warn" style="margin-top:6px"></p>
+    <div class="grid" style="margin-top:8px"><button onclick="closeModal()">Cerrar</button><button class="primary" id="hpOk">Enviar</button></div>`);
+  $("hpOk").onclick = async () => {
+    const t = $("hpIn").value.trim(), rp = $("hpReply").value.trim();
+    if (!t) { $("hpErr").textContent = "Cuéntanos qué pasó primero."; $("hpIn").focus(); return; }
+    $("hpOk").disabled = true; $("hpErr").textContent = "Enviando…";
+    const ok = await sendMsg("ayuda", t, rp);
+    $("hpOk").disabled = false;
+    if (ok !== true) { $("hpErr").textContent = ok; return; }
+    closeModal(); showNote(rp ? "✅ Mensaje enviado. Te responderemos pronto." : "✅ Mensaje enviado. Gracias por avisarnos.");
+  };
+  // Botones directos (WhatsApp y correo del dueño), si están configurados
+  const r = await db.rpc("get_contact");
+  const c = !r.error && r.data && typeof r.data === "object" ? r.data : {};
+  if (!$("hpDirect")) return;
+  const msg = `Hola, necesito ayuda con Comitag${plate && plate.pet_name ? ` (${plate.pet_name}, ${code})` : code ? ` (${code})` : ""}.`;
+  const wa = String(c.contact_whatsapp || "").replace(/[^0-9]/g, ""), mail = String(c.contact_email || "");
+  $("hpDirect").innerHTML = [
+    wa ? `<a class="wa" href="https://wa.me/${wa}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">💬 Escribir por WhatsApp</a>` : "",
+    /@/.test(mail) ? `<a class="btnlike hpMail" href="mailto:${esc(mail)}?subject=${encodeURIComponent("Ayuda con Comitag")}&body=${encodeURIComponent(msg)}">✉️ Mandar un correo</a>` : "",
+  ].join("");
 }
 
 // ================= Menú de opciones =================
