@@ -104,14 +104,18 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .petHead{position:relative;text-align:center;margin:8px 0 14px}
 .petRow{display:flex;flex-wrap:wrap;justify-content:center;gap:12px 18px;max-width:360px;margin:0 auto}
 .pp{width:auto!important;flex:none;display:flex;flex-direction:column;align-items:center;gap:6px;background:none!important;border:none!important;padding:0!important;box-shadow:none!important;cursor:pointer;color:var(--text)}
-.pp .photo{width:var(--s);height:var(--s);display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.2}
-.pp b{font-size:15px}
+.pp .photo{width:var(--s);height:var(--s);display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.2;cursor:pointer;color:var(--muted);font-size:13px}
+.ppName{width:auto!important;background:none!important;border:none!important;box-shadow:none!important;padding:2px 6px!important;font-size:15px;color:var(--text)!important;cursor:pointer;-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+.petHead h1{cursor:pointer}
+.ppName:active,.petHead h1:active{opacity:.6}
+.petEdTimes .trow{display:flex;gap:8px;margin-bottom:8px}
+.petEdTimes .trow input{flex:1}
 .petHead.multi h1{display:none}
 .petHead.multi .link{position:static;transform:none;display:block;margin:2px auto 0;color:var(--muted);font-size:15px;font-weight:500;letter-spacing:.3px;padding:6px 14px}
 .petHead.multi .link:active{opacity:.6}
 .petHead h1{font-size:32px;margin:0;padding:0 72px;overflow-wrap:anywhere}
 /* Nombre de la mascota: letra redondeada de Apple (en otros teléfonos usa la del sistema) */
-.petHead h1,.pp b{font-family:ui-rounded,"SF Pro Rounded","SF Compact Rounded",system-ui,-apple-system,sans-serif;font-weight:700;letter-spacing:-.2px}
+.petHead h1,.pp b,.ppName{font-family:ui-rounded,"SF Pro Rounded","SF Compact Rounded",system-ui,-apple-system,sans-serif;font-weight:700;letter-spacing:-.2px}
 .petHead .link{position:absolute;right:0;top:50%;transform:translateY(-50%)}
 .wa{display:block;text-align:center;text-decoration:none;background:#25d366;color:#fff;border-radius:12px;padding:13px;margin-bottom:8px;font-size:16px}
 .wa.alt{background:var(--card);color:var(--wa-text);border:1px solid #25d366}
@@ -269,7 +273,7 @@ body::before{animation:drift 28s ease-in-out infinite alternate;will-change:tran
     <input type="file" id="photoIn" accept="image/*" class="hidden">
   </div>
   <div class="petHead" id="petView">
-    <h1 id="pet">Cargando…</h1>
+    <h1 id="pet" onclick="if (ready && !petsOf().length && plate && plate.pet_name) openPetEditor(plate.pet_name)" title="Cambiar nombre y horarios">Cargando…</h1>
     <button class="link hidden" id="petEditBtn" onclick="editPet()">✏️ Editar</button>
   </div>
   <section id="petEdit" class="card hidden">
@@ -1046,6 +1050,68 @@ async function savePet() {
   loadPhoto();
 }
 
+// ---- Tocar el nombre: cambiar nombre y horarios de ESA mascota ----
+function openPetEditor(name) {
+  const pets = petsOf(), many = pets.length > 1;
+  const slots = (plate.schedule || []).map(parseSlot).filter(x => /^\d\d:\d\d$/.test(x.t));
+  const mine = many ? slots.filter(x => x.p === name).map(x => x.t) : slots.map(x => x.t);
+  const shared = many ? slots.filter(x => !x.p || !pets.includes(x.p)).map(x => x.t) : [];
+  openModal(`<p style="font-size:18px;margin-top:4px"><b>✏️ ${esc(name)}</b></p>
+    <p style="margin-top:12px"><b>Nombre</b></p>
+    <input id="peName" maxlength="20" value="${esc(name)}" style="margin-top:6px">
+    <p style="margin-top:16px"><b>Horarios de comida${many ? ` de ${esc(name)}` : ""}</b></p>
+    <div id="peTimes" class="petEdTimes" style="margin-top:6px"></div>
+    <button class="add" id="peAdd">+ Agregar horario</button>
+    ${shared.length ? `<p class="muted" style="margin-top:10px">También come con ${pets.length === 2 ? "la otra mascota" : "todas"} a las ${joinNames(shared)} (eso se cambia en “Horarios de comida”).</p>` : ""}
+    <p id="peErr" class="muted warn" style="margin-top:8px"></p>
+    <div class="grid" style="margin-top:12px"><button onclick="closeModal()">Cancelar</button><button class="primary" id="peSave">Guardar</button></div>`);
+  const addT = v => {
+    const r = document.createElement("div"); r.className = "trow";
+    r.innerHTML = `<input type="time" value="${esc(v || "")}"><button class="x" title="Quitar" onclick="this.parentNode.remove()">✕</button>`;
+    $("peTimes").appendChild(r); return r;
+  };
+  (mine.length ? mine : [""]).forEach(addT);
+  $("peAdd").onclick = () => addT("").querySelector("input").focus();
+  $("peSave").onclick = async () => {
+    const nn = $("peName").value.trim().slice(0, 20);
+    const times = [...new Set([...$("peTimes").querySelectorAll("input")].map(i => i.value).filter(Boolean))];
+    if (!nn) { $("peErr").textContent = "Escribe un nombre."; return; }
+    if (many && pets.some(p => p !== name && p.toLowerCase() === nn.toLowerCase())) { $("peErr").textContent = `Ya hay otra mascota llamada ${nn}.`; return; }
+    let schedule, newPets = null, title = nn;
+    if (!many) {
+      schedule = sortTimes(times);
+    } else {
+      newPets = pets.map(p => p === name ? nn : p); title = joinNames(newPets);
+      // Los horarios de las otras se mantienen; los de esta mascota se reemplazan
+      let rest = (plate.schedule || []).filter(x => parseSlot(x).p !== name);
+      for (const t of times) {
+        if (rest.some(x => x === t)) continue;                                    // ya es un horario de todas
+        const other = rest.find(x => parseSlot(x).t === t);
+        if (other) {
+          if (pets.length === 2) { rest = rest.filter(x => x !== other); rest.push(t); continue; }   // comen juntas: horario de todas
+          $("peErr").textContent = `A las ${t} ya come ${parseSlot(other).p}. Si comen juntas, ponlo para “Todos” en Horarios de comida.`; return;
+        }
+        rest.push(`${t}|${nn}`);
+      }
+      schedule = sortTimes(rest.map(x => { const q = parseSlot(x); return q.p === name ? `${q.t}|${nn}` : x; }));
+    }
+    $("peSave").disabled = true;
+    const ok = await updatePlate(title, schedule, newPets || (many ? pets : null));
+    $("peSave").disabled = false;
+    if (ok !== true) { $("peErr").textContent = ok; return; }
+    const renamed = nn !== name;
+    plate.pet_name = title; plate.schedule = schedule; if (newPets) plate.pets = newPets;
+    $("pet").textContent = title; document.title = `${title} · Comitag`; rememberPet(code, title);
+    closeModal(); render();
+    if (renamed) {
+      const rr = await rpcP("rename_pet_photos", { p_code: code, p_map: { [name]: nn }, p_names: newPets || [nn], p_old_first: many ? pets[0] : name });
+      if (rr.error && rr.error.code !== "PGRST202") console.error(rr.error);
+    }
+    if (many) loadPhoto();
+    showNote(`✅ ${renamed ? `Ahora se llama ${nn}. ` : ""}Horarios de ${nn} guardados.`);
+  };
+}
+
 // ---- Editar horarios de comida ----
 function sortTimes(a) { return [...new Set(a.map(s => String(s).trim()).filter(Boolean))].sort(); }
 // Un horario es "08:00" (para todas) o "13:00|Luna" (solo para Luna)
@@ -1271,9 +1337,11 @@ function renderPetPhotos() {
   showPhotoMode(true);
   const s = pets.length === 2 ? 116 : pets.length === 3 ? 96 : 86;
   $("petRow").innerHTML = pets.map((p, i) => { const src = photoOf(p);
-    return `<button class="pp" data-i="${i}" aria-label="Agregar o cambiar la foto de ${esc(p)}"><span class="photo" style="--s:${s}px">${src
-      ? `<img src="${src}" alt="Foto de ${esc(p)}">` : `<span><span style="font-size:26px">🐾</span><br>Agregar foto</span>`}</span><b>${esc(p)}</b></button>`; }).join("");
-  $("petRow").querySelectorAll(".pp").forEach(b => b.onclick = () => { photoTarget = pets[+b.dataset.i]; $("photoIn").click(); });
+    return `<div class="pp"><button class="photo" style="--s:${s}px" data-i="${i}" aria-label="Agregar o cambiar la foto de ${esc(p)}">${src
+      ? `<img src="${src}" alt="Foto de ${esc(p)}">` : `<span><span style="font-size:26px">🐾</span><br>Agregar foto</span>`}</button>
+      <button class="ppName" data-i="${i}" aria-label="Cambiar el nombre y los horarios de ${esc(p)}">${esc(p)}</button></div>`; }).join("");
+  $("petRow").querySelectorAll(".pp .photo").forEach(b => b.onclick = () => { photoTarget = pets[+b.dataset.i]; $("photoIn").click(); });
+  $("petRow").querySelectorAll(".ppName").forEach(b => b.onclick = () => openPetEditor(pets[+b.dataset.i]));
   applyMultiTheme(pets.map(photoOf).filter(Boolean));
 }
 // Colores del fondo: cada foto aporta su propio color (repartidos en las esquinas)
