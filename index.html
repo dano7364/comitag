@@ -168,7 +168,27 @@ button:disabled{opacity:.4;cursor:default;box-shadow:none}
 .eRow{display:flex;align-items:center;gap:12px;font-size:17px;font-weight:600}
 .eRow img,.eRow b{width:46px;height:46px;border-radius:50%;object-fit:cover;flex:none;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:18px;font-weight:700}
 .eRow span{font-family:ui-rounded,-apple-system,system-ui,sans-serif}
-.eWho b{background:var(--muted)}
+.eRole{display:block;font-size:13px;font-weight:500;color:var(--muted);font-family:-apple-system,system-ui,sans-serif}
+.menuModal{padding:16px}
+.menuModal .menuList{position:static;width:auto;max-width:none;box-shadow:none;border:none;border-radius:16px;margin-top:14px;animation:none;
+  background:color-mix(in srgb,var(--text) 5%,transparent)!important;-webkit-backdrop-filter:none;backdrop-filter:none}
+.menuClose{display:block;margin:10px auto 0;font-size:15px}
+.menuModal .menuList button,.profHead,.pfPhoto{-webkit-backdrop-filter:none!important;backdrop-filter:none!important;box-shadow:none!important}
+.menuModal .menuList button{border-radius:0!important;border-left:none!important;border-right:none!important;border-bottom:none!important;border-top:1px solid var(--line)!important;background:transparent!important}
+.menuModal .menuList button:first-child{border-top:none!important}
+.profHead{display:flex;align-items:center;gap:14px;width:100%;padding:4px 2px;border:none!important;background:none!important;box-shadow:none!important;text-align:left;cursor:pointer;color:var(--text)}
+.profPic,.avP{flex:none;border-radius:50%;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:700;background-size:cover;background-position:center}
+.profPic{width:64px;height:64px;font-size:26px;box-shadow:0 4px 14px var(--shadow)}
+.profTxt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.profTxt b{font-size:20px;font-family:ui-rounded,-apple-system,system-ui,sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.profTxt small{font-size:14px;color:var(--muted)}
+.profEdit{font-size:14px;color:var(--blue);flex:none}
+.pfPhoto{display:block;margin:6px auto 4px;position:relative;width:104px;height:104px;border:none!important;background:none!important;box-shadow:none!important;padding:0;cursor:pointer}
+.pfPhoto .profPic{width:104px;height:104px;font-size:40px}
+.pfPhoto i{position:absolute;right:0;bottom:2px;width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;font-style:normal;display:flex;align-items:center;justify-content:center;font-size:15px;border:3px solid var(--card)}
+.roles{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px}
+.roles button{width:auto;margin:0;padding:8px 13px;border-radius:999px;font-size:14px}
+.roles button.on{background:linear-gradient(180deg,#5a8dff,var(--blue))!important;border-color:rgba(255,255,255,.35)!important;color:#fff!important;transition:none}
 .hav{display:inline-flex;align-items:center}
 .hav img,.hav b{width:30px;height:30px;border-radius:50%;border:2px solid var(--card);object-fit:cover;margin-left:-8px;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;box-sizing:border-box}
 .hav img:first-child,.hav b:first-child{margin-left:0}
@@ -459,16 +479,26 @@ body::before{animation:drift 28s ease-in-out infinite alternate;will-change:tran
       <button class="menuBtn" id="menuBtn" aria-label="Menú" aria-expanded="false" aria-controls="menuList" onclick="toggleMenu()">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       </button>
-      <div id="menuList" class="menuList hidden" role="menu">
+    </div>
+    <div id="menuSheet" class="overlay hidden" onclick="if (event.target === this) toggleMenu(false)">
+      <div class="modal menuModal" role="dialog" aria-modal="true" aria-label="Menú">
+      <button class="profHead" onclick="menuDo(openProfile)" aria-label="Editar mi perfil">
+        <span class="profPic" id="profPic"></span>
+        <span class="profTxt"><b id="profName"></b><small id="profRole"></small></span>
+        <span class="profEdit">Editar</span>
+      </button>
+      <div id="menuList" class="menuList" role="menu">
         <button role="menuitem" onclick="menuDo(openAuto)"><i class="mi">📲</i><span>Registrar al acercar</span></button>
         <button role="menuitem" onclick="menuDo(openInvite)"><i class="mi">👨‍👩‍👧</i><span>Invitar a la familia</span></button>
         <button role="menuitem" onclick="menuDo(openWaMenu)"><i class="mi">💬</i><span>Avisos por WhatsApp</span></button>
-        <button role="menuitem" onclick="menuDo(changeName)"><i class="mi">✏️</i><span>Cambiar mi nombre</span></button>
+        <button role="menuitem" onclick="menuDo(openProfile)"><i class="mi">👤</i><span>Editar mi perfil</span></button>
         <button role="menuitem" onclick="menuDo(openAddPet)"><i class="mi">＋</i><span>Agregar otra mascota</span></button>
         <button role="menuitem" onclick="menuDo(openPinSettings)"><i class="mi">🔒</i><span id="pinLink">PIN familiar</span></button>
         <button role="menuitem" onclick="menuDo(() => startTour(true))"><i class="mi">💡</i><span>Ver tutorial</span></button>
         <button role="menuitem" onclick="cycleTheme()"><i class="mi">🌓</i><span class="themeLbl">Tema</span></button>
         <button role="menuitem" class="mdanger" onclick="menuDo(askRemoveHere)"><i class="mi">🗑️</i><span>Quitar de este teléfono</span></button>
+      </div>
+      <button class="link menuClose" onclick="toggleMenu(false)">Cerrar</button>
       </div>
     </div>
     <div id="waModal" class="overlay hidden" onclick="if (event.target === this) closeWaMenu()">
@@ -681,7 +711,7 @@ async function start() {
   showName();
   loadWa();
   $("photoBox").classList.remove("hidden");
-  loadPhoto();
+  loadPhoto(); loadMembers();
   loadPin();
   autoRun();
   loadAnnouncement();
@@ -1646,11 +1676,11 @@ function applyMultiTheme(srcs) {
     });
 }
 // Recorta al centro en cuadrado y achica a 480 px en JPEG (~40 KB).
-function shrink(file) {
+function shrink(file, max = 480) {
   return new Promise((ok, fail) => {
     const url = URL.createObjectURL(file), img = new Image();
     img.onload = () => {
-      const side = Math.min(img.naturalWidth, img.naturalHeight), out = Math.min(480, side);
+      const side = Math.min(img.naturalWidth, img.naturalHeight), out = Math.min(max, side);
       const c = document.createElement("canvas");
       c.width = c.height = out;
       c.getContext("2d").drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, out, out);
@@ -1952,7 +1982,7 @@ function openEntry(i) {
     <p class="eLbl">${food ? (pets.length > 1 ? "Comieron" : "Comió") : "Agua cambiada para"}</p>
     <div class="eList">${pets.map((p, k) => `<div class="eRow">${pic(p, k)}<span>${esc(p)}</span></div>`).join("")}</div>
     <p class="eLbl" style="margin-top:14px">${food ? "Le dio comida" : "Lo hizo"}</p>
-    <div class="eRow eWho"><b>${esc((g.who || "?").charAt(0).toUpperCase())}</b><span>${esc(g.who || "Alguien")}</span></div>
+    <div class="eRow eWho">${avatarHtml(g.who, profileOf(g.who).photo, "avP", 46)}<span>${esc(g.who || "Alguien")}${profileOf(g.who).role ? `<small class="eRole">${esc(profileOf(g.who).role)}</small>` : ""}</span></div>
     ${g.note ? `<p class="eLbl" style="margin-top:14px">Nota</p><p style="margin:0">“${esc(g.note)}”</p>` : ""}
     <div class="grid" style="margin-top:18px"><button id="eDel" class="link" style="color:var(--danger,#dc2626)">Borrar registro</button><button class="primary" onclick="closeModal()">Listo</button></div>`);
   $("eDel").onclick = () => { closeModal(); askDelete(i); };
@@ -2308,14 +2338,112 @@ function openAddPet() {
 
 // ================= Menú de opciones =================
 function toggleMenu(open) {
-  const show = open ?? $("menuList").classList.contains("hidden");
-  $("menuList").classList.toggle("hidden", !show);
+  const show = open ?? $("menuSheet").classList.contains("hidden");
+  if (show) renderProfHead();
+  $("menuSheet").classList.toggle("hidden", !show);
+  document.body.style.overflow = show ? "hidden" : "";
   $("menuBtn").setAttribute("aria-expanded", show);
   $("menuBtn").classList.toggle("open", show);
 }
 function menuDo(fn) { toggleMenu(false); fn(); }
-document.addEventListener("click", e => { if (!$("menu").contains(e.target) && !$("menuList").classList.contains("hidden")) toggleMenu(false); });
-document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("menuList").classList.contains("hidden")) toggleMenu(false); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("menuSheet").classList.contains("hidden")) toggleMenu(false); });
+
+// ================= Perfil de quien registra =================
+// En este teléfono: comitag_perfil = {role, photo}. En Supabase (perfiles.sql): plates.members, para que la familia lo vea.
+const ROLES = ["Mamá", "Papá", "Hija", "Hijo", "Hermana", "Hermano", "Abuela", "Abuelo", "Tía", "Tío"];
+let members = {}, memberSynced = false;
+function myLocal() { try { return JSON.parse(localStorage.getItem("comitag_perfil") || "{}") || {}; } catch { return {}; } }
+function profileOf(name) {
+  const m = (members && members[name]) || {};
+  if (name && name === me) { const l = myLocal(); return { role: l.role ?? m.role ?? "", photo: l.photo ?? m.photo ?? null }; }
+  return { role: m.role || "", photo: m.photo || null };
+}
+function nameColor(n) { let h = 0; for (const c of String(n || "")) h = (h * 31 + c.charCodeAt(0)) % 360; return `hsl(${h} 45% 55%)`; }
+function avatarHtml(name, photo, cls = "avP", size) {
+  const st = size ? `width:${size}px;height:${size}px;font-size:${Math.round(size * .4)}px;` : "";
+  return photo ? `<span class="${cls}" style="${st}background-image:url('${photo}')" role="img" aria-label="${esc(name || "")}"></span>`
+    : `<span class="${cls}" style="${st}background:${nameColor(name)}" aria-hidden="true">${esc((name || "?").charAt(0).toUpperCase())}</span>`;
+}
+function renderProfHead() {
+  const p = profileOf(me);
+  $("profPic").outerHTML = avatarHtml(me, p.photo, "profPic").replace('class="profPic"', 'class="profPic" id="profPic"');
+  $("profName").textContent = me || "Sin nombre";
+  $("profRole").textContent = p.role || (p.photo ? "Toca para decir quién eres" : "Toca para agregar tu foto y quién eres");
+}
+async function loadMembers() {
+  const r = await rpcP("get_members", { p_code: code });
+  if (r.error || !r.data || typeof r.data !== "object") { members = cacheGet().members || {}; return; }
+  members = r.data; cachePut({ members });
+  // Mi perfil de este teléfono aún no está en este plato: subirlo en silencio
+  const l = myLocal(), m = members[me] || {};
+  if (me && !memberSynced && (l.role || l.photo) && (l.role !== (m.role || undefined) || l.photo !== (m.photo || undefined))) {
+    memberSynced = true;
+    const s = await rpcP("set_member", { p_code: code, p_name: me, p_role: l.role || null, p_photo: l.photo || null });
+    if (!s.error && s.data === "ok") { members = { ...members, [me]: { role: l.role, photo: l.photo } }; cachePut({ members }); }
+  }
+}
+function openProfile() {
+  const cur = profileOf(me);
+  let photo = cur.photo, role = cur.role || "";
+  const other = role && !ROLES.includes(role);
+  openModal(`<p style="font-size:18px;margin-top:4px;text-align:center"><b>Mi perfil</b></p>
+    <button class="pfPhoto" id="pfPhoto" aria-label="Cambiar mi foto"><span class="profPic" id="pfPic"></span><i aria-hidden="true">📷</i></button>
+    <p style="text-align:center;margin:0 0 6px"><button class="link hidden" id="pfNoPhoto" style="font-size:13px;color:var(--muted)">Quitar foto</button></p>
+    <input type="file" accept="image/*" id="pfIn" hidden>
+    <p class="eLbl" style="margin-top:8px">Mi nombre</p>
+    <input id="pfName" maxlength="40" autocomplete="given-name" value="${esc(me || "")}" placeholder="Ej: Daniel">
+    <p class="eLbl" style="margin-top:14px">¿Quién eres en la familia?</p>
+    <div class="roles" id="pfRoles">${ROLES.map(x => `<button data-r="${x}" class="${x === role ? "on" : ""}">${x}</button>`).join("")}<button data-r="" class="${other ? "on" : ""}">Otro…</button></div>
+    <input id="pfOther" maxlength="30" placeholder="Ej: Nana, Prima, Vecino" class="${other ? "" : "hidden"}" value="${other ? esc(role) : ""}" style="margin-top:6px">
+    <p id="pfErr" class="muted warn" style="margin-top:8px"></p>
+    <div class="grid" style="margin-top:10px"><button onclick="closeModal()">Cancelar</button><button class="primary" id="pfOk">Guardar</button></div>`);
+  const pic = () => {
+    const nm = $("pfName").value.trim() || me;
+    $("pfPic").outerHTML = avatarHtml(nm, photo, "profPic").replace('class="profPic"', 'class="profPic" id="pfPic"');
+    $("pfNoPhoto").classList.toggle("hidden", !photo);
+  };
+  pic();
+  $("pfName").oninput = () => { if (!photo) pic(); };
+  $("pfPhoto").onclick = () => $("pfIn").click();
+  $("pfNoPhoto").onclick = () => { photo = null; pic(); };
+  $("pfIn").onchange = async () => {
+    const f = $("pfIn").files[0]; $("pfIn").value = "";
+    if (!f) return;
+    try { photo = await shrink(f, 320); pic(); } catch { $("pfErr").textContent = "No se pudo leer esa imagen. Prueba con otra."; }
+  };
+  $("pfRoles").querySelectorAll("button").forEach(b => b.onclick = () => {
+    $("pfRoles").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+    const isOther = !b.dataset.r;
+    $("pfOther").classList.toggle("hidden", !isOther);
+    role = isOther ? $("pfOther").value.trim() : b.dataset.r;
+    if (isOther) setTimeout(() => $("pfOther").focus(), 30);
+  });
+  $("pfOther").oninput = () => { role = $("pfOther").value.trim(); };
+  $("pfOk").onclick = async () => {
+    const name = $("pfName").value.trim();
+    if (!name) { $("pfErr").textContent = "Escribe tu nombre."; $("pfName").focus(); return; }
+    const old = me;
+    $("pfOk").disabled = true; $("pfErr").textContent = "Guardando…";
+    try { localStorage.setItem("comitag_perfil", JSON.stringify({ role: role || "", photo: photo || null })); }
+    catch { $("pfErr").textContent = "La foto es muy grande para este teléfono. Prueba con otra."; $("pfOk").disabled = false; return; }
+    me = name; localStorage.setItem("comitag_nombre", name);
+    let msg = "👤 Perfil guardado.";
+    if (code) {
+      const r = await rpcPin("set_member", { p_code: code, p_name: name, p_role: role || null, p_photo: photo || null, p_old_name: old && old !== name ? old : null });
+      if (r.error) {
+        if (r.error.cancelled) { $("pfOk").disabled = false; $("pfErr").textContent = ""; return; }
+        msg = r.error.code === "PGRST202" ? "👤 Perfil guardado en este teléfono. Falta correr perfiles.sql en Supabase para que la familia lo vea."
+          : "👤 Perfil guardado en este teléfono, pero no se pudo compartir con la familia. Intenta de nuevo más tarde.";
+      } else if (r.data === "ok") {
+        const mm = { ...members }; if (old && old !== name) delete mm[old];
+        mm[name] = { role: role || undefined, photo: photo || undefined }; members = mm; cachePut({ members }); memberSynced = true;
+      }
+    }
+    closeModal();
+    if (typeof showName === "function") showName();
+    showNote(msg);
+  };
+}
 
 // ================= PIN al entrar =================
 // Lectura/escritura con el PIN guardado de esta mascota (si Supabase aún no lo pide, sin él)
@@ -2485,7 +2613,7 @@ async function saveSetup() {
 }
 
 setInterval(() => ready && refresh(), 30000);
-document.addEventListener("visibilitychange", () => { if (!document.hidden && ready) { refresh(); loadPhoto(); } });
+document.addEventListener("visibilitychange", () => { if (!document.hidden && ready) { refresh(); loadPhoto(); loadMembers(); } });
 load();
 </script>
 </body>
