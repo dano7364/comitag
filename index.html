@@ -63,6 +63,20 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .ann .annB{margin:0;line-height:1.45;white-space:pre-line}
 .ann .annF{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
 .ann .annF a{color:var(--blue);text-decoration:none;font-weight:600}
+.tour{position:fixed;inset:0;z-index:60}
+.tour .hole{position:fixed;border-radius:20px;box-shadow:0 0 0 9999px rgba(10,12,20,.62);pointer-events:none;transition:all .45s var(--spring,cubic-bezier(.2,.9,.3,1.15))}
+.tour .hole.none{width:0!important;height:0!important;left:50%!important;top:45%!important}
+.tour .tip{position:fixed;left:16px;right:16px;max-width:400px;margin:0 auto;background:var(--card);color:var(--text);border-radius:20px;padding:18px 18px 14px;
+  box-shadow:0 18px 50px rgba(0,0,0,.35);transition:top .45s var(--spring,ease),opacity .2s}
+.tour .tip h3{margin:0 0 6px;font-size:18px}
+.tour .tip p{margin:0;line-height:1.45;color:var(--muted);font-size:15px}
+.tour .tbar{display:flex;align-items:center;justify-content:space-between;margin-top:14px;gap:10px}
+.tour .dots{display:flex;gap:5px}
+.tour .dots i{width:7px;height:7px;border-radius:50%;background:var(--line)}
+.tour .dots i.on{background:var(--blue);width:18px;border-radius:4px}
+.tour .tbar .btns{display:flex;gap:8px;align-items:center}
+.tour .tbar button{width:auto;padding:10px 16px}
+@media (prefers-reduced-motion:reduce){.tour .hole,.tour .tip{transition:none}}
 .tqSel{font-size:16px;padding:12px 10px;width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text)}
 .trow .x{width:44px;padding:10px;color:var(--red)}
 .add{margin:4px 0 12px}
@@ -392,6 +406,7 @@ body::before{animation:drift 28s ease-in-out infinite alternate;will-change:tran
         <button role="menuitem" onclick="menuDo(openPinSettings)"><i class="mi">🔒</i><span id="pinLink">PIN familiar</span></button>
         <button role="menuitem" onclick="menuDo(openAddPet)"><i class="mi">＋</i><span>Agregar otra mascota</span></button>
         <button role="menuitem" onclick="cycleTheme()"><i class="mi">🌓</i><span class="themeLbl">Tema</span></button>
+        <button role="menuitem" onclick="menuDo(() => startTour(true))"><i class="mi">💡</i><span>Ver tutorial</span></button>
         <button role="menuitem" onclick="menuDo(changeName)"><i class="mi">✏️</i><span>Cambiar mi nombre</span></button>
         <button role="menuitem" class="mdanger" onclick="menuDo(askRemoveHere)"><i class="mi">🗑️</i><span>Quitar de este teléfono</span></button>
       </div>
@@ -658,10 +673,69 @@ function pulse(el) {
   el.classList.remove("pulse"); void el.offsetWidth; el.classList.add("pulse");
   el.addEventListener("animationend", () => el.classList.remove("pulse"), { once: true });
 }
+// ================= Mini tutorial (se muestra una sola vez por teléfono) =================
+const TOUR_KEY = "comitag_tutorial_visto";
+function tourSteps() {
+  const many = petsOf().length > 0, card = id => $(id) && $(id).closest(".card");
+  return [
+    { t: "¡Bienvenido a Comitag! 🐾", d: `Te mostramos en 30 segundos cómo cuidar a ${esc(plate.pet_name)} en familia.` },
+    { el: many ? $("petRow") : $("photoBtn"), round: !many, pad: many ? 10 : 8, t: many ? "Sus fotos" : "Su foto", d: many ? "Toca la foto de cada mascota para ponerla o cambiarla." : "Toca la foto para ponerla o cambiarla." },
+    { el: $("actions"), t: "Registra en un toque", d: "Cuando le des comida o cambies el agua, toca aquí. Toda la familia lo ve al instante." },
+    { el: card("fT") && card("fT").parentElement, t: "¿Ya comió?", d: "Aquí ves cuándo comió y tomó agua por última vez, y quién se lo dio." },
+    { el: card("sched"), t: "Horarios y avisos", d: "Pon sus horarios de comida y toca 🔔 Avisarme: te llega un aviso si a alguien se le olvida." },
+    { el: $("menuBtn"), pad: 6, t: "Más opciones", d: "En el menú ☰ puedes invitar a tu familia con un QR, registrar solo con acercar el teléfono, cambiar el PIN y más." },
+    { t: "¡Listo! 🎉", d: "La próxima vez, acerca el teléfono a la pegatina del plato y se abre esta página. Puedes ver este tutorial de nuevo en el menú ☰.", last: true },
+  ].filter(x => !("el" in x) || (x.el && x.el.offsetParent));
+}
+function startTour(force) {
+  if (!force) {
+    let seen = false; try { seen = !!localStorage.getItem(TOUR_KEY); } catch { seen = true; }
+    if (seen || !ready || !me || $("app").classList.contains("hidden")) return;
+    if (($("autoBox") && !$("autoBox").classList.contains("hidden")) || !$("modal").classList.contains("hidden") || $("tourBox")) return;
+  }
+  try { localStorage.setItem(TOUR_KEY, "1"); } catch {}
+  const steps = tourSteps(); let i = 0;
+  const box = document.createElement("div");
+  box.className = "tour"; box.id = "tourBox"; box.setAttribute("role", "dialog"); box.setAttribute("aria-modal", "true");
+  box.innerHTML = `<div class="hole none"></div><div class="tip" aria-live="polite"></div>`;
+  document.body.appendChild(box); document.body.style.overflow = "hidden";
+  const hole = box.querySelector(".hole"), tip = box.querySelector(".tip");
+  const end = () => { box.remove(); document.body.style.overflow = ""; window.removeEventListener("resize", place); };
+  function place() {
+    const st = steps[i];
+    if (!st.el) { hole.classList.add("none"); tip.style.top = Math.max(16, (innerHeight - tip.offsetHeight) / 2) + "px"; return; }
+    const r = st.el.getBoundingClientRect(), pad = st.pad ?? 10;
+    hole.classList.remove("none");
+    hole.style.borderRadius = st.round ? "50%" : "20px";
+    Object.assign(hole.style, { left: r.left - pad + "px", top: r.top - pad + "px", width: r.width + pad * 2 + "px", height: r.height + pad * 2 + "px" });
+    const below = r.bottom + pad + 14, above = r.top - pad - 14 - tip.offsetHeight;
+    tip.style.top = (below + tip.offsetHeight < innerHeight - 12 || above < 12 ? Math.min(below, innerHeight - tip.offsetHeight - 12) : above) + "px";
+  }
+  function show() {
+    const st = steps[i];
+    tip.innerHTML = `<h3>${st.t}</h3><p>${st.d}</p><div class="tbar"><div class="dots">${steps.map((_, k) => `<i class="${k === i ? "on" : ""}"></i>`).join("")}</div>
+      <div class="btns">${st.last ? "" : `<button class="link" id="tourSkip">Saltar</button>`}<button class="primary" id="tourNext">${st.last ? "Empezar" : i === 0 ? "Ver cómo" : "Siguiente"}</button></div></div>`;
+    $("tourNext").onclick = () => { if (st.last) end(); else { i++; show(); } };
+    if ($("tourSkip")) $("tourSkip").onclick = end;
+    if (st.el) {
+      const r = st.el.getBoundingClientRect();
+      if (r.top < 70 || r.bottom > innerHeight - 220) {
+        window.scrollTo({ top: Math.max(0, scrollY + r.top - 90), behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+        setTimeout(place, 380);
+      }
+    }
+    requestAnimationFrame(place);
+    $("tourNext").focus({ preventScroll: true });
+  }
+  window.addEventListener("resize", place);
+  show();
+}
+
 function showName() {
   $("nameBox").classList.toggle("hidden", !!me);
   $("app").classList.toggle("hidden", !me);
   if (me) requestAnimationFrame(animateIn);
+  if (me) setTimeout(() => startTour(false), 1100);
   $("hello").textContent = me ? `Hola, ${me}` : "";
 }
 
