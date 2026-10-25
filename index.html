@@ -656,7 +656,7 @@ function notifItems() {
     key: "a" + a.id, at: new Date(a.at), ic: "📣", t: a.title, b: a.body, link: a.link }));
   for (const m of missedToday) {
     const n = m.pets.length ? joinNames(m.pets) : plate.pet_name, many = m.pets.length > 1;
-    out.push({ key: "m" + m.s.getHours() + ":" + m.s.getMinutes() + "|" + m.pets.join(","), at: m.s, ic: "⚠️",
+    out.push({ key: "m" + m.s.getHours() + ":" + m.s.getMinutes() + "|" + m.pets.join(","), at: m.s, ic: "⚠️", pets: m.pets,
       t: `${n} no ${many ? "comieron" : "comió"}`, b: `Su comida era a las ${fmt(m.s)} y nadie la registró.` });
   }
   return out.sort((a, b) => b.at - a.at);
@@ -715,8 +715,57 @@ function openNotif(x) {
         : missed ? `<button class="primary" id="ndReg">Ya le di comida</button>` : `<button class="primary" onclick="closeNotif()">Entendido</button>`}
     </div></div>`;
   box.classList.remove("hidden");
-  if ($("ndReg")) $("ndReg").onclick = () => { closeNotif(); closeModal(); ask("comida"); $("confirm").scrollIntoView({ behavior: "smooth", block: "center" }); };
+  if ($("ndReg")) $("ndReg").onclick = () => askNotifTime(x);
   setTimeout(() => { const b = box.querySelector("button"); b && b.focus({ preventScroll: true }); }, 50);
+}
+// "Ya le di comida" desde una comida olvidada: ¿a qué hora?
+function askNotifTime(x) {
+  const box = $("nDetail").querySelector(".modal"), slot = fmt(x.at), who = x.pets && x.pets.length ? x.pets : [];
+  box.innerHTML = `<div class="ndIc" aria-hidden="true">🍽️</div>
+    <p class="ndT" id="ndT">¿A qué hora le diste?</p>
+    <p class="muted" style="margin:0 0 12px">${who.length ? `Comida de ${esc(joinNames(who))}` : `Comida de ${esc(plate.pet_name)}`} · su horario era a las ${slot}</p>
+    <input type="time" id="ndTime" value="${slot}" style="font-size:22px;text-align:center">
+    <div class="actions" style="justify-content:center;margin-top:10px;display:flex;gap:8px">
+      <button class="chip" type="button" id="ndSlot" style="width:auto">A las ${slot}</button>
+      <button class="chip" type="button" id="ndNow" style="width:auto">Ahora</button>
+    </div>
+    <p class="muted warn" id="ndErr" style="margin-top:8px"></p>
+    <div class="grid" style="margin-top:12px"><button onclick="closeNotif()">Cancelar</button><button class="primary" id="ndOk">Registrar</button></div>`;
+  $("ndSlot").onclick = () => { $("ndTime").value = slot; };
+  $("ndNow").onclick = () => { $("ndTime").value = fmt(new Date()); };
+  $("ndOk").onclick = async () => {
+    const v = $("ndTime").value;
+    if (!/^\d\d:\d\d$/.test(v)) { $("ndErr").textContent = "Elige una hora."; return; }
+    const [h, mi] = v.split(":").map(Number), at = new Date(); at.setHours(h, mi, 0, 0);
+    if (at > Date.now() + 60000) { $("ndErr").textContent = "Esa hora todavía no pasa."; return; }
+    $("ndOk").disabled = true;
+    const ok = await saveAt("comida", who.length ? who : [null], at);
+    $("ndOk").disabled = false;
+    if (ok !== true) { $("ndErr").textContent = ok; return; }
+    closeNotif(); closeModal();
+  };
+  setTimeout(() => $("ndTime").focus(), 50);
+}
+// Registrar con una hora elegida (mismo camino que "Ya le di comida": funciona sin internet y se puede deshacer)
+async function saveAt(kind, sel, atDate) {
+  unlockAudio();
+  const many = petsOf().length > 0;
+  if (!many) sel = [null];
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 10), at = atDate.toISOString();
+  const items = sel.map((pet, i) => ({ id: sel.length > 1 ? `${id}-${i}` : id, code, kind, who: me, at, note: null, pet }));
+  queueSet([...queueGet(), ...items]);
+  for (let i = 0; syncing && i < 50; i++) await new Promise(r => setTimeout(r, 100));
+  await syncQueue();
+  if (items.some(x => rejected.has(x.id))) return "No se pudo guardar. Intenta de nuevo.";
+  const waiting = queueGet().some(x => items.some(y => y.id === x.id));
+  chime(kind);
+  await refresh();
+  lastSaved = items;
+  const para = sel[0] ? ` de ${joinNames(sel)}` : "";
+  showNote(waiting ? "⏳ Quedó guardado en este teléfono. Se enviará solo cuando vuelva internet."
+    : `✅ Comida${para} registrada a las ${fmt(atDate)}.`, true);
+  pulse($(kind === "comida" ? "fT" : "wT").closest(".card"));
+  return true;
 }
 function closeNotif() { const b = $("nDetail"); if (b) b.classList.add("hidden"); }
 document.addEventListener("keydown", e => { if (e.key === "Escape" && $("nDetail") && !$("nDetail").classList.contains("hidden")) { e.stopImmediatePropagation(); closeNotif(); } }, true);
