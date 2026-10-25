@@ -94,6 +94,9 @@ table.tv td:last-child,table.tv th:last-child{text-align:right;font-variant-nume
   #printSheet .q{text-align:center;font:10pt/1.3 -apple-system,sans-serif;break-inside:avoid}
   #printSheet svg{width:42mm;height:42mm}
 }
+.annAll{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 10px}
+.annAll button{width:auto;flex:1;min-width:150px;font-size:14px;padding:10px 12px}
+.dangerBtn{color:#dc2626!important;border-color:#f3c4c4!important}
 .annBtns{display:flex;gap:18px;flex-wrap:wrap;margin-top:6px}
 .annBtns .link{padding:0}
 .annDel{color:#dc2626!important}
@@ -147,6 +150,11 @@ table.tv td:last-child,table.tv th:last-child{text-align:right;font-variant-nume
       </div>
       <div class="card">
         <h2>Últimos anuncios</h2>
+        <div class="annAll hidden" id="annAll">
+          <button id="hideAllBtn">Quitar todos de la página</button>
+          <button class="dangerBtn" id="delAllBtn">Borrar todos</button>
+        </div>
+        <p id="annAllMsg" class="msg hidden"></p>
         <div id="annList"><p class="muted">Cargando…</p></div>
       </div>
     </section>
@@ -359,6 +367,8 @@ $("sendBtn").onclick = async () => {
 async function loadAnn() {
   let r; try { r = await api({ action: "list" }); } catch { return; }
   const items = (r.data && r.data.items) || [];
+  $("annAll").classList.toggle("hidden", !items.length);
+  $("hideAllBtn").disabled = !items.some(a => a.active);
   $("annList").innerHTML = items.length ? items.map(a => {
     const future = a.send_at && new Date(a.send_at) > Date.now();
     const st = !a.active ? '<span class="tag">Quitado</span>' : future ? '<span class="tag warn">🗓️ Programado</span>' : '<span class="tag ok">En la página</span>';
@@ -388,6 +398,26 @@ async function loadAnn() {
     loadAnn();
   });
 }
+
+// Quitar todos de la página / borrar todos
+async function annBulk(action, okText) {
+  $("annAllMsg").classList.add("hidden");
+  $("hideAllBtn").disabled = $("delAllBtn").disabled = true;
+  let r; try { r = await api({ action }); } catch { r = { status: 0 }; }
+  $("delAllBtn").disabled = false;
+  $("annAllMsg").classList.remove("hidden");
+  $("annAllMsg").innerHTML = r.status === 200 ? okText
+    : `<span class="err">${r.status === 400 ? "Falta actualizar la función “anuncio” en Supabase." : "No se pudo. Intenta de nuevo."}</span>`;
+  loadAnn();
+}
+$("hideAllBtn").onclick = async () => {
+  if (!await ask("¿Quitar todos de la página?", "Todos los anuncios dejan de verse en la página y en la campana de las familias. Los programados se cancelan. Quedan guardados aquí en tu lista.", "Quitar todos")) return;
+  annBulk("hide_all", "✅ Se quitaron todos de la página.");
+};
+$("delAllBtn").onclick = async () => {
+  if (!await ask("¿Borrar todos los anuncios?", "Se borran para siempre todos los anuncios, también los programados y los quitados. Las notificaciones que ya llegaron a los teléfonos no se pueden quitar.", "Borrar todos", "BORRAR")) return;
+  annBulk("delete_all", "🗑️ Se borraron todos los anuncios.");
+};
 
 // ---------- Platos y pegatinas ----------
 function stateOf(p) {
