@@ -149,6 +149,19 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .enote{display:block;color:var(--muted);font-size:12px;font-style:italic;margin-top:2px;overflow-wrap:anywhere}
 .hx{background:none;border:none;color:var(--muted);width:auto;padding:4px 6px;font-size:14px;cursor:pointer}
 .hrow{display:flex;align-items:center;gap:4px}
+.hday{margin:14px 0 2px;font-size:12px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+.hday:first-child{margin-top:4px}
+.hitem{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.hday + .hitem{border-top:none}
+.hic{width:38px;height:38px;flex:none;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:19px;background:color-mix(in srgb,var(--text) 6%,transparent)}
+.hmain{flex:1;min-width:0}
+.hline{display:flex;align-items:center;gap:10px}
+.htime{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.2px}
+.hsub{font-size:13px;color:var(--muted);margin-top:1px}
+.hav{display:inline-flex;align-items:center}
+.hav img,.hav b{width:30px;height:30px;border-radius:50%;border:2px solid var(--card);object-fit:cover;margin-left:-8px;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;box-sizing:border-box}
+.hav img:first-child,.hav b:first-child{margin-left:0}
+.hall{font-size:12px;font-weight:600;padding:3px 9px;border-radius:99px;background:color-mix(in srgb,var(--blue) 14%,transparent);color:var(--blue)}
 .chips{margin:4px 0 12px}
 .chip{display:inline-block;width:auto;margin:0 6px 6px 0;padding:9px 14px;border-radius:999px;font-size:15px;border:1px solid var(--chip);background:var(--card);color:var(--muted)}
 .chip.on{background:var(--blue);border-color:var(--blue);color:var(--on-blue)}
@@ -1005,12 +1018,43 @@ function render() {
   const order = petsOf();
   hist.forEach(g => g.pets.sort((x, y) => order.indexOf(x) - order.indexOf(y)));
   histShown = hist;
-  $("hist").innerHTML = hist.map((e, i) =>
-    `<div class="row"><span>${e.kind === "comida" ? "Comida" : "Agua"}${e.pets.length ? ` · ${esc(joinNames(e.pets))}` : ""} · ${esc(e.who)}${e.queued ? ` <span class="q">⏳ por enviar</span>` : ""}${e.note ? `<span class="enote">“${esc(e.note)}”</span>` : ""}</span>`
-    + `<span class="hrow"><span class="muted">${e.t.toLocaleDateString("es-CL", {weekday:"short", day:"numeric"})} ${fmt(e.t)}</span>`
-    + `<button class="hx" title="Borrar registro" aria-label="Borrar registro" onclick="askDelete(${i})">✕</button></span></div>`
-  ).join("");
+  $("hist").innerHTML = histHtml(hist, order);
   bellUI();
+}
+
+// ---- Historial: agrupado por día, con ícono, hora grande y mini fotos ----
+function dayTitle(d) {
+  const a = new Date(); a.setHours(0, 0, 0, 0);
+  const b = new Date(d); b.setHours(0, 0, 0, 0);
+  const n = Math.round((a - b) / 864e5);
+  if (n === 0) return "Hoy";
+  if (n === 1) return "Ayer";
+  const t = d.toLocaleDateString("es-CL", { weekday: "long", day: "numeric" });
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+function petAvatars(names, order) {
+  return `<span class="hav">${names.map(p => { const src = photoOf(p), i = Math.max(0, order.indexOf(p));
+    return src ? `<img src="${src}" alt="${esc(p)}" title="${esc(p)}">`
+      : `<b style="background:${petColor(i)}" title="${esc(p)}" aria-label="${esc(p)}">${esc(p.charAt(0).toUpperCase())}</b>`; }).join("")}</span>`;
+}
+function histHtml(hist, order) {
+  const many = order.length > 1;
+  let out = "", lastDay = "";
+  hist.forEach((e, i) => {
+    const day = dayTitle(e.t);
+    if (day !== lastDay) { out += `<p class="hday">${day}</p>`; lastDay = day; }
+    // ¿Para quién? Todas = registro sin mascota o con todas
+    const all = many && e.kind === "comida" && (!e.pets.length || e.pets.length === order.length);
+    const who = many && e.kind === "comida" ? (all ? `<span class="hall">Todas</span>` : petAvatars(e.pets, order)) : "";
+    const names = many && e.kind === "comida" ? (all ? "todas" : joinNames(e.pets)) : "";
+    out += `<div class="hitem" aria-label="${e.kind === "comida" ? "Comida" : "Agua"}${names ? " de " + esc(names) : ""} a las ${fmt(e.t)}, por ${esc(e.who)}">
+      <span class="hic" aria-hidden="true">${e.kind === "comida" ? "🍽️" : "💧"}</span>
+      <div class="hmain"><div class="hline"><span class="htime">${fmt(e.t)}</span>${who}</div>
+        <div class="hsub">${e.kind === "comida" ? "Comida" : "Agua"} · por ${esc(e.who)}${e.queued ? ` · <span class="q">⏳ por enviar</span>` : ""}</div>
+        ${e.note ? `<span class="enote">“${esc(e.note)}”</span>` : ""}</div>
+      <button class="hx" title="Borrar registro" aria-label="Borrar registro" onclick="askDelete(${i})">✕</button></div>`;
+  });
+  return out;
 }
 
 // ---- Últimos 7 días por mascota (con colores) ----
@@ -1536,6 +1580,7 @@ async function loadPhoto() {
   else map = cacheGet().petPhotos || {};
   petPhotos = map; platePhoto = photo || null;
   renderPetPhotos();
+  if (ready) render();   // para que el historial muestre las fotos
 }
 
 // ---- Varias mascotas: una foto por mascota ----
