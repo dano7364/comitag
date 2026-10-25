@@ -230,7 +230,7 @@ const QR_LIB = "https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js";
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const plural = (n, a, b) => `${n} ${n === 1 ? a : b}`;
-const nfcLink = c => `${SITE}/p/${c}?nfc=1`;
+const nfcLink = c => `${SITE}/p/${c}?d=1`;
 const fmtDate = d => new Date(d).toLocaleString("es-CL", { dateStyle: "medium", timeStyle: "short", hourCycle: "h23" });
 function ago(d) {
   if (!d) return "nunca";
