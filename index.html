@@ -142,6 +142,16 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .foot .link{font-size:13px;color:var(--muted)}
 main{position:relative}
 .menu{position:absolute;top:17px;left:10px;z-index:40}
+.notifBtn{position:absolute;top:17px;right:10px;z-index:40;display:flex;align-items:center;justify-content:center;width:40px!important;height:40px;padding:0!important;border-radius:12px;border:none!important;background:transparent!important;box-shadow:none!important;color:var(--text);cursor:pointer;-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+.notifBtn svg{width:24px;height:24px}
+.nbadge{position:absolute;top:1px;right:-3px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:#ef4444;color:#fff;font-size:10.5px;font-weight:700;line-height:17px;text-align:center;box-shadow:0 0 0 2px var(--bg)}
+.nlist .ni{display:flex;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.nlist .ni:first-child{border-top:none}
+.nlist .ni .ic{font-size:20px;line-height:1.3}
+.nlist .ni .nt{font-weight:700;margin:0}
+.nlist .ni .nb{margin:2px 0 0;color:var(--muted);font-size:14px;line-height:1.4}
+.nlist .ni .nh{font-size:12px;color:var(--muted);margin-top:3px}
+.nlist .ni.new .nt::after{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:#ef4444;margin-left:6px;vertical-align:middle}
 .menuBtn{display:flex;align-items:center;justify-content:center;width:40px;height:40px;padding:0;border-radius:12px;border:none;background:transparent;color:var(--text);cursor:pointer}
 .menuBtn svg{width:24px;height:24px}
 .menuBtn:active,.menuBtn.open{background:var(--card);box-shadow:0 1px 6px var(--shadow)}
@@ -386,6 +396,10 @@ body::before{animation:drift 28s ease-in-out infinite alternate;will-change:tran
       </div>
     </div>
     <div class="card"><p><b>Últimos 7 días</b></p><div id="week"></div><div id="hist" style="margin-top:12px"></div></div>
+    <button class="notifBtn" id="notifBtn" aria-label="Notificaciones" onclick="openNotifs()">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 4.5 1.6 6.4 2.4 7.2.3.3.1.8-.3.8H3.9c-.4 0-.6-.5-.3-.8C4.4 15.4 6 13.5 6 9Z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M10 20.2a2.2 2.2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+      <span class="nbadge hidden" id="nBadge"></span>
+    </button>
     <div class="menu" id="menu">
       <button class="menuBtn" id="menuBtn" aria-label="Menú" aria-expanded="false" aria-controls="menuList" onclick="toggleMenu()">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -619,6 +633,52 @@ async function start() {
 }
 
 // ---- Anuncios del dueño de Comitag ----
+// ================= Campana de notificaciones (se vacía a las 00:00) =================
+let missedToday = [], annToday = [];
+const todayKey = () => new Date().toDateString();
+function notifSeen() {
+  try { const o = JSON.parse(localStorage.getItem("comitag_notif_vistas") || "{}"); return o.d === todayKey() ? new Set(o.k || []) : new Set(); }
+  catch { return new Set(); }
+}
+function notifItems() {
+  const out = annToday.filter(a => new Date(a.at).toDateString() === todayKey()).map(a => ({
+    key: "a" + a.id, at: new Date(a.at), ic: "📣", t: a.title, b: a.body, link: a.link }));
+  for (const m of missedToday) {
+    const n = m.pets.length ? joinNames(m.pets) : plate.pet_name, many = m.pets.length > 1;
+    out.push({ key: "m" + m.s.getHours() + ":" + m.s.getMinutes() + "|" + m.pets.join(","), at: m.s, ic: "⚠️",
+      t: `${n} no ${many ? "comieron" : "comió"}`, b: `Su comida era a las ${fmt(m.s)} y nadie la registró.` });
+  }
+  return out.sort((a, b) => b.at - a.at);
+}
+function notifUpdate() {
+  if (!$("nBadge")) return;
+  const seen = notifSeen(), n = notifItems().filter(x => !seen.has(x.key)).length;
+  $("nBadge").textContent = n > 9 ? "9+" : n;
+  $("nBadge").classList.toggle("hidden", !n);
+  $("notifBtn").setAttribute("aria-label", n ? `Notificaciones: ${n} sin ver` : "Notificaciones");
+}
+async function loadAnnToday() {
+  const r = await db.rpc("announcements_today", { p_code: code });
+  if (!r.error && Array.isArray(r.data)) annToday = r.data;
+  else if (r.error && r.error.code === "PGRST202") {           // Supabase sin notificaciones.sql: al menos el último
+    const l = await db.rpc("latest_announcement2", { p_code: code });
+    annToday = !l.error && l.data ? [{ ...l.data, at: l.data.created_at }] : [];
+  }
+  notifUpdate();
+}
+function openNotifs() {
+  const list = notifItems(), seen = notifSeen();
+  openModal(`<p style="font-size:18px;margin-top:4px"><b>🔔 Notificaciones de hoy</b></p>
+    <div class="nlist" style="margin-top:6px">${list.length ? list.map(x => `<div class="ni${seen.has(x.key) ? "" : " new"}"><span class="ic" aria-hidden="true">${x.ic}</span><div style="flex:1;min-width:0">
+      <p class="nt">${esc(x.t)}</p><p class="nb">${esc(x.b)}</p>
+      <div class="nh">${fmt(x.at)}${x.link && /^https:\/\//.test(x.link) ? ` · <a href="${esc(x.link)}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:none">Ver más →</a>` : ""}</div></div></div>`).join("")
+      : `<p class="muted" style="padding:14px 0">No hay notificaciones hoy. 🐾</p>`}</div>
+    <p class="muted" style="font-size:12px;margin-top:10px">Las notificaciones se borran solas a las 00:00.</p>
+    <button class="link" style="display:block;margin:8px auto 0" onclick="closeModal()">Cerrar</button>`);
+  try { localStorage.setItem("comitag_notif_vistas", JSON.stringify({ d: todayKey(), k: list.map(x => x.key) })); } catch {}
+  notifUpdate();
+}
+
 async function loadAnnouncement() {
   let seen = 0; try { seen = +localStorage.getItem("comitag_anuncio_visto") || 0; } catch {}
   let r = await db.rpc("latest_announcement2", { p_code: code });
@@ -665,7 +725,7 @@ async function refresh() {
     }
   }
   render();
-  if (ready) loadWa();
+  if (ready) { loadWa(); loadAnnToday(); }
 }
 
 // Entrada escalonada (solo la primera vez)
@@ -694,6 +754,7 @@ function tourSteps() {
     { el: card("fT") && card("fT").parentElement, t: "¿Ya comió?", d: "Aquí ves cuándo comió y tomó agua por última vez, y quién se lo dio." },
     { el: card("sched"), t: "Horarios y avisos", d: "Pon sus horarios de comida y toca 🔔 Avisarme: te llega un aviso si a alguien se le olvida." },
     { el: $("menuBtn"), pad: 6, t: "Más opciones", d: "En el menú ☰ puedes invitar a tu familia con un QR, registrar solo con acercar el teléfono, configurar avisos por WhatsApp, cambiar el PIN y más." },
+    { el: $("notifBtn"), pad: 6, t: "Notificaciones", d: "En la campana ves los avisos del día: si alguien olvidó una comida o hay novedades de Comitag. Se borran solas a las 00:00." },
     { t: "¡Listo! 🎉", d: "La próxima vez, acerca el teléfono al dispositivo Comitag y se abre esta página. Puedes ver este tutorial de nuevo en el menú ☰.", last: true },
   ].filter(x => !("el" in x) || (x.el && x.el.offsetParent));
 }
@@ -791,6 +852,13 @@ function render() {
       res[x.idx][p || ""] = { e, to };
     });
   }
+  // Para la campana: horarios de hoy que ya pasaron sin comida registrada
+  missedToday = items.map((it, idx) => {
+    const who = it.p ? [it.p] : (pets.length ? pets : [""]), miss = who.filter(p => !res[idx][p].e);
+    const to = Math.max(...who.map(p => res[idx][p].to));
+    return Date.now() >= to && miss.length ? { s: it.d, to, pets: miss.filter(Boolean) } : null;
+  }).filter(Boolean);
+  notifUpdate();
   $("sched").innerHTML = items.length ? items.map((it, idx) => {
     const s = it.d, who = it.p ? [it.p] : (pets.length ? pets : [""]);
     const got = who.filter(p => res[idx][p].e), miss = who.filter(p => !res[idx][p].e);
