@@ -189,6 +189,14 @@ button:disabled{opacity:.4;cursor:default;box-shadow:none}
 .roles{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px}
 .roles button{width:auto;margin:0;padding:8px 13px;border-radius:999px;font-size:14px}
 .roles button.on{background:linear-gradient(180deg,#5a8dff,var(--blue))!important;border-color:rgba(255,255,255,.35)!important;color:#fff!important;transition:none}
+.sPh{flex:none;width:44px!important;height:44px;padding:0!important;border-radius:50%!important;display:inline-flex;align-items:center;justify-content:center;font-size:18px;
+  background-size:cover!important;background-position:center!important;overflow:hidden;cursor:pointer}
+.sPh.has{border:2px solid var(--card)!important;box-shadow:0 2px 8px var(--shadow)!important}
+.pfRow{display:flex;align-items:center;gap:12px;margin-top:10px}
+.pfRow .pfPhoto{margin:0;width:64px;height:64px;flex:none}
+.pfRow .pfPhoto .profPic{width:64px;height:64px;font-size:24px}
+.pfRow .pfPhoto i{width:24px;height:24px;font-size:11px;border-width:2px}
+.pfRow input{flex:1;min-width:0}
 .hav{display:inline-flex;align-items:center}
 .hav img,.hav b{width:30px;height:30px;border-radius:50%;border:2px solid var(--card);object-fit:cover;margin-left:-8px;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;box-sizing:border-box}
 .hav img:first-child,.hav b:first-child{margin-left:0}
@@ -379,6 +387,7 @@ body::before{animation:drift 28s ease-in-out infinite alternate;will-change:tran
   <section id="setup" class="card hidden">
     <p class="muted">Este plato todavía no está configurado. Solo hay que hacerlo una vez y queda listo para toda la familia.</p>
     <p><b>¿Cómo se llama tu mascota?</b></p>
+    <p class="muted" style="margin:-4px 0 0">Toca 📷 para ponerle su foto (opcional).</p>
     <div id="setRows0" style="margin-top:8px"></div>
     <button class="add" id="setRows0Add" onclick="addNameRow('setRows0', '')">+ Agrega otra mascota</button>
     <p style="margin-top:16px"><b>¿A qué horas come?</b> <span class="muted">(opcional)</span></p>
@@ -394,10 +403,10 @@ body::before{animation:drift 28s ease-in-out infinite alternate;will-change:tran
     <div id="setMailBox" style="margin-top:12px"><p class="muted">Correo de recuperación <span style="opacity:.8">(opcional)</span></p>
       <input id="setMail" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" maxlength="120" placeholder="tucorreo@gmail.com" style="margin-top:6px">
       <p class="muted" style="font-size:12px;margin-top:4px">Si alguien olvida el PIN, te llegará un enlace para crear uno nuevo.</p></div>
-    <div id="setMeBox" style="margin-top:16px">
-      <p><b>¿Y tú cómo te llamas?</b></p>
-      <p class="muted">Queda guardado en este teléfono para saber quién registra.</p>
-      <input id="setMe" placeholder="Sofía" maxlength="40">
+    <div id="setMeBox" style="margin-top:18px">
+      <p><b>Tu perfil</b></p>
+      <p class="muted">Así la familia sabe quién registró. La foto es opcional.</p>
+      <div id="setProf"></div>
     </div>
     <p id="setErr" class="muted warn"></p>
     <button class="primary" id="setBtn" onclick="saveSetup()" style="margin-top:10px">Listo</button>
@@ -420,10 +429,10 @@ body::before{animation:drift 28s ease-in-out infinite alternate;will-change:tran
 
   <section id="nameBox" class="card hidden">
     <p><b>¿Quién eres?</b></p>
-    <p class="muted">Solo la primera vez. Queda guardado en este teléfono.</p>
-    <input id="nameIn" placeholder="Sofía" maxlength="40">
+    <p class="muted">Solo la primera vez. Agrega tu foto y quién eres en la familia (opcional).</p>
+    <div id="nameProf"></div>
     <p id="nameErr" class="muted warn" style="display:none">Escribe tu nombre primero</p>
-    <button class="primary" id="nameBtn" style="margin-top:10px">Guardar nombre</button>
+    <button class="primary" id="nameBtn" style="margin-top:10px">Listo</button>
   </section>
 
   <section id="app" class="hidden">
@@ -966,6 +975,7 @@ function startTour(force) {
 }
 
 function showName() {
+  if (!me && $("nameBox").classList.contains("hidden")) readNameProf = profileFields("nameProf");
   $("nameBox").classList.toggle("hidden", !!me);
   $("app").classList.toggle("hidden", !me);
   if (me) requestAnimationFrame(animateIn);
@@ -1153,6 +1163,18 @@ function addNameRow(box, val) {
   r.className = "trow";
   if (val) r.dataset.orig = val;
   r.innerHTML = `<input maxlength="20" placeholder="Nombre" value="${esc(val)}"><button class="x" title="Quitar" onclick="this.parentNode.remove(); nameRowsUI('${box}')">✕</button>`;
+  if (box === "setRows0") {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "sPh"; b.textContent = "📷"; b.setAttribute("aria-label", "Foto de la mascota");
+    const f = document.createElement("input"); f.type = "file"; f.accept = "image/*"; f.hidden = true;
+    b.onclick = () => f.click();
+    f.onchange = async () => {
+      const file = f.files[0]; f.value = ""; if (!file) return;
+      try { r._photo = await shrink(file); } catch { $("setErr").textContent = "No se pudo leer esa imagen. Prueba con otra."; return; }
+      b.textContent = ""; b.classList.add("has"); b.style.backgroundImage = `url('${r._photo}')`;
+    };
+    r.prepend(b, f);
+  }
   $(box).appendChild(r);
   nameRowsUI(box);
 }
@@ -1163,7 +1185,7 @@ function nameRowsUI(box) {
   const add = $(box + "Add"); if (add) add.classList.toggle("hidden", n >= MAX_PETS);
 }
 function readNames(box) {
-  return [...new Set([...$(box).querySelectorAll("input")].map(i => i.value.trim().slice(0, 20)).filter(Boolean))];
+  return [...new Set([...$(box).querySelectorAll("input:not([type=file])")].map(i => i.value.trim().slice(0, 20)).filter(Boolean))];
 }
 // Botones para elegir a qué mascotas se les dio comida
 function renderPetChips() {
@@ -1307,12 +1329,16 @@ function showNote(msg, withUndo) {
   noteTimer = setTimeout(() => { $("note").classList.add("hidden"); if (withUndo) lastSaved = null; }, withUndo ? 15000 : 8000);
 }
 
-$("nameIn").oninput = () => $("nameErr").style.display = "none";
-$("nameBtn").onclick = () => {
-  const v = $("nameIn").value.trim();
-  if (!v) { $("nameErr").style.display = "block"; return; }
-  me = v;
-  localStorage.setItem("comitag_nombre", v);
+$("nameBox").addEventListener("input", () => $("nameErr").style.display = "none");
+$("nameBtn").onclick = async () => {
+  const p = readNameProf ? readNameProf() : { name: "" };
+  if (!p.name) { $("nameErr").style.display = "block"; return; }
+  $("nameErr").style.display = "none";
+  me = p.name;
+  localStorage.setItem("comitag_nombre", p.name);
+  $("nameBtn").disabled = true;
+  await saveMyProfile(p);
+  $("nameBtn").disabled = false;
   showName();
 };
 // ---- Editar nombre de la mascota ----
@@ -1439,7 +1465,7 @@ function addRow(val, box = "schedRows") {
 let setNamesBefore = [];
 function refreshSetSelectors() {
   // Nombres por posición (incluye vacíos) para que la selección siga a la mascota mientras se escribe
-  const raw = [...$("setRows0").querySelectorAll("input")].map(i => i.value.trim());
+  const raw = [...$("setRows0").querySelectorAll("input:not([type=file])")].map(i => i.value.trim());
   const before = setNamesBefore; setNamesBefore = raw;
   const names = readNames("setRows0");
   $("setSchedHint").classList.toggle("hidden", names.length < 2);
@@ -2564,6 +2590,50 @@ $("gatePin").onkeydown = $("gatePin2").onkeydown = e => { if (e.key === "Enter")
 
 function changeName() { me = null; localStorage.removeItem("comitag_nombre"); showName(); }
 
+// Foto + nombre + quién eres, para la primera vez (configurar plato o entrar a uno)
+function profileFields(boxId) {
+  const cur = me ? profileOf(me) : myLocal();
+  const st = { photo: cur.photo || null, role: cur.role || "" };
+  const other = st.role && !ROLES.includes(st.role), id = k => boxId + k;
+  $(boxId).innerHTML = `<div class="pfRow">
+      <button type="button" class="pfPhoto" id="${id("Ph")}" aria-label="Agregar mi foto"><span class="profPic" id="${id("Pic")}"></span><i aria-hidden="true">📷</i></button>
+      <input type="file" accept="image/*" id="${id("In")}" hidden>
+      <input id="${id("Name")}" maxlength="40" autocomplete="given-name" placeholder="Tu nombre" value="${esc(me || "")}">
+    </div>
+    <p class="muted" style="margin:12px 0 2px">¿Quién eres en la familia?</p>
+    <div class="roles" id="${id("Roles")}">${ROLES.map(x => `<button type="button" data-r="${x}" class="${x === st.role ? "on" : ""}">${x}</button>`).join("")}<button type="button" data-r="" class="${other ? "on" : ""}">Otro…</button></div>
+    <input id="${id("Other")}" maxlength="30" placeholder="Ej: Nana, Prima, Vecino" class="${other ? "" : "hidden"}" value="${other ? esc(st.role) : ""}" style="margin-top:6px">`;
+  const pic = () => { const nm = $(id("Name")).value.trim();
+    $(id("Pic")).outerHTML = avatarHtml(nm || "?", st.photo, "profPic").replace('class="profPic"', `class="profPic" id="${id("Pic")}"`); };
+  pic();
+  $(id("Name")).addEventListener("input", () => { if (!st.photo) pic(); });
+  $(id("Ph")).onclick = () => $(id("In")).click();
+  $(id("In")).onchange = async () => {
+    const f = $(id("In")).files[0]; $(id("In")).value = ""; if (!f) return;
+    try { st.photo = await shrink(f, 320); pic(); } catch {}
+  };
+  $(id("Roles")).querySelectorAll("button").forEach(b => b.onclick = () => {
+    const was = b.classList.contains("on");
+    $(id("Roles")).querySelectorAll("button").forEach(x => x.classList.remove("on"));
+    const isOther = !b.dataset.r;
+    if (was && !isOther) { st.role = ""; $(id("Other")).classList.add("hidden"); return; }   // tocar de nuevo = quitar
+    b.classList.add("on");
+    $(id("Other")).classList.toggle("hidden", !isOther);
+    st.role = isOther ? $(id("Other")).value.trim() : b.dataset.r;
+    if (isOther) setTimeout(() => $(id("Other")).focus(), 30);
+  });
+  $(id("Other")).oninput = () => { st.role = $(id("Other")).value.trim(); };
+  return () => ({ name: $(id("Name")).value.trim(), role: st.role, photo: st.photo });
+}
+// Guardar mi perfil en este teléfono y (si se puede) para la familia de este plato
+async function saveMyProfile(p) {
+  try { localStorage.setItem("comitag_perfil", JSON.stringify({ role: p.role || "", photo: p.photo || null })); } catch {}
+  if (!code || (!p.role && !p.photo)) return;
+  const r = await rpcP("set_member", { p_code: code, p_name: p.name, p_role: p.role || null, p_photo: p.photo || null });
+  if (!r.error && r.data === "ok") { members = { ...members, [p.name]: { role: p.role || undefined, photo: p.photo || undefined } }; cachePut({ members }); memberSynced = true; }
+}
+let readSetProf = null, readNameProf = null;
+
 // ---- Configurar un plato nuevo (primera vez) ----
 function showSetup() {
   $("pet").textContent = "¡Bienvenido a Comitag!";
@@ -2572,12 +2642,12 @@ function showSetup() {
   $("setRows0").innerHTML = "";
   addNameRow("setRows0", "");
   $("setRows0").oninput = refreshSetSelectors;
-  $("setMeBox").classList.toggle("hidden", !!me);
+  readSetProf = profileFields("setProf");
   $("setup").classList.remove("hidden");
 }
 async function saveSetup() {
   const names = readNames("setRows0"), pet = joinNames(names), pets = names.length > 1 ? names : [];
-  const who = me || $("setMe").value.trim();
+  const prof = readSetProf ? readSetProf() : { name: me || "" }, who = prof.name;
   if (!names.length) { $("setErr").textContent = "Escribe el nombre de tu mascota"; return; }
   const pin = $("setPin").value.trim();
   if (!PIN_RE.test(pin)) { $("setErr").textContent = "El PIN tiene que ser de 4 a 6 números"; return; }
@@ -2602,12 +2672,26 @@ async function saveSetup() {
     hasPin = true; savePin(pin); cachePut({ hasPin });
     if (mail) await saveRecoveryEmail(mail, pin);
   }
-  if (!me) { me = who; localStorage.setItem("comitag_nombre", who); }
+  me = who; localStorage.setItem("comitag_nombre", who);
+  // Fotos de las mascotas (cada una sigue a su nombre)
+  $("setBtn").disabled = true; $("setErr").textContent = "Guardando fotos…";
+  const rows = [...$("setRows0").querySelectorAll(".trow")].filter(r => r._photo && r.querySelector("input:not([type=file])").value.trim());
+  let photoFail = false;
+  for (const r of rows) {
+    const nm = r.querySelector("input:not([type=file])").value.trim().slice(0, 20);
+    const res = pets.length ? await rpcP("set_pet_photo", { p_code: code, p_pet: nm, p_photo: r._photo })
+      : await rpcP("set_photo", { p_code: code, p_photo: r._photo });
+    if (res.error || (pets.length && res.data !== "ok")) photoFail = true;
+    if (!pets.length) break;
+  }
+  await saveMyProfile(prof);
+  $("setBtn").disabled = false; $("setErr").textContent = "";
   plate.pet_name = pet;
   plate.pets = pets;
   plate.schedule = times;
   $("setup").classList.add("hidden");
   start();
+  if (photoFail) setTimeout(() => showNote("Algunas fotos no se pudieron guardar. Puedes ponerlas tocando la foto de la mascota."), 1400);
 }
 
 setInterval(() => ready && refresh(), 30000);
