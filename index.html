@@ -96,6 +96,8 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .petHead.multi .link{position:static;transform:none;display:block;margin:2px auto 0;color:var(--muted);font-size:15px;font-weight:500;letter-spacing:.3px;padding:6px 14px}
 .petHead.multi .link:active{opacity:.6}
 .petHead h1{font-size:32px;margin:0;padding:0 72px;overflow-wrap:anywhere}
+/* Nombre de la mascota: letra redondeada de Apple (en otros teléfonos usa la del sistema) */
+.petHead h1,.pp b{font-family:ui-rounded,"SF Pro Rounded","SF Compact Rounded",system-ui,-apple-system,sans-serif;font-weight:700;letter-spacing:-.2px}
 .petHead .link{position:absolute;right:0;top:50%;transform:translateY(-50%)}
 .wa{display:block;text-align:center;text-decoration:none;background:#25d366;color:#fff;border-radius:12px;padding:13px;margin-bottom:8px;font-size:16px}
 .wa.alt{background:var(--card);color:var(--wa-text);border:1px solid #25d366}
@@ -812,15 +814,24 @@ function closeC() {
 // ---- Sonido al registrar (generado aquí mismo, sin archivos) ----
 let audio;
 function unlockAudio() {
-  // iPhone solo deja sonar si el audio se prepara justo al tocar un botón
+  // iPhone solo deja sonar si el audio se prepara justo al tocar un botón.
+  // Si la página estuvo en segundo plano, el audio queda "interrumpido": hay que reactivarlo.
   try {
+    if (audio && audio.state === "closed") audio = null;
     audio = audio || new (window.AudioContext || window.webkitAudioContext)();
-    if (audio.state === "suspended") audio.resume();
+    if (audio.state !== "running") audio.resume().catch(() => {});
+    // Un sonido vacío dentro del toque termina de "desbloquear" el audio en iPhone
+    const b = audio.createBuffer(1, 1, 22050), src = audio.createBufferSource();
+    src.buffer = b; src.connect(audio.destination); src.start(0);
   } catch {}
 }
+// Al tocar cualquier parte de la página (y al volver a ella), dejar el audio listo
+["pointerdown", "touchend"].forEach(ev => document.addEventListener(ev, unlockAudio, { passive: true }));
+document.addEventListener("visibilitychange", () => { if (!document.hidden && audio && audio.state !== "running") audio.resume().catch(() => {}); });
 function chime(kind) {
   try {
     if (!audio) return;
+    if (audio.state !== "running") audio.resume().catch(() => {});
     const notes = kind === "comida" ? [659, 880, 1319] : [523, 659]; // comida: Mi-La-Mi; agua: Do-Mi suave
     const vol = kind === "comida" ? 0.22 : 0.14;
     notes.forEach((f, i) => {
