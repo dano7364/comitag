@@ -197,6 +197,10 @@ button:disabled{opacity:.4;cursor:default;box-shadow:none}
 .pfRow .pfPhoto .profPic{width:64px;height:64px;font-size:24px}
 .pfRow .pfPhoto i{width:24px;height:24px;font-size:11px;border-width:2px}
 .pfRow input{flex:1;min-width:0}
+/* Las dos tarjetas de arriba: título, hora y detalle alineados aunque un título use dos líneas */
+.lastRow{grid-template-rows:auto auto auto auto}
+.lastRow .card{display:grid;grid-row:span 4;grid-template-rows:subgrid;align-content:start}
+.lastRow .card > p:first-child{align-self:start}
 .hav{display:inline-flex;align-items:center}
 .hav img,.hav b{width:30px;height:30px;border-radius:50%;border:2px solid var(--card);object-fit:cover;margin-left:-8px;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;box-sizing:border-box}
 .hav img:first-child,.hav b:first-child{margin-left:0}
@@ -444,9 +448,9 @@ body::before{animation:drift 28s ease-in-out infinite alternate;will-change:tran
       <div class="head"><p><b>¿Avisar por WhatsApp?</b></p><button class="link" onclick="$('waBox').classList.add('hidden')">✕ Cerrar</button></div>
       <div id="waBtns"></div>
     </div>
-    <div class="grid">
+    <div class="grid lastRow">
       <div class="card"><p class="muted">Última comida</p><p class="big" id="fT">--</p><p class="muted" id="fB"></p><p class="enote" id="fN"></p></div>
-      <div class="card"><p class="muted">Último agua</p><p class="big" id="wT">--</p><p class="muted" id="wB"></p><p class="enote" id="wN"></p></div>
+      <div class="card"><p class="muted">Último registro de agua</p><p class="big" id="wT">--</p><p class="muted" id="wB"></p><p class="enote" id="wN"></p></div>
     </div>
     <div class="grid" id="actions">
       <button class="primary" onclick="ask('comida')">Ya le di comida</button>
@@ -996,7 +1000,15 @@ function render() {
     $("fB").textContent = f ? `${ago(f.t)} · ${f.who}${f.queued ? " · ⏳ por enviar" : ""}` : "Sin registros";
   }
   $("wT").textContent = w ? fmt(w.t) : "--";
-  $("wB").textContent = w ? `${ago(w.t)} · ${w.who}${w.queued ? " · ⏳ por enviar" : ""}` : "Sin registros";
+  if (pets.length) {
+    // Varias mascotas: el último cambio de agua de cada una
+    $("wB").innerHTML = pets.map(p => {
+      const e = log.find(x => x.kind === "agua" && (!x.pet || x.pet === p));
+      return `<b>${esc(p)}</b>: ${e ? `${ago(e.t)} · ${esc(e.who)}${e.queued ? " ⏳" : ""}` : "sin registros"}`;
+    }).join("<br>");
+  } else {
+    $("wB").textContent = w ? `${ago(w.t)} · ${w.who}${w.queued ? " · ⏳ por enviar" : ""}` : "Sin registros";
+  }
   $("fN").textContent = f && f.note ? `“${f.note}”` : "";
   $("wN").textContent = w && w.note ? `“${w.note}”` : "";
 
@@ -1095,9 +1107,9 @@ function histHtml(hist, order) {
     const day = dayTitle(e.t);
     if (day !== lastDay) { out += `<p class="hday">${day}</p>`; lastDay = day; }
     // ¿Para quién? Todas = registro sin mascota o con todas
-    const all = many && e.kind === "comida" && (!e.pets.length || e.pets.length === order.length);
-    const who = many && e.kind === "comida" ? (all ? `<span class="hall">Todas</span>` : petAvatars(e.pets, order)) : "";
-    const names = many && e.kind === "comida" ? (all ? "todas" : joinNames(e.pets)) : "";
+    const all = many && (!e.pets.length || e.pets.length === order.length);
+    const who = many ? (all ? `<span class="hall">Todas</span>` : petAvatars(e.pets, order)) : "";
+    const names = many ? (all ? "todas" : joinNames(e.pets)) : "";
     out += `<div class="hitem tap" role="button" tabindex="0" onclick="openEntry(${i})" onkeydown="if(event.key==='Enter'){openEntry(${i})}" aria-label="${e.kind === "comida" ? "Comida" : "Agua"}${names ? " de " + esc(names) : ""} a las ${fmt(e.t)}, por ${esc(e.who)}">
       <span class="hic" aria-hidden="true">${e.kind === "comida" ? "🍽️" : "💧"}</span>
       <div class="hmain"><div class="hline"><span class="htime">${fmt(e.t)}</span>${who}</div>
@@ -1190,12 +1202,23 @@ function readNames(box) {
 // Botones para elegir a qué mascotas se les dio comida
 function renderPetChips() {
   const pets = petsOf();
-  $("cPets").classList.toggle("hidden", !(pending === "comida" && pets.length));
+  $("cPets").classList.toggle("hidden", !(pending && pets.length));
   if (!pets.length) return;
-  $("cPets").innerHTML = `<p class="muted" style="margin-bottom:8px">¿A quién le diste?</p>` + pets.map(p =>
-    `<button type="button" class="chip on" data-p="${esc(p)}" aria-pressed="true" onclick="this.classList.toggle('on'); this.setAttribute('aria-pressed', this.classList.contains('on'))">${esc(p)}</button>`).join("");
+  $("cPets").innerHTML = `<p class="muted" style="margin-bottom:8px">${pending === "agua" ? "¿A quién le cambiaste el agua?" : "¿A quién le diste?"}</p>` +
+    `<button type="button" class="chip on" id="cAll" aria-pressed="true" onclick="chipsAll()">Todos</button>` + pets.map(p =>
+    `<button type="button" class="chip on" data-p="${esc(p)}" aria-pressed="true" onclick="this.classList.toggle('on'); this.setAttribute('aria-pressed', this.classList.contains('on')); chipsAllSync()">${esc(p)}</button>`).join("");
 }
-const chosenPets = () => [...$("cPets").querySelectorAll(".chip.on")].map(b => b.dataset.p);
+// "Todos": marca todas (o las desmarca si ya estaban todas)
+function chipsAll() {
+  const chips = [...$("cPets").querySelectorAll(".chip[data-p]")], all = chips.every(b => b.classList.contains("on"));
+  chips.forEach(b => { b.classList.toggle("on", !all); b.setAttribute("aria-pressed", !all); });
+  chipsAllSync();
+}
+function chipsAllSync() {
+  const chips = [...$("cPets").querySelectorAll(".chip[data-p]")], all = chips.length && chips.every(b => b.classList.contains("on"));
+  if ($("cAll")) { $("cAll").classList.toggle("on", !!all); $("cAll").setAttribute("aria-pressed", !!all); }
+}
+const chosenPets = () => [...$("cPets").querySelectorAll(".chip.on[data-p]")].map(b => b.dataset.p);
 
 function ask(k) {
   pending = k;
@@ -1207,6 +1230,8 @@ function ask(k) {
     $("cMsg").innerHTML = recent.length
       ? `<span class="warn">Ojo:</span> ` + recent.map(x => `${esc(x.p)} ya comió ${ago(x.e.t)} (${esc(x.e.who)})`).join("; ") + "."
       : "¿Confirmas que les diste comida ahora?";
+  } else if (k === "agua" && pets.length) {
+    $("cMsg").innerHTML = "¿Confirmas que cambiaste el agua ahora?";
   } else {
     const l = last(k);
     $("cMsg").innerHTML = (k === "comida" && l && Date.now() - l.t < 3 * 3600000)
@@ -1265,7 +1290,7 @@ function chime(kind) {
 
 async function save() {
   unlockAudio();
-  const kind = pending, pets = kind === "comida" ? petsOf() : [];
+  const kind = pending, pets = petsOf();
   const sel = pets.length ? chosenPets() : [null];
   if (!sel.length) { $("cMsg").innerHTML = '<span class="warn">Elige al menos una mascota.</span>'; return; }
   $("cYes").disabled = true;
@@ -1293,7 +1318,7 @@ async function save() {
     const para = sel[0] ? ` para ${joinNames(sel)}` : "";
     showNote(`✅ Comida registrada${para}` + (s ? ` ${diffText(e.t, s).replace("Se registró ", "")} (${fmt(s)}).` : "."), true);
   } else {
-    showNote("✅ Agua registrada.", true);
+    showNote(`✅ Agua registrada${sel[0] ? ` para ${joinNames(sel)}` : ""}.`, true);
   }
   if (e) offerWa(kind, e, s, names);
   pulse($(kind === "comida" ? "fT" : "wT").closest(".card"));
@@ -1997,7 +2022,7 @@ function openEntry(i) {
   const g = histShown[i];
   if (!g) return;
   const order = petsOf(), food = g.kind === "comida";
-  const pets = order.length > 1 ? (food ? (g.pets.length ? g.pets : order) : order) : [(plate && plate.pet_name) || "Mascota"];
+  const pets = order.length > 1 ? (g.pets.length ? g.pets : order) : [(plate && plate.pet_name) || "Mascota"];
   const pic = (p, k) => { const src = order.length > 1 ? photoOf(p) : platePhoto, idx = Math.max(0, order.indexOf(p));
     return src ? `<img src="${src}" alt="">` : `<b style="background:${petColor(k < 0 ? 0 : idx)}">${esc(p.charAt(0).toUpperCase())}</b>`; };
   const when = `${dayTitle(g.t)} · ${fmt(g.t)}`;
@@ -2099,7 +2124,7 @@ function openAuto() {
       <option value="agua"${cfg.kind === "agua" ? " selected" : ""}>💧 Agua</option>
     </select>
     ${pets.length ? `<select id="auPet" class="tqSel" style="margin-top:8px" aria-label="Para quién">
-      <option value="">Para todas (según sus horarios)</option>${pets.map(p => `<option${cfg.pet === p ? " selected" : ""}>${esc(p)}</option>`).join("")}</select>` : ""}
+      <option value="">Para todas (comida: según sus horarios)</option>${pets.map(p => `<option${cfg.pet === p ? " selected" : ""}>${esc(p)}</option>`).join("")}</select>` : ""}
     <div class="grid" style="margin-top:14px"><button onclick="closeModal()">Cancelar</button><button class="primary" id="auSave">Guardar</button></div>
     <p class="muted" style="font-size:12px;margin-top:12px">Se activa solo en este teléfono: cada persona lo elige en el suyo. En iPhone, al acercarlo aparece un aviso arriba: tócalo y se registra.</p>`);
   $("auSave").onclick = () => {
@@ -2174,7 +2199,7 @@ function autoAllSync() {
 // Elegir a mano a quién se le dio (platos con varias mascotas)
 function autoChoose(kind, msg, pre) {
   clearInterval(autoTimer); autoTimer = null;
-  autoSheet(`<p style="margin:0 0 6px"><b>🍽️ ¿A quién le diste comida?</b></p>
+  autoSheet(`<p style="margin:0 0 6px"><b>${kind === "agua" ? "💧 ¿A quién le cambiaste el agua?" : "🍽️ ¿A quién le diste comida?"}</b></p>
     ${msg ? `<p class="muted" style="margin-bottom:8px">${msg}</p>` : ""}
     <div id="auChips"><button type="button" class="chip" id="auAll" aria-pressed="false" onclick="autoAll()">Todos</button>${petsOf().map(p => { const on = pre.includes(p);
       return `<button type="button" class="chip${on ? " on" : ""}" data-p="${esc(p)}" aria-pressed="${on}" onclick="this.classList.toggle('on'); this.setAttribute('aria-pressed', this.classList.contains('on')); autoAllSync()">${esc(p)}</button>`; }).join("")}</div>
@@ -2215,9 +2240,10 @@ function autoRun() {
       if (fed.length) extra = fed.map(f => `${esc(f.p)} ya comió (${esc(f.e.who)}, ${fmt(f.e.t)})`).join(" · ");
     }
   }
+  if (kind === "agua" && pets.length) sel = cfg.pet && pets.includes(cfg.pet) ? [cfg.pet] : pets;
   const quien = sel[0] ? joinNames(sel) : plate.pet_name;
-  const lbl = kind === "comida" ? `🍽️ Registrando comida de ${esc(quien)}` : `💧 Registrando agua de ${esc(plate.pet_name)}`;
-  const many = kind === "comida" && pets.length;
+  const lbl = kind === "comida" ? `🍽️ Registrando comida de ${esc(quien)}` : `💧 Registrando agua de ${esc(quien)}`;
+  const many = pets.length;
   let n = AUTO_SEG;
   autoSheet(`<p style="margin:0"><b>${lbl}…</b> <span id="auN" class="auN">${n}</span></p>
     ${extra ? `<p class="muted" style="margin-top:4px">${extra.charAt(0).toUpperCase() + extra.slice(1)}.</p>` : ""}
@@ -2234,8 +2260,8 @@ function autoRun() {
 }
 function autoSave(kind, sel) {
   ask(kind);
-  if (kind === "comida" && petsOf().length) {
-    $("cPets").querySelectorAll(".chip").forEach(b => {
+  if (petsOf().length) {
+    $("cPets").querySelectorAll(".chip[data-p]").forEach(b => {
       const on = sel.includes(b.dataset.p) || sel[0] === null;
       b.classList.toggle("on", on); b.setAttribute("aria-pressed", on);
     });
