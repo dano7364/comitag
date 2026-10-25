@@ -401,13 +401,13 @@ body::before{animation:drift 28s ease-in-out infinite alternate;will-change:tran
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       </button>
       <div id="menuList" class="menuList hidden" role="menu">
-        <button role="menuitem" onclick="menuDo(openInvite)"><i class="mi">👨‍👩‍👧</i><span>Invitar a la familia</span></button>
         <button role="menuitem" onclick="menuDo(openAuto)"><i class="mi">📲</i><span>Registrar al acercar</span></button>
-        <button role="menuitem" onclick="menuDo(openPinSettings)"><i class="mi">🔒</i><span id="pinLink">PIN familiar</span></button>
-        <button role="menuitem" onclick="menuDo(openAddPet)"><i class="mi">＋</i><span>Agregar otra mascota</span></button>
-        <button role="menuitem" onclick="cycleTheme()"><i class="mi">🌓</i><span class="themeLbl">Tema</span></button>
-        <button role="menuitem" onclick="menuDo(() => startTour(true))"><i class="mi">💡</i><span>Ver tutorial</span></button>
+        <button role="menuitem" onclick="menuDo(openInvite)"><i class="mi">👨‍👩‍👧</i><span>Invitar a la familia</span></button>
         <button role="menuitem" onclick="menuDo(changeName)"><i class="mi">✏️</i><span>Cambiar mi nombre</span></button>
+        <button role="menuitem" onclick="menuDo(openAddPet)"><i class="mi">＋</i><span>Agregar otra mascota</span></button>
+        <button role="menuitem" onclick="menuDo(openPinSettings)"><i class="mi">🔒</i><span id="pinLink">PIN familiar</span></button>
+        <button role="menuitem" onclick="menuDo(() => startTour(true))"><i class="mi">💡</i><span>Ver tutorial</span></button>
+        <button role="menuitem" onclick="cycleTheme()"><i class="mi">🌓</i><span class="themeLbl">Tema</span></button>
         <button role="menuitem" class="mdanger" onclick="menuDo(askRemoveHere)"><i class="mi">🗑️</i><span>Quitar de este teléfono</span></button>
       </div>
     </div>
