@@ -145,7 +145,18 @@ main{position:relative}
 .notifBtn{position:absolute;top:17px;right:10px;z-index:40;display:flex;align-items:center;justify-content:center;width:40px!important;height:40px;padding:0!important;border-radius:12px;border:none!important;background:transparent!important;box-shadow:none!important;color:var(--text);cursor:pointer;-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
 .notifBtn svg{width:24px;height:24px}
 .nbadge{position:absolute;top:1px;right:-3px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:#ef4444;color:#fff;font-size:10.5px;font-weight:700;line-height:17px;text-align:center;box-shadow:0 0 0 2px var(--bg)}
-.nlist .ni{display:flex;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.nlist .ni{display:flex;gap:12px;padding:12px 6px;margin:0 -6px;border-top:1px solid var(--line);cursor:pointer;border-radius:12px;align-items:center}
+.nlist .ni:active{background:var(--line)}
+.nlist .ni .nchev{color:var(--muted);font-size:22px;line-height:1;padding-left:4px}
+.nlist .ni .nb{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ndetail{z-index:70}
+.ndetail .modal{text-align:center;max-width:340px}
+.ndetail .ndIc{font-size:40px;line-height:1;margin:4px 0 8px}
+.ndetail .ndK{font-size:12px;letter-spacing:.5px;color:var(--muted);margin:0 0 6px;text-transform:uppercase}
+.ndetail .ndT{font-size:20px;font-weight:700;margin:0 0 8px}
+.ndetail .ndB{margin:0;line-height:1.5;white-space:pre-line}
+.btnlike{display:flex;align-items:center;justify-content:center;border-radius:14px;padding:12px;text-decoration:none;font-weight:600}
+.btnlike.primary{background:var(--blue);color:var(--on-blue,#fff)}
 .nlist .ni:first-child{border-top:none}
 .nlist .ni .ic{font-size:20px;line-height:1.3}
 .nlist .ni .nt{font-weight:700;margin:0}
@@ -669,15 +680,46 @@ async function loadAnnToday() {
 function openNotifs() {
   const list = notifItems(), seen = notifSeen();
   openModal(`<p style="font-size:18px;margin-top:4px"><b>🔔 Notificaciones de hoy</b></p>
-    <div class="nlist" style="margin-top:6px">${list.length ? list.map(x => `<div class="ni${seen.has(x.key) ? "" : " new"}"><span class="ic" aria-hidden="true">${x.ic}</span><div style="flex:1;min-width:0">
+    <div class="nlist" style="margin-top:6px">${list.length ? list.map((x, i) => `<div class="ni${seen.has(x.key) ? "" : " new"}" role="button" tabindex="0" data-n="${i}"><span class="ic" aria-hidden="true">${x.ic}</span><div style="flex:1;min-width:0">
       <p class="nt">${esc(x.t)}</p><p class="nb">${esc(x.b)}</p>
-      <div class="nh">${fmt(x.at)}${x.link && /^https:\/\//.test(x.link) ? ` · <a href="${esc(x.link)}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:none">Ver más →</a>` : ""}</div></div></div>`).join("")
+      <div class="nh">${fmt(x.at)}</div></div><span class="nchev" aria-hidden="true">›</span></div>`).join("")
       : `<p class="muted" style="padding:14px 0">No hay notificaciones hoy. 🐾</p>`}</div>
     <p class="muted" style="font-size:12px;margin-top:10px">Las notificaciones se borran solas a las 00:00.</p>
     <button class="link" style="display:block;margin:8px auto 0" onclick="closeModal()">Cerrar</button>`);
   try { localStorage.setItem("comitag_notif_vistas", JSON.stringify({ d: todayKey(), k: list.map(x => x.key) })); } catch {}
   notifUpdate();
+  $("modalBody").querySelectorAll(".ni").forEach(el => {
+    const open = () => openNotif(list[+el.dataset.n]);
+    el.onclick = open; el.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } };
+  });
 }
+// Recuadro con el detalle de una notificación (encima de la lista)
+function openNotif(x) {
+  let box = $("nDetail");
+  if (!box) {
+    box = document.createElement("div"); box.id = "nDetail"; box.className = "overlay ndetail";
+    box.onclick = e => { if (e.target === box) closeNotif(); };
+    document.body.appendChild(box);
+  }
+  const safe = x.link && /^https:\/\//.test(x.link) ? x.link : "";
+  const missed = x.key.startsWith("m");
+  box.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-labelledby="ndT">
+    <div class="ndIc" aria-hidden="true">${x.ic}</div>
+    <p class="ndK">${missed ? "Comida olvidada" : "Aviso de Comitag"} · hoy ${fmt(x.at)}</p>
+    <p id="ndT" class="ndT">${esc(x.t)}</p>
+    <p class="ndB">${esc(x.b)}</p>
+    ${missed ? `<p class="muted" style="margin-top:10px">¿Sí comió y nadie lo anotó? Puedes registrarlo ahora.</p>` : ""}
+    <div class="grid" style="margin-top:16px">
+      <button onclick="closeNotif()">Cerrar</button>
+      ${safe ? `<a class="btnlike primary" href="${esc(safe)}" target="_blank" rel="noopener">Ver más →</a>`
+        : missed ? `<button class="primary" id="ndReg">Ya le di comida</button>` : `<button class="primary" onclick="closeNotif()">Entendido</button>`}
+    </div></div>`;
+  box.classList.remove("hidden");
+  if ($("ndReg")) $("ndReg").onclick = () => { closeNotif(); closeModal(); ask("comida"); $("confirm").scrollIntoView({ behavior: "smooth", block: "center" }); };
+  setTimeout(() => { const b = box.querySelector("button"); b && b.focus({ preventScroll: true }); }, 50);
+}
+function closeNotif() { const b = $("nDetail"); if (b) b.classList.add("hidden"); }
+document.addEventListener("keydown", e => { if (e.key === "Escape" && $("nDetail") && !$("nDetail").classList.contains("hidden")) { e.stopImmediatePropagation(); closeNotif(); } }, true);
 
 async function loadAnnouncement() {
   let seen = 0; try { seen = +localStorage.getItem("comitag_anuncio_visto") || 0; } catch {}
