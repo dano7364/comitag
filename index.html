@@ -400,9 +400,10 @@ body::before{animation:drift 28s ease-in-out infinite alternate;will-change:tran
     </div>
     <div id="waModal" class="overlay hidden" onclick="if (event.target === this) closeWaMenu()">
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="waTitle">
-      <div class="head"><p id="waTitle" style="font-size:18px"><b>💬 Avisos por WhatsApp</b></p><button class="link" id="waEditBtn" onclick="editWa()">✏️ Editar</button></div>
+      <p id="waTitle" style="font-size:18px;margin-top:4px"><b>💬 Avisos por WhatsApp</b></p>
       <p class="muted" style="margin:-2px 0 12px">Después de registrar, Comitag te ofrece avisarles por WhatsApp a estas personas.</p>
       <div id="waList"></div>
+      <button id="waEditBtn" style="width:100%;margin-top:14px" onclick="editWa()">＋ Agregar contactos</button>
       <div id="waEdit" class="hidden">
         <p class="muted" style="margin-bottom:10px">Nombre y número de quienes quieren recibir el aviso. Ej: +56 9 1234 5678</p>
         <div id="waRows"></div>
@@ -1344,6 +1345,7 @@ async function loadWa() {
   if ($("waEdit").classList.contains("hidden")) renderWa();
 }
 function renderWa() {
+  if ($("waEditBtn")) $("waEditBtn").textContent = contacts.length ? "＋ Agregar o quitar contactos" : "＋ Agregar contactos";
   $("waList").innerHTML = contacts.length
     ? contacts.map(c => `<div class="row"><span>${esc(c.name)}</span><span class="muted">${esc(prettyPhone(c.phone))}</span></div>`).join("")
     : `<p class="muted">Sin contactos. También puedes avisar al grupo familiar sin agregar a nadie.</p>`;
