@@ -381,8 +381,27 @@ body::before{animation:drift 28s ease-in-out infinite alternate;will-change:tran
         </div>
       </div>
     </div>
-    <div class="card">
-      <div class="head"><p><b>Avisos por WhatsApp</b></p><button class="link" id="waEditBtn" onclick="editWa()">✏️ Editar</button></div>
+    <div class="card"><p><b>Últimos 7 días</b></p><div id="week"></div><div id="hist" style="margin-top:12px"></div></div>
+    <div class="menu" id="menu">
+      <button class="menuBtn" id="menuBtn" aria-label="Menú" aria-expanded="false" aria-controls="menuList" onclick="toggleMenu()">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <div id="menuList" class="menuList hidden" role="menu">
+        <button role="menuitem" onclick="menuDo(openAuto)"><i class="mi">📲</i><span>Registrar al acercar</span></button>
+        <button role="menuitem" onclick="menuDo(openInvite)"><i class="mi">👨‍👩‍👧</i><span>Invitar a la familia</span></button>
+        <button role="menuitem" onclick="menuDo(openWaMenu)"><i class="mi">💬</i><span>Avisos por WhatsApp</span></button>
+        <button role="menuitem" onclick="menuDo(changeName)"><i class="mi">✏️</i><span>Cambiar mi nombre</span></button>
+        <button role="menuitem" onclick="menuDo(openAddPet)"><i class="mi">＋</i><span>Agregar otra mascota</span></button>
+        <button role="menuitem" onclick="menuDo(openPinSettings)"><i class="mi">🔒</i><span id="pinLink">PIN familiar</span></button>
+        <button role="menuitem" onclick="menuDo(() => startTour(true))"><i class="mi">💡</i><span>Ver tutorial</span></button>
+        <button role="menuitem" onclick="cycleTheme()"><i class="mi">🌓</i><span class="themeLbl">Tema</span></button>
+        <button role="menuitem" class="mdanger" onclick="menuDo(askRemoveHere)"><i class="mi">🗑️</i><span>Quitar de este teléfono</span></button>
+      </div>
+    </div>
+    <div id="waModal" class="overlay hidden" onclick="if (event.target === this) closeWaMenu()">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="waTitle">
+      <div class="head"><p id="waTitle" style="font-size:18px"><b>💬 Avisos por WhatsApp</b></p><button class="link" id="waEditBtn" onclick="editWa()">✏️ Editar</button></div>
+      <p class="muted" style="margin:-2px 0 12px">Después de registrar, Comitag te ofrece avisarles por WhatsApp a estas personas.</p>
       <div id="waList"></div>
       <div id="waEdit" class="hidden">
         <p class="muted" style="margin-bottom:10px">Nombre y número de quienes quieren recibir el aviso. Ej: +56 9 1234 5678</p>
@@ -394,21 +413,7 @@ body::before{animation:drift 28s ease-in-out infinite alternate;will-change:tran
           <button class="primary" id="waSave" onclick="saveWa()">Guardar</button>
         </div>
       </div>
-    </div>
-    <div class="card"><p><b>Últimos 7 días</b></p><div id="week"></div><div id="hist" style="margin-top:12px"></div></div>
-    <div class="menu" id="menu">
-      <button class="menuBtn" id="menuBtn" aria-label="Menú" aria-expanded="false" aria-controls="menuList" onclick="toggleMenu()">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-      </button>
-      <div id="menuList" class="menuList hidden" role="menu">
-        <button role="menuitem" onclick="menuDo(openAuto)"><i class="mi">📲</i><span>Registrar al acercar</span></button>
-        <button role="menuitem" onclick="menuDo(openInvite)"><i class="mi">👨‍👩‍👧</i><span>Invitar a la familia</span></button>
-        <button role="menuitem" onclick="menuDo(changeName)"><i class="mi">✏️</i><span>Cambiar mi nombre</span></button>
-        <button role="menuitem" onclick="menuDo(openAddPet)"><i class="mi">＋</i><span>Agregar otra mascota</span></button>
-        <button role="menuitem" onclick="menuDo(openPinSettings)"><i class="mi">🔒</i><span id="pinLink">PIN familiar</span></button>
-        <button role="menuitem" onclick="menuDo(() => startTour(true))"><i class="mi">💡</i><span>Ver tutorial</span></button>
-        <button role="menuitem" onclick="cycleTheme()"><i class="mi">🌓</i><span class="themeLbl">Tema</span></button>
-        <button role="menuitem" class="mdanger" onclick="menuDo(askRemoveHere)"><i class="mi">🗑️</i><span>Quitar de este teléfono</span></button>
+      <button class="link" id="waClose" style="display:block;margin:12px auto 0" onclick="closeWaMenu()">Cerrar</button>
       </div>
     </div>
     <div id="rmBox" class="overlay hidden" onclick="if (event.target === this) askRemoveHere()">
@@ -683,7 +688,7 @@ function tourSteps() {
     { el: $("actions"), t: "Registra en un toque", d: "Cuando le des comida o cambies el agua, toca aquí. Toda la familia lo ve al instante." },
     { el: card("fT") && card("fT").parentElement, t: "¿Ya comió?", d: "Aquí ves cuándo comió y tomó agua por última vez, y quién se lo dio." },
     { el: card("sched"), t: "Horarios y avisos", d: "Pon sus horarios de comida y toca 🔔 Avisarme: te llega un aviso si a alguien se le olvida." },
-    { el: $("menuBtn"), pad: 6, t: "Más opciones", d: "En el menú ☰ puedes invitar a tu familia con un QR, registrar solo con acercar el teléfono, cambiar el PIN y más." },
+    { el: $("menuBtn"), pad: 6, t: "Más opciones", d: "En el menú ☰ puedes invitar a tu familia con un QR, registrar solo con acercar el teléfono, configurar avisos por WhatsApp, cambiar el PIN y más." },
     { t: "¡Listo! 🎉", d: "La próxima vez, acerca el teléfono al dispositivo Comitag y se abre esta página. Puedes ver este tutorial de nuevo en el menú ☰.", last: true },
   ].filter(x => !("el" in x) || (x.el && x.el.offsetParent));
 }
@@ -1360,18 +1365,31 @@ function addWaRow(name, phone) {
   r.innerHTML = `<input placeholder="Nombre" maxlength="30" value="${esc(name)}"><input type="tel" placeholder="+56 9 1234 5678" value="${esc(phone ? prettyPhone(phone) : "")}"><button class="x" title="Quitar" onclick="this.parentNode.remove()">✕</button>`;
   $("waRows").appendChild(r);
 }
+function openWaMenu() {
+  cancelWa();
+  $("waModal").classList.remove("hidden");
+  document.body.style.overflow = "hidden";
+}
+function closeWaMenu() {
+  $("waModal").classList.add("hidden");
+  document.body.style.overflow = "";
+  cancelWa();
+}
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("waModal").classList.contains("hidden")) closeWaMenu(); });
 function editWa() {
   $("waRows").innerHTML = "";
   (contacts.length ? contacts : [{ name: "", phone: "" }]).forEach(c => addWaRow(c.name, c.phone));
   $("waErr").textContent = "";
   $("waList").classList.add("hidden");
   $("waEditBtn").classList.add("hidden");
+  $("waClose").classList.add("hidden");
   $("waEdit").classList.remove("hidden");
 }
 function cancelWa() {
   $("waEdit").classList.add("hidden");
   $("waList").classList.remove("hidden");
   $("waEditBtn").classList.remove("hidden");
+  $("waClose").classList.remove("hidden");
   renderWa();
 }
 async function saveWa() {
