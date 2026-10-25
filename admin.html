@@ -63,6 +63,11 @@ button.link{border:none;background:none;color:var(--blue);padding:4px 0}
 .links button{flex:none;white-space:nowrap;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
 .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 .plate{cursor:pointer}
+.plate .ck{width:22px;height:22px;flex:none;border-radius:7px;border:2px solid var(--border);display:inline-flex;align-items:center;justify-content:center;font-size:14px;color:#fff;margin-right:10px}
+.plate.sel .ck{background:var(--blue);border-color:var(--blue)}
+.plate.sel{background:color-mix(in srgb,var(--blue) 7%,transparent);border-radius:12px}
+.selbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom));width:min(528px,calc(100% - 32px));
+  background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;box-shadow:0 10px 30px rgba(0,0,0,.18);z-index:10}
 .plate .meta{color:var(--muted);font-size:13px;margin-top:2px}
 /* gráficos */
 .chart{position:relative;margin-top:8px}
@@ -169,7 +174,12 @@ table.tv td:last-child,table.tv th:last-child{text-align:right;font-variant-nume
           <button class="on" data-f="all">Todos</button><button data-f="active">Activos</button>
           <button data-f="sleep">Dormidos</button><button data-f="new">Sin configurar</button><button data-f="off">Desactivados</button>
         </div>
+        <div class="row" style="margin-top:10px"><span class="muted" id="selHint"></span><button class="small" id="selBtn">Seleccionar</button></div>
         <div id="plateList" style="margin-top:8px"><p class="muted">Cargando…</p></div>
+      </div>
+      <div id="selBar" class="selbar hidden">
+        <span id="selCount">0 seleccionadas</span>
+        <div class="actions" style="margin:0"><button class="small" id="selAll">Todos</button><button class="small" id="selNone">Ninguno</button><button class="small primary" id="selDel" style="background:var(--bad);border-color:var(--bad)">Eliminar</button></div>
       </div>
       <p class="muted" style="margin-top:10px;padding:0 4px">Por privacidad, aquí solo se ve lo necesario para dar soporte: no se ven notas ni quién registró cada comida.</p>
     </section>
@@ -206,6 +216,7 @@ table.tv td:last-child,table.tv th:last-child{text-align:right;font-variant-nume
   <div class="modal">
     <p style="font-size:18px;margin:0 0 8px"><b id="confirmTitle"></b></p>
     <p class="muted" id="confirmText"></p>
+    <input id="confirmInput" type="text" class="hidden" autocomplete="off" autocapitalize="characters" style="margin-top:12px">
     <div class="grid2"><button id="cancelBtn">Cancelar</button><button class="primary" id="okBtn">Sí</button></div>
   </div>
 </div>
@@ -239,10 +250,16 @@ async function api(body) {
   let d = {}; try { d = await r.json(); } catch {}
   return { status: r.status, data: d };
 }
-function ask(title, text, okLabel = "Sí") {
+function ask(title, text, okLabel = "Sí", word = "") {
   return new Promise(ok => {
     $("confirmTitle").textContent = title; $("confirmText").textContent = text; $("okBtn").textContent = okLabel;
+    // Para lo que no se puede deshacer: hay que escribir una palabra
+    $("confirmInput").classList.toggle("hidden", !word); $("confirmInput").value = "";
+    $("confirmInput").placeholder = word ? `Escribe ${word}` : "";
+    $("okBtn").disabled = !!word;
+    $("confirmInput").oninput = () => { $("okBtn").disabled = $("confirmInput").value.trim().toUpperCase() !== word; };
     $("confirm").classList.remove("hidden");
+    if (word) setTimeout(() => $("confirmInput").focus(), 50);
     $("okBtn").onclick = () => { $("confirm").classList.add("hidden"); ok(true); };
     $("cancelBtn").onclick = () => { $("confirm").classList.add("hidden"); ok(false); };
   });
@@ -379,15 +396,49 @@ $("q").addEventListener("input", renderPlates);
 $("pf").querySelectorAll("button").forEach(b => b.onclick = () => {
   filter = b.dataset.f; $("pf").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); renderPlates();
 });
-function renderPlates() {
+// ---- Seleccionar varios para eliminar ----
+let selMode = false; const selected = new Set();
+function visiblePlates() {
   const q = $("q").value.trim().toLowerCase();
-  const list = plates.filter(p => (filter === "all" || stateOf(p).k === filter) &&
+  return plates.filter(p => (filter === "all" || stateOf(p).k === filter) &&
     (!q || (p.pet_name || "").toLowerCase().includes(q) || p.code.toLowerCase().includes(q)));
-  $("plateList").innerHTML = list.length ? list.map(p => { const s = stateOf(p);
-    return `<div class="item plate" data-code="${esc(p.code)}">
-      <div class="row"><b>${esc(p.pet_name || "Pegatina sin configurar")}</b><span class="tag ${s.cls}">${s.label}</span></div>
+}
+function selUI() {
+  for (const c of [...selected]) if (!plates.some(p => p.code === c)) selected.delete(c);
+  $("selBtn").textContent = selMode ? "Listo" : "Seleccionar";
+  if (selMode) $("selHint").textContent = "Toca los platos que quieres eliminar";
+  else if (!/eliminad/.test($("selHint").textContent)) $("selHint").textContent = "";
+  $("selBar").classList.toggle("hidden", !selMode);
+  $("selCount").textContent = `${selected.size} ${selected.size === 1 ? "seleccionado" : "seleccionados"}`;
+  $("selDel").disabled = !selected.size;
+  $("selDel").textContent = selected.size ? `Eliminar (${selected.size})` : "Eliminar";
+}
+$("selBtn").onclick = () => { selMode = !selMode; selected.clear(); openCode = null; renderPlates(); };
+$("selAll").onclick = () => { visiblePlates().forEach(p => selected.add(p.code)); renderPlates(); };
+$("selNone").onclick = () => { selected.clear(); renderPlates(); };
+$("selDel").onclick = async () => {
+  const list = plates.filter(p => selected.has(p.code)); if (!list.length) return;
+  const used = list.filter(p => p.pet_name);
+  const ok = await ask(`¿Eliminar ${plural(list.length, "plato", "platos")}?`,
+    (used.length ? `${used.length === 1 ? (list.length === 1 ? "Lo usa una familia" : "Uno lo usa una familia") : `${used.length} los usan familias`} (${used.slice(0, 3).map(p => p.pet_name).join(", ")}${used.length > 3 ? "…" : ""}): se borrarán sus registros, fotos, horarios y avisos, y su pegatina dejará de funcionar. ` : "Son pegatinas sin configurar. ")
+    + "Esto no se puede deshacer.", "Eliminar", used.length ? "ELIMINAR" : "");
+  if (!ok) return;
+  $("selDel").disabled = true; $("selDel").textContent = "Eliminando…";
+  let r; try { r = await api({ action: "delete_plates", codes: list.map(p => p.code) }); } catch { r = { status: 0 }; }
+  if (r.status !== 200) { $("selHint").innerHTML = '<span class="err">No se pudo eliminar. ¿Corriste eliminar_platos.sql en Supabase?</span>'; selUI(); return; }
+  selected.clear(); selMode = false;
+  await loadPlates(true);
+  $("selHint").textContent = `🗑️ ${plural(r.data.deleted, "plato eliminado", "platos eliminados")}.`;
+};
+
+function renderPlates() {
+  const list = visiblePlates();
+  selUI();
+  $("plateList").innerHTML = list.length ? list.map(p => { const s = stateOf(p), on = selected.has(p.code);
+    return `<div class="item plate${selMode && on ? " sel" : ""}" data-code="${esc(p.code)}">
+      <div class="row"><span style="display:flex;align-items:center;min-width:0">${selMode ? `<span class="ck" aria-hidden="true">${on ? "✓" : ""}</span>` : ""}<b>${esc(p.pet_name || "Pegatina sin configurar")}</b></span><span class="tag ${s.cls}">${s.label}</span></div>
       <div class="meta">${esc(p.code)} · último registro ${ago(p.last_entry)} · ${plural(p.phones, "teléfono", "teléfonos")} con avisos${p.has_pin ? " · 🔒 PIN" : ""}${p.has_email ? " · 📧 correo" : ""}</div>
-      ${openCode === p.code ? `<div class="actions">
+      ${!selMode && openCode === p.code ? `<div class="actions">
         <button class="small" data-a="copy">Copiar link</button>
         ${p.pet_name && !p.disabled ? '<button class="small" data-a="msg">📣 Mandar anuncio</button>' : ""}
         ${p.has_pin ? '<button class="small" data-a="pin">Borrar PIN</button>' : ""}
@@ -396,6 +447,7 @@ function renderPlates() {
     </div>`; }).join("") : '<p class="muted" style="margin-top:8px">No hay platos con ese filtro.</p>';
   $("plateList").querySelectorAll(".plate").forEach(el => el.onclick = e => {
     const code = el.dataset.code, p = plates.find(x => x.code === code), a = e.target.dataset && e.target.dataset.a;
+    if (selMode) { selected.has(code) ? selected.delete(code) : selected.add(code); renderPlates(); return; }
     if (!a) { openCode = openCode === code ? null : code; renderPlates(); return; }
     e.stopPropagation(); plateAction(a, p, e.target);
   });
