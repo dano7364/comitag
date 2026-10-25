@@ -552,8 +552,8 @@ async function load() {
     $("err").style.textAlign = "center";
     $("err").after($("pets"));
     $("err").textContent = getPets().length
-      ? "Elige una mascota, o acerca tu celular al dispositivo Comitag de otro plato."
-      : "Acerca tu celular al dispositivo Comitag del plato para abrir la página de tu mascota.";
+      ? "Elige una mascota, o acerca tu celular a otro dispositivo Comitag."
+      : "Acerca tu celular al dispositivo Comitag para abrir la página de tu mascota.";
     $("pets").after($("addPetBox"));
     $("addPetBox").classList.remove("hidden");
     return;
@@ -684,7 +684,7 @@ function tourSteps() {
     { el: card("fT") && card("fT").parentElement, t: "¿Ya comió?", d: "Aquí ves cuándo comió y tomó agua por última vez, y quién se lo dio." },
     { el: card("sched"), t: "Horarios y avisos", d: "Pon sus horarios de comida y toca 🔔 Avisarme: te llega un aviso si a alguien se le olvida." },
     { el: $("menuBtn"), pad: 6, t: "Más opciones", d: "En el menú ☰ puedes invitar a tu familia con un QR, registrar solo con acercar el teléfono, cambiar el PIN y más." },
-    { t: "¡Listo! 🎉", d: "La próxima vez, acerca el teléfono al dispositivo Comitag del plato y se abre esta página. Puedes ver este tutorial de nuevo en el menú ☰.", last: true },
+    { t: "¡Listo! 🎉", d: "La próxima vez, acerca el teléfono al dispositivo Comitag y se abre esta página. Puedes ver este tutorial de nuevo en el menú ☰.", last: true },
   ].filter(x => !("el" in x) || (x.el && x.el.offsetParent));
 }
 function startTour(force) {
@@ -1146,8 +1146,8 @@ function tapRemove(c) {
   if (!getPets().length) editingPets = false;
   renderPets();
   if (!code) $("err").textContent = getPets().length
-    ? "Elige una mascota, o acerca tu celular al dispositivo Comitag de otro plato."
-    : "Acerca tu celular al dispositivo Comitag del plato para abrir la página de tu mascota.";
+    ? "Elige una mascota, o acerca tu celular a otro dispositivo Comitag."
+    : "Acerca tu celular al dispositivo Comitag para abrir la página de tu mascota.";
 }
 // Solo la saca de ESTE teléfono: la mascota y sus registros siguen para la familia.
 // Los registros "por enviar" de esa mascota NO se borran: se envían igual al volver internet.
@@ -1619,7 +1619,7 @@ function autoSet(v) { try { v ? localStorage.setItem(autoKey(), JSON.stringify(v
 function openAuto() {
   const cfg = autoGet() || {}, pets = petsOf();
   openModal(`<p style="font-size:18px;margin-top:4px"><b>📲 Registrar al acercar</b></p>
-    <p class="muted">Al acercar <b>este teléfono</b> al dispositivo Comitag del plato se abre la página y, después de una cuenta de ${AUTO_SEG} segundos, se registra solo. Puedes tocar <b>Cancelar</b> antes.</p>
+    <p class="muted">Al acercar <b>este teléfono</b> al dispositivo Comitag se abre la página y, después de una cuenta de ${AUTO_SEG} segundos, se registra solo. Puedes tocar <b>Cancelar</b> antes.</p>
     <p class="muted" style="margin-top:8px">Si alguien ya le dio comida hace menos de ${AUTO_REPETIDA_MIN} min, te avisa y no registra nada.</p>
     <p class="muted" style="margin:14px 0 6px"><b>Al acercar este teléfono, registrar:</b></p>
     <select id="auKind" class="tqSel" aria-label="Qué registrar">
