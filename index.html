@@ -233,6 +233,9 @@ main{position:relative}
 .btnlike{display:flex;align-items:center;justify-content:center;border-radius:14px;padding:12px;text-decoration:none;font-weight:600}
 .btnlike.primary{background:var(--blue);color:var(--on-blue,#fff)}
 .nlist .ni:first-child{border-top:none}
+.nlist .ni .nDel{flex:none;align-self:center;font-size:15px;padding:8px}
+.nlist .ni.gone{opacity:0;transform:translateX(30px);transition:opacity .2s,transform .2s}
+.nDelAll{display:block;margin:10px auto 0;color:var(--danger,#dc2626)!important;font-size:14px}
 .nlist .ni .ic{font-size:20px;line-height:1.3}
 .nlist .ni .nt{font-weight:700;margin:0}
 .nlist .ni .nb{margin:2px 0 0;color:var(--muted);font-size:14px;line-height:1.4}
@@ -736,7 +739,21 @@ function notifSeen() {
   try { const o = JSON.parse(localStorage.getItem("comitag_notif_vistas") || "{}"); return o.d === todayKey() ? new Set(o.k || []) : new Set(); }
   catch { return new Set(); }
 }
+// Borradas en este teléfono (por plato; se olvidan a las 00:00 como el resto)
+const notifDelKey = () => "comitag_notif_borradas_" + code;
+function notifDeleted() {
+  try { const o = JSON.parse(localStorage.getItem(notifDelKey()) || "{}"); return o.d === todayKey() ? new Set(o.k || []) : new Set(); }
+  catch { return new Set(); }
+}
+function notifDelete(keys) {
+  const k = notifDeleted(); keys.forEach(x => k.add(x));
+  try { localStorage.setItem(notifDelKey(), JSON.stringify({ d: todayKey(), k: [...k] })); } catch {}
+}
 function notifItems() {
+  const del = notifDeleted();
+  return notifAll().filter(x => !del.has(x.key));
+}
+function notifAll() {
   const out = annToday.filter(a => new Date(a.at).toDateString() === todayKey()).map(a => ({
     key: "a" + a.id, at: new Date(a.at), ic: "📣", t: a.title, b: a.body, link: a.link }));
   for (const m of missedToday) {
@@ -767,16 +784,30 @@ function openNotifs() {
   openModal(`<p style="font-size:18px;margin-top:4px"><b>🔔 Notificaciones de hoy</b></p>
     <div class="nlist" style="margin-top:6px">${list.length ? list.map((x, i) => `<div class="ni${seen.has(x.key) ? "" : " new"}" role="button" tabindex="0" data-n="${i}"><span class="ic" aria-hidden="true">${x.ic}</span><div style="flex:1;min-width:0">
       <p class="nt">${esc(x.t)}</p><p class="nb">${esc(x.b)}</p>
-      <div class="nh">${fmt(x.at)}</div></div><span class="nchev" aria-hidden="true">›</span></div>`).join("")
+      <div class="nh">${fmt(x.at)}</div></div><button class="hx nDel" data-del="${i}" title="Borrar" aria-label="Borrar esta notificación">✕</button></div>`).join("")
       : `<p class="muted" style="padding:14px 0">No hay notificaciones hoy. 🐾</p>`}</div>
-    <p class="muted" style="font-size:12px;margin-top:10px">Las notificaciones se borran solas a las 00:00.</p>
+    ${list.length > 1 ? `<button class="link nDelAll" id="nDelAll">Borrar todas</button>` : ""}
+    <p class="muted" style="font-size:12px;margin-top:10px">${list.length ? "Al borrarlas desaparecen solo de este teléfono. " : ""}Las notificaciones se borran solas a las 00:00.</p>
     <button class="link" style="display:block;margin:8px auto 0" onclick="closeModal()">Cerrar</button>`);
   try { localStorage.setItem("comitag_notif_vistas", JSON.stringify({ d: todayKey(), k: list.map(x => x.key) })); } catch {}
   notifUpdate();
   $("modalBody").querySelectorAll(".ni").forEach(el => {
     const open = () => openNotif(list[+el.dataset.n]);
-    el.onclick = open; el.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } };
+    el.onclick = open; el.onkeydown = e => { if (e.target === el && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); open(); } };
   });
+  $("modalBody").querySelectorAll(".nDel").forEach(b => b.onclick = e => {
+    e.stopPropagation();
+    const row = b.closest(".ni"); row.classList.add("gone");
+    notifDelete([list[+b.dataset.del].key]);
+    setTimeout(() => { openNotifs(); }, 220);
+  });
+  if ($("nDelAll")) $("nDelAll").onclick = () => {
+    const b = $("nDelAll");
+    if (!b.classList.contains("sure")) { b.classList.add("sure"); b.textContent = "¿Seguro? Toca de nuevo para borrar todas"; return; }
+    notifDelete(list.map(x => x.key));
+    openNotifs();
+    showNote("🗑️ Notificaciones borradas.");
+  };
 }
 // Recuadro con el detalle de una notificación (encima de la lista)
 function openNotif(x) {
