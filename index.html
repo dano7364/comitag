@@ -39,6 +39,25 @@ button{font-size:16px;padding:14px;border-radius:12px;border:1px solid var(--bor
 input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text)}
 .hidden{display:none !important}
 #week{display:flex;align-items:flex-end;gap:6px;height:90px}
+:root{--pc1:#2a78d6;--pc2:#eb6834;--pc3:#1baf7a;--pc4:#eda100;--pc5:#e87ba4;--pc6:#008300}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--pc1:#3987e5;--pc2:#d95926;--pc3:#199e70;--pc4:#c98500;--pc5:#d55181;--pc6:#008300}}
+:root[data-theme=dark]{--pc1:#3987e5;--pc2:#d95926;--pc3:#199e70;--pc4:#c98500;--pc5:#d55181;--pc6:#008300}
+.wkCtl{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 12px}
+.wkCtl button{width:auto!important;padding:6px 11px!important;border-radius:99px!important;font-size:13px;display:inline-flex;align-items:center;gap:6px}
+.wkCtl button.on{background:var(--text)!important;color:var(--bg)!important;border-color:var(--text)!important}
+.wkCtl i,.wkLeg i{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
+.wk{flex:1;display:flex;flex-direction:column;align-items:center;cursor:pointer;font-size:11px;color:var(--muted);border-radius:8px;padding:2px 0}
+.wk.sel{background:color-mix(in srgb,var(--text) 7%,transparent)}
+.wk .bars{display:flex;align-items:flex-end;justify-content:center;gap:2px;height:62px;width:100%}
+.wk .bars span{display:block;border-radius:4px 4px 0 0;min-height:2px}
+.wk .n{height:14px;line-height:14px}
+.wkLeg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--muted);margin-top:8px}
+.wkLeg span{display:inline-flex;align-items:center;gap:5px}
+.wkInfo{font-size:13px;color:var(--muted);margin-top:8px}
+.wkInfo b{color:var(--text)}
+.wkTbl{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
+.wkTbl th,.wkTbl td{padding:4px 3px;border-bottom:1px solid var(--line);text-align:center;font-variant-numeric:tabular-nums}
+.wkTbl th:first-child,.wkTbl td:first-child{text-align:left}
 .bar{flex:1;text-align:center;font-size:11px;color:var(--muted)}
 .bar div{background:var(--blue);border-radius:4px;margin:3px 0}
 .head{display:flex;justify-content:space-between;align-items:center;gap:8px}
@@ -406,7 +425,7 @@ body::before{animation:drift 28s ease-in-out infinite alternate;will-change:tran
         </div>
       </div>
     </div>
-    <div class="card"><p><b>Últimos 7 días</b></p><div id="week"></div><div id="hist" style="margin-top:12px"></div></div>
+    <div class="card"><p><b>Últimos 7 días</b></p><div id="weekCtl" class="wkCtl hidden"></div><div id="week"></div><div id="weekInfo" class="wkInfo hidden" aria-live="polite"></div><div id="hist" style="margin-top:12px"></div></div>
     <button class="notifBtn" id="notifBtn" aria-label="Notificaciones" onclick="openNotifs()">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 4.5 1.6 6.4 2.4 7.2.3.3.1.8-.3.8H3.9c-.4 0-.6-.5-.3-.8C4.4 15.4 6 13.5 6 9Z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M10 20.2a2.2 2.2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
       <span class="nbadge hidden" id="nBadge"></span>
@@ -974,6 +993,7 @@ function render() {
   $("week").innerHTML = days.map((d, i) =>
     `<div class="bar">${cnt[i]}<div style="height:${Math.round(cnt[i] / mx * 55) + 2}px"></div>${d.toLocaleDateString("es-CL", {weekday:"short"}).slice(0, 2)}</div>`
   ).join("");
+  renderWeekPets(days);
 
   // Historial: los registros hechos juntos (mismo momento, misma persona) van en una sola línea
   const hist = [];
@@ -991,6 +1011,51 @@ function render() {
     + `<button class="hx" title="Borrar registro" aria-label="Borrar registro" onclick="askDelete(${i})">✕</button></span></div>`
   ).join("");
   bellUI();
+}
+
+// ---- Últimos 7 días por mascota (con colores) ----
+let weekDay = 6, weekTable = false;
+const petColor = i => `var(--pc${(i % 6) + 1})`;
+function weekView() { try { return localStorage.getItem("comitag_semana_" + code) || "all"; } catch { return "all"; } }
+function renderWeekPets(days) {
+  const pets = petsOf(), on = pets.length > 1;
+  $("weekCtl").classList.toggle("hidden", !on); $("weekInfo").classList.toggle("hidden", !on);
+  if (!on) { $("week").style.display = ""; $("week").style.height = ""; return; }
+  let view = weekView(); if (view !== "all" && !pets.includes(view)) view = "all";
+  const shown = view === "all" ? pets : [view];
+  // Comidas de cada mascota por día (un registro "para todas" cuenta para cada una)
+  const per = p => days.map(d => new Set(log.filter(e => e.kind === "comida" && e.t.toDateString() === d.toDateString() && (!e.pet || e.pet === p))
+    .map(e => e.created_at + "|" + e.who)).size);
+  const data = Object.fromEntries(pets.map(p => [p, per(p)]));
+  const mx = Math.max(3, ...shown.flatMap(p => data[p]));
+  const day = d => d.toLocaleDateString("es-CL", { weekday: "short" }).slice(0, 2);
+  $("weekCtl").innerHTML = `<button class="${view === "all" ? "on" : ""}" data-v="all">Todas</button>` +
+    pets.map((p, i) => `<button class="${view === p ? "on" : ""}" data-v="${esc(p)}"><i style="background:${petColor(i)}"></i>${esc(p)}</button>`).join("");
+  $("weekCtl").querySelectorAll("button").forEach(b => b.onclick = () => {
+    try { localStorage.setItem("comitag_semana_" + code, b.dataset.v); } catch {}
+    renderWeekPets(days);
+  });
+  if (weekTable) {
+    $("week").style.height = "auto"; $("week").style.display = "block";
+    $("week").innerHTML = `<table class="wkTbl"><tr><th>Día</th>${shown.map(p => `<th>${esc(p)}</th>`).join("")}</tr>` +
+      days.map((d, k) => `<tr><td>${d.toLocaleDateString("es-CL", { weekday: "short", day: "numeric" })}</td>${shown.map(p => `<td>${data[p][k]}</td>`).join("")}</tr>`).reverse().join("") + "</table>";
+  } else {
+    $("week").style.height = ""; $("week").style.display = "";
+    const w = Math.max(3, Math.min(14, Math.floor(34 / shown.length) - 2));
+    $("week").innerHTML = days.map((d, k) => `<div class="wk${k === weekDay ? " sel" : ""}" data-k="${k}" role="button" tabindex="0" aria-label="${esc(d.toLocaleDateString("es-CL", { weekday: "long", day: "numeric" }))}: ${shown.map(p => `${esc(p)} ${data[p][k]}`).join(", ")}">
+      <div class="n">${shown.length === 1 ? data[view][k] : ""}</div>
+      <div class="bars">${shown.map(p => `<span style="width:${w}px;height:${Math.round(data[p][k] / mx * 58) + 2}px;background:${petColor(pets.indexOf(p))};${data[p][k] ? "" : "opacity:.35"}"></span>`).join("")}</div>${day(d)}</div>`).join("");
+    $("week").querySelectorAll(".wk").forEach(el => {
+      const pick = () => { weekDay = +el.dataset.k; renderWeekPets(days); };
+      el.onclick = pick; el.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } };
+    });
+  }
+  const dd = days[weekDay], label = weekDay === 6 ? "Hoy" : weekDay === 5 ? "Ayer" : dd.toLocaleDateString("es-CL", { weekday: "long", day: "numeric" });
+  $("weekInfo").innerHTML = (view === "all"
+      ? `<div class="wkLeg">${pets.map((p, i) => `<span><i style="background:${petColor(i)}"></i>${esc(p)}</span>`).join("")}</div>` : "")
+    + `<p style="margin:8px 0 0"><b>${label.charAt(0).toUpperCase() + label.slice(1)}:</b> ${shown.map(p => `${esc(p)} ${data[p][weekDay]} ${data[p][weekDay] === 1 ? "comida" : "comidas"}`).join(" · ")}</p>`
+    + `<button class="link" id="wkTblBtn" style="margin-top:4px;padding:0">${weekTable ? "Ver gráfico" : "Ver números"}</button>`;
+  $("wkTblBtn").onclick = () => { weekTable = !weekTable; renderWeekPets(days); };
 }
 
 // ---- Varias mascotas en un plato ----
