@@ -160,6 +160,15 @@ button:disabled{opacity:.4;cursor:default;box-shadow:none}
 .hline{display:flex;align-items:center;gap:10px}
 .htime{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.2px}
 .hsub{font-size:13px;color:var(--muted);margin-top:1px}
+.hitem.tap{cursor:pointer;-webkit-tap-highlight-color:transparent;border-radius:12px;transition:background .15s}
+.hitem.tap:active{background:color-mix(in srgb,var(--blue) 8%,transparent)}
+.eHead{font-size:20px;font-weight:700;margin:4px 0 0}
+.eLbl{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:0 0 8px}
+.eList{display:flex;flex-direction:column;gap:10px}
+.eRow{display:flex;align-items:center;gap:12px;font-size:17px;font-weight:600}
+.eRow img,.eRow b{width:46px;height:46px;border-radius:50%;object-fit:cover;flex:none;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:18px;font-weight:700}
+.eRow span{font-family:ui-rounded,-apple-system,system-ui,sans-serif}
+.eWho b{background:var(--muted)}
 .hav{display:inline-flex;align-items:center}
 .hav img,.hav b{width:30px;height:30px;border-radius:50%;border:2px solid var(--card);object-fit:cover;margin-left:-8px;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;box-sizing:border-box}
 .hav img:first-child,.hav b:first-child{margin-left:0}
@@ -1051,12 +1060,12 @@ function histHtml(hist, order) {
     const all = many && e.kind === "comida" && (!e.pets.length || e.pets.length === order.length);
     const who = many && e.kind === "comida" ? (all ? `<span class="hall">Todas</span>` : petAvatars(e.pets, order)) : "";
     const names = many && e.kind === "comida" ? (all ? "todas" : joinNames(e.pets)) : "";
-    out += `<div class="hitem" aria-label="${e.kind === "comida" ? "Comida" : "Agua"}${names ? " de " + esc(names) : ""} a las ${fmt(e.t)}, por ${esc(e.who)}">
+    out += `<div class="hitem tap" role="button" tabindex="0" onclick="openEntry(${i})" onkeydown="if(event.key==='Enter'){openEntry(${i})}" aria-label="${e.kind === "comida" ? "Comida" : "Agua"}${names ? " de " + esc(names) : ""} a las ${fmt(e.t)}, por ${esc(e.who)}">
       <span class="hic" aria-hidden="true">${e.kind === "comida" ? "🍽️" : "💧"}</span>
       <div class="hmain"><div class="hline"><span class="htime">${fmt(e.t)}</span>${who}</div>
         <div class="hsub">${e.kind === "comida" ? "Comida" : "Agua"} · por ${esc(e.who)}${e.queued ? ` · <span class="q">⏳ por enviar</span>` : ""}</div>
         ${e.note ? `<span class="enote">“${esc(e.note)}”</span>` : ""}</div>
-      <button class="hx" title="Borrar registro" aria-label="Borrar registro" onclick="askDelete(${i})">✕</button></div>`;
+      <button class="hx" title="Borrar registro" aria-label="Borrar registro" onclick="event.stopPropagation();askDelete(${i})">✕</button></div>`;
   });
   return out;
 }
@@ -1578,7 +1587,7 @@ async function loadPhoto() {
   if (pinStatus(r)) return;
   const photo = r.error ? cacheGet().photo : r.data;
   if (!r.error) cachePut({ photo });
-  if (!many) { showPhotoMode(false); showPhoto(photo); return; }
+  if (!many) { platePhoto = photo || null; showPhotoMode(false); showPhoto(photo); return; }
   let map = {};
   if (rp && !rp.error && rp.data && typeof rp.data === "object") { map = rp.data; cachePut({ petPhotos: map }); }
   else map = cacheGet().petPhotos || {};
@@ -1929,6 +1938,25 @@ function openPinSettings() {
 }
 
 // ================= Borrar un registro del historial =================
+// Tocar un registro: qué mascotas recibieron y quién lo hizo
+function openEntry(i) {
+  const g = histShown[i];
+  if (!g) return;
+  const order = petsOf(), food = g.kind === "comida";
+  const pets = order.length > 1 ? (food ? (g.pets.length ? g.pets : order) : order) : [(plate && plate.pet_name) || "Mascota"];
+  const pic = (p, k) => { const src = order.length > 1 ? photoOf(p) : platePhoto, idx = Math.max(0, order.indexOf(p));
+    return src ? `<img src="${src}" alt="">` : `<b style="background:${petColor(k < 0 ? 0 : idx)}">${esc(p.charAt(0).toUpperCase())}</b>`; };
+  const when = `${dayTitle(g.t)} · ${fmt(g.t)}`;
+  openModal(`<p class="eHead">${food ? "🍽️ Comida" : "💧 Agua"}</p>
+    <p class="muted" style="margin:2px 0 14px">${esc(when)}${g.queued ? " · ⏳ por enviar" : ""}</p>
+    <p class="eLbl">${food ? (pets.length > 1 ? "Comieron" : "Comió") : "Agua cambiada para"}</p>
+    <div class="eList">${pets.map((p, k) => `<div class="eRow">${pic(p, k)}<span>${esc(p)}</span></div>`).join("")}</div>
+    <p class="eLbl" style="margin-top:14px">${food ? "Le dio comida" : "Lo hizo"}</p>
+    <div class="eRow eWho"><b>${esc((g.who || "?").charAt(0).toUpperCase())}</b><span>${esc(g.who || "Alguien")}</span></div>
+    ${g.note ? `<p class="eLbl" style="margin-top:14px">Nota</p><p style="margin:0">“${esc(g.note)}”</p>` : ""}
+    <div class="grid" style="margin-top:18px"><button id="eDel" class="link" style="color:var(--danger,#dc2626)">Borrar registro</button><button class="primary" onclick="closeModal()">Listo</button></div>`);
+  $("eDel").onclick = () => { closeModal(); askDelete(i); };
+}
 function askDelete(i) {
   const g = histShown[i];
   if (!g) return;
