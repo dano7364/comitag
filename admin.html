@@ -100,6 +100,9 @@ table.tv td:last-child,table.tv th:last-child{text-align:right;font-variant-nume
 .tabBadge{display:inline-block;min-width:17px;height:17px;line-height:17px;padding:0 4px;margin-left:5px;border-radius:9px;background:#ef4444;color:#fff;font-size:11px;font-weight:700;text-align:center;vertical-align:1px}
 .item.msg a{color:var(--blue);text-decoration:none;font-weight:600}
 .lbl{display:block;font-size:14px;font-weight:600;margin:12px 0 6px}
+.answered{margin-top:8px;padding:10px 12px;border-radius:12px;background:var(--okbg)}
+.replyBox{margin-top:10px}
+.replyBox textarea{min-height:90px}
 .annBtns{display:flex;gap:18px;flex-wrap:wrap;margin-top:6px}
 .annBtns .link{padding:0}
 .annDel{color:#dc2626!important}
@@ -227,11 +230,9 @@ table.tv td:last-child,table.tv th:last-child{text-align:right;font-variant-nume
         <div id="msgList" style="margin-top:8px"><p class="muted">Cargando…</p></div>
       </div>
       <div class="card">
-        <h2>Tus datos de contacto</h2>
-        <p class="muted">Aparecen en “Contacto y ayuda” de la página. Si dejas uno vacío, ese botón no se muestra.</p>
-        <label class="lbl" for="cWa">WhatsApp (con código de país)</label>
-        <input id="cWa" type="text" inputmode="tel" maxlength="20" placeholder="56912345678">
-        <label class="lbl" for="cMail" style="margin-top:10px">Correo</label>
+        <h2>Tu correo de contacto</h2>
+        <p class="muted">Aparece en “Contacto y ayuda” de la página. Cuando respondas un mensaje, si la persona contesta tu correo, le llega aquí.</p>
+        <label class="lbl" for="cMail">Correo</label>
         <input id="cMail" type="text" inputmode="email" autocapitalize="off" spellcheck="false" maxlength="120" placeholder="tucorreo@gmail.com">
         <button class="primary wide" id="cSave" style="margin-top:12px">Guardar contacto</button>
         <p id="cMsg" class="msg"></p>
@@ -449,6 +450,7 @@ $("delAllBtn").onclick = async () => {
 
 // ---------- Mensajes de las familias ----------
 let msgs = [], msgFilter = "all", msgOld = false;
+const MAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 async function loadMsgs() {
   let r; try { r = await api({ action: "messages" }); } catch { return; }
   if (r.status !== 200) {
@@ -464,17 +466,49 @@ function renderMsgs() {
   $("msgBadge").textContent = unread > 9 ? "9+" : unread; $("msgBadge").classList.toggle("hidden", !unread);
   const list = msgs.filter(m => msgFilter === "all" || (msgFilter === "unread" ? !m.read : m.kind === msgFilter));
   $("msgList").innerHTML = list.length ? list.map(m => {
-    const rep = m.reply_to || "", digits = rep.replace(/[^0-9]/g, "");
-    const replyLink = /@/.test(rep) ? `<a href="mailto:${esc(rep)}?subject=${encodeURIComponent("Comitag")}">✉️ Responder a ${esc(rep)}</a>`
-      : digits.length >= 8 ? `<a href="https://wa.me/${digits}" target="_blank" rel="noopener">💬 Responder a ${esc(rep)}</a>`
-      : rep ? `<span>Contacto: ${esc(rep)}</span>` : "";
+    const rep = m.reply_to || "", canReply = MAIL_RE.test(rep);
+    const answered = m.replied_at ? `<div class="answered"><p class="muted" style="font-size:12px;margin:0">✅ Respondiste el ${esc(fmtDate(m.replied_at))} a ${esc(rep)}</p>
+        <p style="margin:4px 0 0;white-space:pre-wrap">${esc(m.reply_body || "")}</p></div>` : "";
+    const replyInfo = canReply ? `<p class="muted" style="font-size:13px;margin-top:4px">✉️ ${esc(rep)}</p>`
+      : `<p class="muted" style="font-size:13px;margin-top:4px">${rep ? `Dejó: ${esc(rep)} (no es un correo, no se puede responder desde aquí)` : "No dejó correo para responder."}</p>`;
     return `<div class="item msg${m.read ? "" : " unread"}">
       <div class="row"><b>${m.kind === "ayuda" ? "🆘 Pide ayuda" : "💡 Sugerencia"}</b><span class="tag${m.read ? "" : " warn"}">${m.read ? "Leído" : "Nuevo"}</span></div>
       <p style="margin:6px 0 0;white-space:pre-wrap">${esc(m.body)}</p>
       <p class="muted" style="font-size:12px;margin-top:6px">${esc(m.who || "Sin nombre")} · ${m.pet_name ? esc(m.pet_name) + " · " : ""}${esc(m.plate_code || "")} · ${esc(fmtDate(m.created_at))}</p>
-      ${replyLink ? `<p style="font-size:14px;margin-top:4px">${replyLink}</p>` : ""}
-      <div class="annBtns"><button class="link" data-mread="${m.id}">${m.read ? "Marcar como no leído" : "Marcar como leído"}</button><button class="link annDel" data-mdel="${m.id}">Borrar</button></div>
+      ${replyInfo}${answered}
+      <div class="replyBox hidden" data-rbox="${m.id}">
+        <textarea maxlength="2000" placeholder="Escribe tu respuesta…"></textarea>
+        <div class="row" style="margin-top:8px"><button class="small" data-rcancel="${m.id}">Cancelar</button><button class="small primary" data-rsend="${m.id}">Enviar respuesta</button></div>
+        <p class="msg hidden" data-rmsg="${m.id}"></p>
+      </div>
+      <div class="annBtns">${canReply ? `<button class="link" data-reply="${m.id}">✉️ ${m.replied_at ? "Responder de nuevo" : "Responder"}</button>` : ""}<button class="link" data-mread="${m.id}">${m.read ? "Marcar como no leído" : "Marcar como leído"}</button><button class="link annDel" data-mdel="${m.id}">Borrar</button></div>
     </div>`; }).join("") : `<p class="muted">${msgs.length ? "No hay mensajes con este filtro." : "Todavía no llegan mensajes."}</p>`;
+  const box = id => $("msgList").querySelector(`[data-rbox="${id}"]`);
+  $("msgList").querySelectorAll("[data-reply]").forEach(b => b.onclick = () => {
+    const bx = box(b.dataset.reply); bx.classList.remove("hidden"); b.classList.add("hidden");
+    const m = msgs.find(x => x.id === +b.dataset.reply);
+    const ta = bx.querySelector("textarea");
+    if (!ta.value) ta.value = `Hola${m.who ? " " + m.who : ""}, `;
+    ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+  });
+  $("msgList").querySelectorAll("[data-rcancel]").forEach(b => b.onclick = () => {
+    box(b.dataset.rcancel).classList.add("hidden");
+    $("msgList").querySelector(`[data-reply="${b.dataset.rcancel}"]`).classList.remove("hidden");
+  });
+  $("msgList").querySelectorAll("[data-rsend]").forEach(b => b.onclick = async () => {
+    const id = +b.dataset.rsend, bx = box(id), text = bx.querySelector("textarea").value.trim();
+    const out = bx.querySelector(`[data-rmsg="${id}"]`), say = h => { out.innerHTML = h; out.classList.remove("hidden"); };
+    if (!text) return say('<span class="err">Escribe tu respuesta primero.</span>');
+    b.disabled = true; say("Enviando…");
+    let r; try { r = await api({ action: "message_reply", id, text }); } catch { r = { status: 0 }; }
+    b.disabled = false;
+    if (r.status !== 200) return say(`<span class="err">${r.status === 400 ? "Falta actualizar la función “anuncio” en Supabase."
+      : r.status === 502 ? "Brevo no pudo enviar el correo. Intenta de nuevo en un rato."
+      : r.status === 422 ? "Ese mensaje no tiene un correo válido." : "No se pudo enviar. Intenta de nuevo."}</span>`);
+    const m = msgs.find(x => x.id === id);
+    Object.assign(m, { reply_body: text, replied_at: r.data.replied_at, read: true });
+    renderMsgs();
+  });
   $("msgList").querySelectorAll("[data-mread]").forEach(b => b.onclick = async () => {
     const m = msgs.find(x => x.id === +b.dataset.mread); b.disabled = true;
     const r = await api({ action: "message_read", id: m.id, read: !m.read }).catch(() => ({ status: 0 }));
@@ -498,18 +532,16 @@ async function loadContact() {
   let r; try { r = await api({ action: "contact_get" }); } catch { return; }
   if (r.status !== 200) return;
   loaded.contact = true;
-  $("cWa").value = r.data.contact_whatsapp || ""; $("cMail").value = r.data.contact_email || "";
+  $("cMail").value = r.data.contact_email || "";
 }
 $("cSave").onclick = async () => {
-  const wa = $("cWa").value.replace(/[^0-9]/g, ""), mail = $("cMail").value.trim();
-  if (wa && wa.length < 8) { $("cMsg").innerHTML = '<span class="err">Revisa el número: incluye el código de país, por ejemplo 56912345678.</span>'; return; }
-  if (mail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) { $("cMsg").innerHTML = '<span class="err">Revisa el correo.</span>'; return; }
+  const mail = $("cMail").value.trim();
+  if (mail && !MAIL_RE.test(mail)) { $("cMsg").innerHTML = '<span class="err">Revisa el correo.</span>'; return; }
   $("cSave").disabled = true; $("cMsg").textContent = "Guardando…";
-  let r; try { r = await api({ action: "contact_set", whatsapp: wa, email: mail }); } catch { r = { status: 0 }; }
+  let r; try { r = await api({ action: "contact_set", email: mail }); } catch { r = { status: 0 }; }
   $("cSave").disabled = false;
   $("cMsg").innerHTML = r.status === 200 ? "✅ Contacto guardado. Ya aparece en la página."
     : `<span class="err">${r.status === 400 ? "Falta actualizar la función “anuncio” en Supabase." : "No se pudo guardar. ¿Corriste mensajes.sql?"}</span>`;
-  if (r.status === 200) $("cWa").value = wa;
 };
 
 // ---------- Platos y pegatinas ----------
