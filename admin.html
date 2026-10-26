@@ -105,6 +105,7 @@ table.tv td:last-child,table.tv th:last-child{text-align:right;font-variant-nume
 .replyBox textarea{min-height:90px}
 .supBox{margin-top:10px}
 .supLink{display:block;text-align:center;padding:12px;border-radius:12px;background:var(--text);color:var(--card)!important;text-decoration:none;font-weight:600}
+.lockIc{font-size:44px;margin:4px 0 6px}
 .annBtns{display:flex;gap:18px;flex-wrap:wrap;margin-top:6px}
 .annBtns .link{padding:0}
 .annDel{color:#dc2626!important}
@@ -114,8 +115,18 @@ table.tv td:last-child,table.tv th:last-child{text-align:right;font-variant-nume
 <main>
   <p class="brand">COMITAG 🐾</p>
 
+  <!-- Desbloquear con Face ID (si se activó en este teléfono) -->
+  <section id="lock" class="card hidden" style="text-align:center">
+    <div class="lockIc" aria-hidden="true">🔐</div>
+    <h1>Panel del dueño</h1>
+    <p class="muted" id="lockText">Este teléfono está protegido con Face ID.</p>
+    <button class="primary wide" id="unlockBtn">Desbloquear con Face ID</button>
+    <p id="lockErr" class="msg err"></p>
+    <button class="link" id="useKey" style="margin-top:6px">Usar mi clave</button>
+  </section>
+
   <!-- Entrar con la clave de dueño -->
-  <section id="login" class="card">
+  <section id="login" class="card hidden">
     <h1>Panel del dueño</h1>
     <p class="muted">Solo para el dueño de Comitag. Escribe tu clave de dueño.</p>
     <label for="key">Clave de dueño</label>
@@ -249,7 +260,9 @@ table.tv td:last-child,table.tv th:last-child{text-align:right;font-variant-nume
       </div>
     </section>
 
-    <p style="text-align:center;margin-top:18px"><button class="link" id="logout">Salir de este teléfono</button></p>
+    <p style="text-align:center;margin-top:18px"><button class="link hidden" id="faceBtn"></button></p>
+    <p id="faceMsg" class="msg hidden" style="text-align:center"></p>
+    <p style="text-align:center;margin-top:6px"><button class="link" id="logout">Salir de este teléfono</button></p>
   </div>
 </main>
 
@@ -315,18 +328,80 @@ async function enter() {
   if (r.status === 401) { $("loginErr").textContent = "Clave incorrecta."; return false; }
   if (r.status !== 200) { $("loginErr").textContent = "Algo falló. Intenta de nuevo."; return false; }
   phones = r.data.phones;
-  $("login").classList.add("hidden"); $("panel").classList.remove("hidden");
+  $("login").classList.add("hidden"); $("lock").classList.add("hidden"); $("panel").classList.remove("hidden");
+  faceUI();
   loadAnn(); loadPlates(); loadMsgs();
   return true;
 }
 $("loginBtn").onclick = async () => {
   key = $("key").value.trim(); if (!key) return;
   $("loginBtn").disabled = true;
-  if (await enter()) { try { localStorage.setItem("comitag_admin", key); } catch {} }
+  if (await enter()) { try { localStorage.setItem("comitag_admin", key); sessionStorage.setItem(FID_OK, "1"); } catch {} }
   $("loginBtn").disabled = false;
 };
 $("key").onkeydown = e => { if (e.key === "Enter") $("loginBtn").click(); };
-$("logout").onclick = () => { try { localStorage.removeItem("comitag_admin"); } catch {} location.reload(); };
+$("logout").onclick = () => { try { localStorage.removeItem("comitag_admin"); localStorage.removeItem(FID); sessionStorage.removeItem(FID_OK); } catch {} location.reload(); };
+
+// ---------- Face ID (llave de acceso del teléfono) ----------
+// Protege este teléfono: para abrir el panel hay que pasar Face ID (o huella / código del teléfono).
+const FID = "comitag_admin_faceid", FID_OK = "comitag_admin_desbloqueado";
+const fidGet = () => { try { return localStorage.getItem(FID) || ""; } catch { return ""; } };
+const isApple = /iPhone|iPad|Macintosh/.test(navigator.userAgent);
+const bioName = isApple ? "Face ID" : "tu huella o bloqueo de pantalla";
+const rand = n => crypto.getRandomValues(new Uint8Array(n));
+const b64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));
+const unb64 = t => Uint8Array.from(atob(t), c => c.charCodeAt(0));
+async function fidAvailable() {
+  try { return !!window.PublicKeyCredential && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable(); } catch { return false; }
+}
+async function faceUI() {
+  if (!(await fidAvailable())) return;
+  const on = !!fidGet();
+  $("faceBtn").textContent = on ? `🔓 Desactivar ${bioName === "Face ID" ? "Face ID" : "el desbloqueo"}` : `🔐 Activar ${bioName === "Face ID" ? "Face ID" : "huella o bloqueo de pantalla"}`;
+  $("faceBtn").classList.remove("hidden");
+}
+function faceSay(t) { $("faceMsg").innerHTML = t; $("faceMsg").classList.remove("hidden"); }
+$("faceBtn").onclick = async () => {
+  if (fidGet()) {
+    try { localStorage.removeItem(FID); } catch {}
+    faceSay(`Listo: ya no se pide ${bioName} para entrar.`); faceUI(); return;
+  }
+  try {
+    const cred = await navigator.credentials.create({ publicKey: {
+      rp: { name: "Comitag · Panel del dueño" },
+      user: { id: rand(16), name: "dueno-comitag", displayName: "Dueño de Comitag" },
+      challenge: rand(32),
+      pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
+      authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required", residentKey: "preferred" },
+      timeout: 60000,
+    } });
+    if (!cred) throw new Error("sin llave");
+    localStorage.setItem(FID, b64(cred.rawId));
+    try { sessionStorage.setItem(FID_OK, "1"); } catch {}
+    faceSay(`✅ ${bioName === "Face ID" ? "Face ID activado" : "Desbloqueo activado"}. La próxima vez que abras el panel en este teléfono te lo pedirá.`);
+  } catch (e) {
+    faceSay(`<span class="err">${e && e.name === "NotAllowedError" ? "Se canceló. Puedes intentarlo de nuevo." : "Este teléfono no permitió activarlo."}</span>`);
+  }
+  faceUI();
+};
+async function unlock() {
+  $("lockErr").textContent = ""; $("unlockBtn").disabled = true;
+  try {
+    const cred = await navigator.credentials.get({ publicKey: {
+      challenge: rand(32), allowCredentials: [{ type: "public-key", id: unb64(fidGet()) }],
+      userVerification: "required", timeout: 60000,
+    } });
+    if (!cred) throw new Error("sin llave");
+    try { sessionStorage.setItem(FID_OK, "1"); } catch {}
+    $("lock").classList.add("hidden");
+    openPanel();
+  } catch (e) {
+    $("lockErr").textContent = e && e.name === "NotAllowedError" ? "No se pudo verificar. Intenta de nuevo." : `No se pudo usar ${bioName}. Entra con tu clave.`;
+  }
+  $("unlockBtn").disabled = false;
+}
+$("unlockBtn").onclick = unlock;
+$("useKey").onclick = () => { $("lock").classList.add("hidden"); $("login").classList.remove("hidden"); $("key").focus(); };
 
 // ---------- Pestañas ----------
 const loaded = {};
@@ -779,11 +854,20 @@ async function loadHealth() {
 }
 $("healthBtn").onclick = loadHealth;
 
-if (key) enter().then(ok => {
-  if (!ok) { $("key").value = ""; return; }
-  let t = "anuncios"; try { t = sessionStorage.getItem("comitag_admin_tab") || t; } catch {}
-  showTab(t);
-});
+function openPanel() {
+  enter().then(ok => {
+    if (!ok) { $("key").value = ""; $("login").classList.remove("hidden"); return; }
+    let t = "anuncios"; try { t = sessionStorage.getItem("comitag_admin_tab") || t; } catch {}
+    showTab(t);
+  });
+}
+let unlocked = false; try { unlocked = !!sessionStorage.getItem(FID_OK); } catch {}
+if (key && fidGet() && !unlocked) {
+  $("lockText").textContent = `Este teléfono está protegido con ${bioName}.`;
+  $("unlockBtn").textContent = `Desbloquear con ${bioName === "Face ID" ? "Face ID" : "huella o código"}`;
+  $("lock").classList.remove("hidden");
+} else if (key) openPanel();
+else $("login").classList.remove("hidden");
 </script>
 </body>
 </html>
