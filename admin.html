@@ -186,6 +186,8 @@ input[type=date]{width:100%;font:inherit;padding:12px;border:1px solid var(--bor
   #printSheet .lab svg{width:30mm;height:30mm;flex:none}
   #printSheet .lab b{display:block;font-size:16pt;margin-bottom:1mm}
   #printSheet .lab small{display:block;color:#555;font-size:8.5pt}
+  #printSheet .lab ol{margin:1.5mm 0 0;padding-left:4.5mm;font-size:8.5pt;color:#333;line-height:1.35}
+  #printSheet .lab ol li{margin:.6mm 0}
 }
 </style>
 </head>
@@ -293,7 +295,7 @@ input[type=date]{width:100%;font:inherit;padding:12px;border:1px solid var(--bor
       <div class="card" id="newBox">
         <div class="row"><h2 style="margin:0">Dispositivos sin entregar</h2><span class="tag" id="nFree">–</span></div>
         <p class="muted" style="margin-top:4px">Graba cada link en un dispositivo con NFC Tools (Escribir → Agregar registro → URL). El QR sirve de respaldo.</p>
-        <div class="actions"><button class="small" id="copyAll">Copiar todos los links</button><button class="small" id="printQr">Imprimir QR</button></div>
+        <div class="actions"><button class="small" id="copyAll">Copiar todos los links</button><button class="small" id="printQr">Imprimir QR</button><button class="small" id="printWel">🏷️ Etiquetas de bienvenida</button></div>
         <div id="freeList" class="links" style="margin-top:10px"></div>
       </div>
       <div class="card">
@@ -1035,12 +1037,13 @@ function renderFree() {
   const f = freePlates();
   $("nFree").textContent = f.length;
   $("freeList").innerHTML = f.length ? f.map(p => `<div style="padding:8px 0;border-top:1px solid var(--line)"><div class="row"><span>${esc(nfcLink(p.code))}</span><button class="small" data-c="${esc(p.code)}">Copiar</button></div>
-      <button class="link" data-pq="${esc(p.code)}" style="font-size:13.5px;padding:4px 0 0">🖨️ Imprimir QR</button></div>`).join("")
+      <div style="display:flex;gap:16px;flex-wrap:wrap"><button class="link" data-pq="${esc(p.code)}" style="font-size:13.5px;padding:4px 0 0">🖨️ Imprimir QR</button><button class="link" data-pw="${esc(p.code)}" style="font-size:13.5px;padding:4px 0 0">🏷️ Imprimir etiqueta</button></div></div>`).join("")
     : '<p class="muted">No hay dispositivos sin entregar. Crea nuevos arriba.</p>';
   $("freeList").querySelectorAll("[data-c]").forEach(b => b.onclick = async () => {
     try { await navigator.clipboard.writeText(nfcLink(b.dataset.c)); b.textContent = "✓"; } catch {}
   });
   $("freeList").querySelectorAll("[data-pq]").forEach(b => b.onclick = () => printQrCodes([b.dataset.pq]));
+  $("freeList").querySelectorAll("[data-pw]").forEach(b => b.onclick = () => printWelcome([b.dataset.pw]));
 }
 $("createBtn").onclick = async () => {
   const n = Math.min(100, Math.max(1, parseInt($("nNew").value, 10) || 0));
@@ -1072,6 +1075,7 @@ async function printQrCodes(codes) {
   window.print();
 }
 $("printQr").onclick = () => printQrCodes(freePlates().map(p => p.code));
+$("printWel").onclick = () => printWelcome(freePlates().map(p => p.code));
 
 // ---------- Números ----------
 function barChart(el, days, vals, unit, lab) {
@@ -1355,6 +1359,20 @@ async function printLabels(list) {
   window.print();
 }
 $("labelsAll").onclick = () => printLabels(plates.filter(p => p.pet_name && !p.disabled));
+
+// Etiquetas de bienvenida para dispositivos sin configurar (mismo diseño, con los pasos para empezar)
+async function printWelcome(codes) {
+  if (!codes.length) return;
+  try { if (!window.qrcode) await loadScript(QR_LIB); } catch { alert("No se pudo cargar el generador de QR. Revisa la conexión."); return; }
+  $("printSheet").className = "labels";
+  $("printSheet").innerHTML = codes.map(c => `<div class="lab">${qrSvg(`${SITE}/p/${c}`)}<div>
+    <b>¡Bienvenidos a Comitag! 🐾</b><small>Así empiezan:</small>
+    <ol><li>Acerquen el teléfono al plato o escaneen este código.</li>
+      <li>Escriban el nombre de su mascota y sus horarios de comida.</li>
+      <li>Cada vez que le den comida, acerquen el teléfono y listo.</li></ol>
+    <small style="margin-top:2mm">Comitag 🐾 · ${esc(c)}</small></div></div>`).join("");
+  window.print();
+}
 
 // ---------- Ficha de una familia ----------
 let fichaCode = "", ficha = null;
