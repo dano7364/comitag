@@ -1339,11 +1339,11 @@ function histHtml(hist, order) {
     if (day !== lastDay) { out += `<p class="hday">${day}</p>`; lastDay = day; }
     // ¿Para quién? Todas = registro sin mascota o con todas
     const all = many && (!e.pets.length || e.pets.length === order.length);
-    const who = many ? (all ? `<span class="hall">Todas</span>` : petAvatars(e.pets, order)) : "";
+    // Las mascotas no se muestran aquí: se ven al tocar el registro
     const names = many ? (all ? "todas" : joinNames(e.pets)) : "";
     out += `<div class="hitem tap" role="button" tabindex="0" onclick="openEntry(${i})" onkeydown="if(event.key==='Enter'){openEntry(${i})}" aria-label="${e.kind === "comida" ? "Comida" : "Agua"}${names ? " de " + esc(names) : ""} a las ${fmt(e.t)}, por ${esc(e.who)}">
       <span class="hic" aria-hidden="true">${e.kind === "comida" ? "🍽️" : "💧"}</span>
-      <div class="hmain"><div class="hline"><span class="htime">${fmt(e.t)}</span>${who}</div>
+      <div class="hmain"><div class="hline"><span class="htime">${fmt(e.t)}</span></div>
         <div class="hsub">${e.kind === "comida" ? "Comida" : "Agua"} · por ${esc(e.who)}${e.queued ? ` · <span class="q">⏳ por enviar</span>` : ""}</div>
         ${e.note ? `<span class="enote">“${esc(e.note)}”</span>` : ""}</div>
       <button class="hx" title="Borrar registro" aria-label="Borrar registro" onclick="event.stopPropagation();askDelete(${i})">✕</button></div>`;
