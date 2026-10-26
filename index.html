@@ -82,6 +82,13 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .ann .annB{margin:0;line-height:1.45;white-space:pre-line}
 .ann .annF{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
 .ann .annF a{color:var(--blue);text-decoration:none;font-weight:600}
+.maint{display:flex;gap:10px;align-items:flex-start;background:#fef3c7;color:#7c4a03;border:1px solid #f5d77a;border-radius:14px;padding:11px 14px;margin-bottom:12px;font-size:14px;line-height:1.4}
+@media (prefers-color-scheme:dark){.maint{background:#33290f;color:#fbd56b;border-color:#5a4512}}
+.poll{padding:16px 18px;margin-bottom:14px}
+.poll .pq{font-weight:700;font-size:17px;margin:0 0 10px}
+.poll .po{display:block;width:100%;text-align:left;margin-top:8px;padding:12px 14px;font-size:15px}
+.poll .po.on{border-color:var(--blue);color:var(--blue);font-weight:600}
+.poll .pf{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
 .tour{position:fixed;inset:0;z-index:60}
 .tour .hole{position:fixed;border-radius:20px;box-shadow:0 0 0 9999px rgba(10,12,20,.62);pointer-events:none;transition:all .45s var(--spring,cubic-bezier(.2,.9,.3,1.15))}
 .tour .hole.none{width:0!important;height:0!important;left:50%!important;top:45%!important}
@@ -368,6 +375,7 @@ body::before{animation:drift 28s ease-in-out infinite alternate;will-change:tran
 <body>
 <main>
   <div class="brand">COMITAG<svg class="logo" viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="42" fill="none" stroke="var(--blue)" stroke-width="9"/><g fill="var(--blue)"><ellipse cx="60" cy="70" rx="13" ry="11"/><circle cx="42" cy="55" r="6.5"/><circle cx="52" cy="43.5" r="6.5"/><circle cx="68" cy="43.5" r="6.5"/><circle cx="78" cy="55" r="6.5"/></g></svg></div>
+  <div id="maintBar" class="maint hidden" role="status"><span aria-hidden="true">🚧</span><span id="maintText"></span></div>
   <nav id="pets" class="pets hidden" aria-label="Mis mascotas"></nav>
   <div id="photoBox" class="photoBox hidden">
     <button class="photo" id="photoBtn" onclick="photoTarget = null; $('photoIn').click()" aria-label="Agregar o cambiar la foto de la mascota" title="Toca para agregar o cambiar la foto">
@@ -453,6 +461,7 @@ body::before{animation:drift 28s ease-in-out infinite alternate;will-change:tran
   <section id="app" class="hidden">
     <p class="muted" id="hello" style="margin-bottom:10px"></p>
     <div id="annBox" class="card ann hidden" role="status"></div>
+    <div id="pollBox" class="card poll hidden"></div>
     <div id="offline" class="offline hidden"></div>
     <div id="note" class="note hidden"></div>
     <div id="waBox" class="card hidden">
@@ -679,6 +688,7 @@ window.addEventListener("online", async () => { await syncQueue(); if (ready) re
 
 // Datos del plato (con su lista de mascotas si Supabase ya la tiene)
 async function getPlate() {
+  loadSiteStatus();
   let r = await db.rpc("get_plate2", { p_code: code });
   if (r.error && r.error.code === "PGRST202") r = await db.rpc("get_plate", { p_code: code });
   return r;
@@ -944,6 +954,46 @@ async function saveAt(kind, sel, atDate) {
 function closeNotif() { const b = $("nDetail"); if (b) b.classList.add("hidden"); }
 document.addEventListener("keydown", e => { if (e.key === "Escape" && $("nDetail") && !$("nDetail").classList.contains("hidden")) { e.stopImmediatePropagation(); closeNotif(); } }, true);
 
+// ---- Aviso de mantenimiento y encuesta del dueño de Comitag ----
+let siteAt = 0, sitePoll = null, pollEdit = false;
+async function loadSiteStatus(force) {
+  if (!code || (!force && Date.now() - siteAt < 60000)) return;
+  siteAt = Date.now();
+  const r = await db.rpc("site_status", { p_code: code, p_client: deviceId() });
+  if (r.error || !r.data) return;                         // Supabase sin panel_extras.sql: no se muestra nada
+  const m = r.data.maintenance;
+  $("maintText").textContent = m || ""; $("maintBar").classList.toggle("hidden", !m);
+  sitePoll = r.data.poll || null; renderPoll();
+}
+function pollHidden(id) {
+  try { return localStorage.getItem("comitag_poll_ok") === String(id) || sessionStorage.getItem("comitag_poll_later") === String(id); } catch { return false; }
+}
+function renderPoll() {
+  const q = sitePoll, box = $("pollBox");
+  if (!q || isSupport() || pollHidden(q.id)) { box.classList.add("hidden"); return; }
+  const voted = q.voted != null && !pollEdit;
+  box.innerHTML = `<p class="annH" style="font-size:12px;letter-spacing:1.5px;color:var(--muted);margin:0 0 6px">🗳️ ENCUESTA DE COMITAG</p>
+    <p class="pq">${esc(q.question)}</p>
+    ${voted ? `<p style="margin:0">¡Gracias por responder! 🐾 Votaste: <b>${esc(q.options[q.voted] || "")}</b></p>
+      <div class="pf"><button class="link" id="pollChange">Cambiar mi voto</button><button class="link" id="pollOk">Listo</button></div>`
+    : q.options.map((o, i) => `<button class="po${q.voted === i ? " on" : ""}" data-po="${i}">${esc(o)}</button>`).join("") +
+      `<div class="pf"><span class="muted" style="font-size:12px">Tu respuesta es anónima.</span><button class="link" id="pollLater">Ahora no</button></div>`}`;
+  box.classList.remove("hidden");
+  box.querySelectorAll("[data-po]").forEach(b => b.onclick = async () => {
+    box.querySelectorAll("[data-po]").forEach(x => x.disabled = true);
+    const opt = +b.dataset.po;
+    const r = await db.rpc("vote_poll", { p_code: code, p_poll: q.id, p_client: deviceId(), p_option: opt });
+    if (!r.error && r.data === "ok") { q.voted = opt; pollEdit = false; renderPoll(); return; }
+    if (!r.error && r.data === "cerrada") { sitePoll = null; renderPoll(); showNote("Esa encuesta ya se cerró."); return; }
+    box.querySelectorAll("[data-po]").forEach(x => x.disabled = false);
+    showNote(netErr(r.error) ? "Sin internet. Intenta de nuevo cuando vuelva la conexión." : "No se pudo guardar tu respuesta. Intenta de nuevo.");
+  });
+  const hide = () => { try { localStorage.setItem("comitag_poll_ok", q.id); } catch {} box.classList.add("hidden"); };
+  if ($("pollOk")) $("pollOk").onclick = hide;
+  if ($("pollLater")) $("pollLater").onclick = () => { try { sessionStorage.setItem("comitag_poll_later", q.id); } catch {} box.classList.add("hidden"); };
+  if ($("pollChange")) $("pollChange").onclick = () => { pollEdit = true; renderPoll(); };
+}
+
 async function loadAnnouncement() {
   let seen = 0; try { seen = +localStorage.getItem("comitag_anuncio_visto") || 0; } catch {}
   let r = await db.rpc("latest_announcement2", { p_code: code });
@@ -990,7 +1040,7 @@ async function refresh() {
     }
   }
   render();
-  if (ready) { loadWa(); loadAnnToday(); loadReplies(); }
+  if (ready) { loadWa(); loadAnnToday(); loadReplies(); loadSiteStatus(); }
 }
 
 // Entrada escalonada (solo la primera vez)

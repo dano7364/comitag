@@ -144,6 +144,42 @@ input.pinIn{text-align:center;font-size:26px;letter-spacing:12px;padding:12px 8p
 .card{border-radius:20px;box-shadow:0 1px 2px rgba(0,0,0,.03),0 6px 18px rgba(0,0,0,.035)}
 section[data-pane] > .card:first-child{margin-top:16px}
 @media (prefers-color-scheme:dark){.tile,.sum,.card{box-shadow:none}}
+/* ===== Extras del panel ===== */
+.idle{display:flex;align-items:center;gap:12px;width:100%;text-align:left;margin-top:12px;padding:12px 14px;border-radius:16px;border:1px solid var(--line);background:var(--warnbg);color:var(--text)}
+.idle b{display:block}
+.idle small{color:var(--text2);font-size:13px}
+.qchips{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 8px}
+.qchips button{font-size:13px;padding:6px 10px;border-radius:99px;background:var(--chip);border-color:transparent;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qitem{display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)}
+.qitem:first-child{border-top:none}
+.qitem p{flex:1;margin:0;font-size:14px;white-space:pre-wrap}
+.bar{height:10px;border-radius:99px;background:var(--chip);overflow:hidden;margin-top:4px}
+.bar i{display:block;height:100%;background:var(--blue);border-radius:99px}
+.pollOpt{margin-top:10px;font-size:14px}
+.optRow{display:flex;gap:8px;margin-top:8px}
+.optRow input{flex:1}
+.facts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.fact{background:var(--bg);border-radius:12px;padding:10px 12px;font-size:13px;color:var(--muted)}
+.fact b{display:block;color:var(--text);font-size:15px}
+.note{padding:10px 0;border-top:1px solid var(--line)}
+.note:first-child{border-top:none}
+.note p{margin:0;white-space:pre-wrap}
+.logRow{display:flex;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:14px}
+.logRow:first-child{border-top:none}
+.logRow .ic{width:24px;text-align:center;flex:none}
+.logRow .muted{font-size:12px}
+.inv{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:10px 0;border-top:1px solid var(--line);cursor:pointer}
+.inv:first-child{border-top:none}
+.inv .meta{color:var(--muted);font-size:12.5px;margin-top:2px}
+.switchRow{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px}
+input[type=date]{width:100%;font:inherit;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--bg);color:var(--text)}
+@media print{
+  #printSheet.labels{grid-template-columns:repeat(2,1fr);gap:6mm}
+  #printSheet .lab{border:1px dashed #999;border-radius:5mm;padding:5mm;display:flex;gap:4mm;align-items:center;break-inside:avoid;font:11pt/1.3 -apple-system,sans-serif}
+  #printSheet .lab svg{width:30mm;height:30mm;flex:none}
+  #printSheet .lab b{display:block;font-size:16pt;margin-bottom:1mm}
+  #printSheet .lab small{display:block;color:#555;font-size:8.5pt}
+}
 </style>
 </head>
 <body>
@@ -190,7 +226,11 @@ section[data-pane] > .card:first-child{margin-top:16px}
         <button class="tile" data-go="pegatinas" style="--c:#1baf7a"><span class="tIc">📟</span><b>Dispositivos</b><small id="tFree">Crear y entregar</small></button>
         <button class="tile" data-go="numeros" style="--c:#7c5cff"><span class="tIc">📊</span><b>Números</b><small>Uso de los últimos 30 días</small></button>
         <button class="tile" data-go="sistema" style="--c:#e9a000"><span class="tIc">🚦</span><b>Sistema</b><small id="tSys">Estado de los servicios</small></button>
+        <button class="tile" data-go="encuestas" style="--c:#0ea5b7"><span class="tIc">🗳️</span><b>Encuestas</b><small id="tPoll">Pregúntale a las familias</small></button>
+        <button class="tile" data-go="actividad" style="--c:#64748b"><span class="tIc">🕘</span><b>Actividad</b><small id="tLog">Lo que hiciste en el panel</small></button>
       </div>
+      <button class="idle hidden" id="idleBtn"><span style="font-size:24px">😴</span><span style="flex:1"><b id="idleT"></b><small>Toca para verlas y mandarles un mensaje</small></span><span aria-hidden="true">›</span></button>
+      <button class="idle hidden" id="maintHome" style="background:var(--badbg)"><span style="font-size:24px">🚧</span><span style="flex:1"><b>Modo mantenimiento activado</b><small>Las familias ven el aviso arriba de su página</small></span><span aria-hidden="true">›</span></button>
     </div>
 
     <!-- Barra de cada sección -->
@@ -249,10 +289,22 @@ section[data-pane] > .card:first-child{margin-top:16px}
         <div class="actions"><button class="small" id="copyAll">Copiar todos los links</button><button class="small" id="printQr">Imprimir QR</button></div>
         <div id="freeList" class="links" style="margin-top:10px"></div>
       </div>
+      <div class="card">
+        <div class="row"><h2 style="margin:0">Inventario</h2><span class="tag" id="invSum">–</span></div>
+        <p class="muted" style="margin-top:4px">A quién entregaste cada dispositivo, cuándo, si lo pagó y desde cuándo lo usa. Toca uno para editarlo.</p>
+        <div class="seg" id="invF" style="margin-top:10px"><button class="on" data-f="all">Todos</button><button data-f="unpaid">Sin pagar</button><button data-f="nodeliv">Sin datos de entrega</button></div>
+        <div id="invList" style="margin-top:8px"></div>
+        <div class="actions"><button class="small" id="labelsAll">🏷️ Imprimir etiquetas de todas</button></div>
+      </div>
     </section>
 
     <!-- ===== Platos ===== -->
     <section data-pane="platos" class="hidden">
+      <div class="card hidden" id="idleCard">
+        <h2>😴 Dejaron de usarlo</h2>
+        <p class="muted">Familias que no registran nada hace 7 días o más.</p>
+        <div id="idleList" style="margin-top:6px"></div>
+      </div>
       <div class="card">
         <input id="q" type="search" placeholder="Buscar por mascota o código">
         <div class="seg" id="pf" style="margin-top:10px">
@@ -266,7 +318,7 @@ section[data-pane] > .card:first-child{margin-top:16px}
         <span id="selCount">0 seleccionadas</span>
         <div class="actions" style="margin:0"><button class="small" id="selAll">Todos</button><button class="small" id="selNone">Ninguno</button><button class="small primary" id="selDel" style="background:var(--bad);border-color:var(--bad)">Eliminar</button></div>
       </div>
-      <p class="muted" style="margin-top:10px;padding:0 4px">Por privacidad, aquí solo se ve lo necesario para dar soporte: no se ven notas ni quién registró cada comida.</p>
+      <p class="muted" style="margin-top:10px;padding:0 4px">Por privacidad, aquí solo se ve lo necesario para dar soporte: no se ven las notas de las familias ni quién registró cada comida.</p>
     </section>
 
     <!-- ===== Números ===== -->
@@ -276,7 +328,13 @@ section[data-pane] > .card:first-child{margin-top:16px}
         <div class="stat"><b id="sAct">–</b><span>activos esta semana</span></div>
         <div class="stat"><b id="sPh">–</b><span>teléfonos con notificaciones</span></div>
         <div class="stat"><b id="sFree">–</b><span>dispositivos sin entregar</span></div>
+        <div class="stat"><b id="sPets">–</b><span>mascotas en total</span></div>
+        <div class="stat"><b id="sMonth">–</b><span>familias activas en 30 días</span></div>
+        <div class="stat"><b id="sComp">–</b><span>horarios cumplidos (30 días)</span></div>
+        <div class="stat"><b id="sPeak">–</b><span>hora en que más se da comida</span></div>
       </div>
+      <div class="card"><h2 style="margin:0">¿A qué hora se da comida?</h2>
+        <p class="muted">Últimos 30 días · todas las familias</p><div class="chart" id="cHours"></div></div>
       <div class="card"><div class="row"><h2 style="margin:0">Comidas registradas por día</h2><button class="link" data-tv="cMeals">Ver tabla</button></div>
         <p class="muted">Últimos 30 días · una comida para varias mascotas cuenta una vez</p><div class="chart" id="cMeals"></div></div>
       <div class="card"><div class="row"><h2 style="margin:0">Familias nuevas por día</h2><button class="link" data-tv="cNew">Ver tabla</button></div>
@@ -297,6 +355,14 @@ section[data-pane] > .card:first-child{margin-top:16px}
         <div id="msgList" style="margin-top:8px"><p class="muted">Cargando…</p></div>
       </div>
       <div class="card">
+        <h2>⚡ Respuestas rápidas</h2>
+        <p class="muted">Textos que usas seguido. Aparecen como botones al responder un mensaje.</p>
+        <div id="qList" style="margin-top:8px"></div>
+        <textarea id="qNew" maxlength="500" placeholder="Ej: Hola, ya te borré el PIN. Ahora puedes crear uno nuevo desde el menú." style="margin-top:10px;min-height:70px"></textarea>
+        <button class="wide" id="qAdd" style="margin-top:8px">Agregar respuesta rápida</button>
+        <p id="qMsg" class="msg hidden"></p>
+      </div>
+      <div class="card">
         <h2>Tu correo de contacto</h2>
         <p class="muted">Aparece en “Contacto y ayuda” de la página. Cuando respondas un mensaje, si la persona contesta tu correo, le llega aquí.</p>
         <label class="lbl" for="cMail">Correo</label>
@@ -312,6 +378,54 @@ section[data-pane] > .card:first-child{margin-top:16px}
         <div class="row"><h2 style="margin:0">Estado del sistema</h2><button class="small" id="healthBtn">Revisar</button></div>
         <div id="health" style="margin-top:6px"><p class="muted">Cargando…</p></div>
       </div>
+      <div class="card">
+        <h2>🔔 Avisos en este teléfono</h2>
+        <p class="muted">Te llega una notificación cuando una familia manda un mensaje o si algo del sistema falla.</p>
+        <p class="muted" id="ownIos" style="margin-top:8px"></p>
+        <div class="actions"><button class="small primary" id="ownOn">Activar avisos</button><button class="small hidden" id="ownTest">Mandar prueba</button><button class="small hidden" id="ownOff">Desactivar en este teléfono</button></div>
+        <p id="ownMsg" class="msg hidden"></p>
+      </div>
+      <div class="card">
+        <h2>🚧 Modo mantenimiento</h2>
+        <p class="muted">Muestra una franja arriba en la página de todas las familias, por ejemplo mientras arreglas algo.</p>
+        <label class="lbl" for="mText">Aviso <span class="count" id="mCount">0/200</span></label>
+        <input id="mText" type="text" maxlength="200" placeholder="Estamos haciendo mejoras. Si algo falla, intenta en unos minutos.">
+        <div class="actions"><button class="small primary" id="mOn">Activar aviso</button><button class="small hidden" id="mOff">Quitar aviso</button></div>
+        <p id="mMsg" class="msg hidden"></p>
+      </div>
+    </section>
+
+    <!-- ===== Encuestas ===== -->
+    <section data-pane="encuestas" class="hidden">
+      <div class="card">
+        <h2>Nueva encuesta</h2>
+        <p class="muted">Aparece en la página de todas las familias hasta que la cierres. Solo puede haber una abierta a la vez.</p>
+        <label class="lbl" for="pQ">Pregunta <span class="count" id="pQc">0/140</span></label>
+        <input id="pQ" type="text" maxlength="140" placeholder="¿Qué función te gustaría que agreguemos?">
+        <label class="lbl">Opciones</label>
+        <div id="pOpts"></div>
+        <button class="link" id="pAddOpt" style="margin-top:6px">+ Agregar opción</button>
+        <button class="primary wide" id="pCreate">Publicar encuesta</button>
+        <p id="pMsg" class="msg hidden"></p>
+      </div>
+      <div class="card">
+        <h2>Resultados</h2>
+        <div id="pollList"><p class="muted">Cargando…</p></div>
+      </div>
+    </section>
+
+    <!-- ===== Actividad ===== -->
+    <section data-pane="actividad" class="hidden">
+      <div class="card">
+        <div class="row"><h2 style="margin:0">Lo que hiciste en el panel</h2><button class="small" id="logBtn">Actualizar</button></div>
+        <p class="muted" style="margin-top:4px">Las últimas 60 acciones: anuncios, respuestas, platos, soporte y cambios.</p>
+        <div id="logList" style="margin-top:6px"><p class="muted">Cargando…</p></div>
+      </div>
+    </section>
+
+    <!-- ===== Ficha de una familia ===== -->
+    <section data-pane="ficha" class="hidden">
+      <div id="fichaBody"><p class="muted" style="margin-top:16px">Cargando…</p></div>
     </section>
 
     <div id="homeFoot" class="homeFoot">
@@ -405,7 +519,7 @@ async function enter() {
   $("login").classList.add("hidden"); $("panel").classList.remove("hidden");
   if ($("secBar").classList.contains("hidden")) showTab("home", false);
   pinUI();
-  loadAnn(); loadPlates(); loadMsgs(); loadHealth();
+  loadAnn(); loadPlates(); loadMsgs(); loadHealth(); loadSettings(true); loadPolls(); loadLog();
   return true;
 }
 $("loginBtn").onclick = async () => {
@@ -486,7 +600,8 @@ $("psOk").onclick = async () => {
 
 // ---------- Pestañas ----------
 const loaded = {};
-const TITLES = { anuncios: "📣 Anuncios", mensajes: "💬 Mensajes", platos: "🍽️ Platos", pegatinas: "📟 Dispositivos", numeros: "📊 Números", sistema: "🚦 Sistema" };
+const TITLES = { anuncios: "📣 Anuncios", mensajes: "💬 Mensajes", platos: "🍽️ Platos", pegatinas: "📟 Dispositivos", numeros: "📊 Números", sistema: "🚦 Sistema",
+  encuestas: "🗳️ Encuestas", actividad: "🕘 Actividad", ficha: "📇 Ficha" };
 function showTab(t, push = true) {
   if (!TITLES[t]) t = "home";
   const home = t === "home";
@@ -498,9 +613,13 @@ function showTab(t, push = true) {
   if (home) { tileStats(); try { sessionStorage.setItem("comitag_admin_tab", t); } catch {} return; }
   try { sessionStorage.setItem("comitag_admin_tab", t); } catch {}
   if (t === "numeros") loadStats();
-  if (t === "sistema" && !loaded.health) loadHealth();
-  if (t === "mensajes") { loadMsgs(); if (!loaded.contact) loadContact(); }
+  if (t === "sistema") { if (!loaded.health) loadHealth(); loadSettings(); ownUI(); }
+  if (t === "mensajes") { loadMsgs(); if (!loaded.contact) loadContact(); loadSettings(); }
   if (t === "platos" || t === "pegatinas") loadPlates();
+  if (t === "encuestas") loadPolls();
+  if (t === "actividad") loadLog();
+  if (t === "ficha") { if (!fichaCode) try { fichaCode = sessionStorage.getItem("comitag_admin_ficha") || ""; } catch {}
+    if (!fichaCode) return showTab("home"); loadFicha(); }
   try { sessionStorage.setItem("comitag_admin_tab", t); } catch {}
 }
 document.querySelectorAll(".tile").forEach(b => b.onclick = () => showTab(b.dataset.go));
@@ -519,6 +638,13 @@ function tileStats() {
   $("tFree").textContent = plates.length ? (free.length ? `${plural(free.length, "listo para entregar", "listos para entregar")}` : "Ninguno sin entregar") : "Crear y entregar";
   $("tAnn").textContent = annCache.length ? (onPage || sched ? [onPage ? `${onPage} en la página` : "", sched ? `${sched} programado${sched > 1 ? "s" : ""}` : ""].filter(Boolean).join(" · ") : "Ninguno activo") : "Mandar avisos a las familias";
   $("tMsg").textContent = msgOld ? "Sugerencias y ayuda" : unread ? `${unread} sin leer` : msgs.length ? "Todo leído ✓" : "Sugerencias y ayuda";
+  const idle = idlePlates();
+  $("idleBtn").classList.toggle("hidden", !idle.length);
+  $("idleT").textContent = `${plural(idle.length, "familia dejó", "familias dejaron")} de usarlo`;
+  $("maintHome").classList.toggle("hidden", !settings.maintenance);
+  const open = pollsCache.find(x => x.active);
+  $("tPoll").textContent = open ? `Abierta · ${plural(open.total, "voto", "votos")}` : pollsCache.length ? "Ninguna abierta" : "Pregúntale a las familias";
+  if (logCache.length) $("tLog").textContent = `Última: ${ago(logCache[0].at)}`;
   $("homeDate").textContent = new Date().toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" }).replace(/^./, c => c.toUpperCase());
 }
 
@@ -663,8 +789,9 @@ function renderMsgs() {
       <p class="muted" style="font-size:12px;margin-top:6px">${esc(m.who || "Sin nombre")} · ${m.pet_name ? esc(m.pet_name) + " · " : ""}${esc(m.plate_code || "")} · ${esc(fmtDate(m.created_at))}</p>
       ${replyInfo}${answered}
       <div class="replyBox hidden" data-rbox="${m.id}">
+        ${quick.length ? `<div class="qchips">${quick.map((q, i) => `<button type="button" data-qi="${i}" title="${esc(q)}">⚡ ${esc(q.length > 34 ? q.slice(0, 34) + "…" : q)}</button>`).join("")}</div>` : ""}
         <textarea maxlength="2000" placeholder="Escribe tu respuesta…"></textarea>
-        <div class="row" style="margin-top:8px"><button class="small" data-rcancel="${m.id}">Cancelar</button><button class="small primary" data-rsend="${m.id}">Enviar respuesta</button></div>
+        <div class="row" style="margin-top:8px"><button class="small" data-rcancel="${m.id}">Cancelar</button><button class="link" data-qsave="${m.id}" style="font-size:13px">⚡ Guardar como rápida</button><button class="small primary" data-rsend="${m.id}">Enviar respuesta</button></div>
         <p class="msg hidden" data-rmsg="${m.id}"></p>
       </div>
       <div class="annBtns">${canReply ? `<button class="link" data-reply="${m.id}">✉️ ${m.replied_at ? "Responder de nuevo" : "Responder"}</button>` : ""}<button class="link" data-mread="${m.id}">${m.read ? "Marcar como no leído" : "Marcar como leído"}</button><button class="link annDel" data-mdel="${m.id}">Borrar</button></div>
@@ -676,6 +803,18 @@ function renderMsgs() {
     const ta = bx.querySelector("textarea");
     if (!ta.value) ta.value = `Hola${m.who ? " " + m.who : ""}, `;
     ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+  });
+  $("msgList").querySelectorAll("[data-qi]").forEach(b => b.onclick = () => {
+    const ta = b.closest(".replyBox").querySelector("textarea"), q = quick[+b.dataset.qi];
+    ta.value = /^Hola[^,]*,\s*$/.test(ta.value) ? ta.value.replace(/\s*$/, " ") + q.replace(/^Hola[^,]*,\s*/i, "").replace(/^./, c => c.toLowerCase()) : (ta.value ? ta.value.replace(/\s*$/, "\n") : "") + q;
+    ta.focus();
+  });
+  $("msgList").querySelectorAll("[data-qsave]").forEach(b => b.onclick = async () => {
+    const ta = box(b.dataset.qsave).querySelector("textarea"), t = ta.value.trim().replace(/^Hola[^,\n]*,\s*/i, "");
+    if (!t) return;
+    b.textContent = "Guardando…";
+    const ok = await saveQuick([...quick.filter(x => x !== t), t]);
+    b.textContent = ok ? "✓ Guardada" : "No se pudo";
   });
   $("msgList").querySelectorAll("[data-rcancel]").forEach(b => b.onclick = () => {
     box(b.dataset.rcancel).classList.add("hidden");
@@ -740,7 +879,7 @@ function stateOf(p) {
 }
 let filter = "all", openCode = null, platesAt = 0;
 async function loadPlates(force) {
-  if (!force && Date.now() - platesAt < 15000 && plates.length) { renderPlates(); renderFree(); return; }
+  if (!force && Date.now() - platesAt < 15000 && plates.length) { renderPlates(); renderFree(); renderIdle(); renderInv(); return; }
   let r; try { r = await api({ action: "plates" }); } catch { return; }
   if (r.status !== 200) { $("plateList").innerHTML = '<p class="muted err">No se pudo cargar. ¿Corriste admin.sql en Supabase?</p>'; return; }
   plates = r.data.items || []; platesAt = Date.now();
@@ -748,7 +887,7 @@ async function loadPlates(force) {
   $("to").innerHTML = '<option value="">Todas las familias</option>' + plates.filter(p => p.pet_name && !p.disabled)
     .map(p => `<option value="${esc(p.code)}">Solo ${esc(p.pet_name)} (${esc(p.code)})</option>`).join("");
   $("to").value = sel;
-  renderPlates(); renderFree(); tileStats();
+  renderPlates(); renderFree(); renderIdle(); renderInv(); tileStats();
 }
 $("q").addEventListener("input", renderPlates);
 $("pf").querySelectorAll("button").forEach(b => b.onclick = () => {
@@ -797,6 +936,7 @@ function renderPlates() {
       <div class="row"><span style="display:flex;align-items:center;min-width:0">${selMode ? `<span class="ck" aria-hidden="true">${on ? "✓" : ""}</span>` : ""}<b>${esc(p.pet_name || "Dispositivo sin configurar")}</b></span><span class="tag ${s.cls}">${s.label}</span></div>
       <div class="meta">${esc(p.code)} · último registro ${ago(p.last_entry)} · ${plural(p.phones, "teléfono", "teléfonos")} con avisos${p.has_pin ? " · 🔒 PIN" : ""}${p.has_email ? " · 📧 correo" : ""}</div>
       ${!selMode && openCode === p.code ? `<div class="actions">
+        <button class="small" data-a="ficha">📇 Ficha y notas</button>
         <button class="small" data-a="copy">Copiar link</button>
         ${p.pet_name ? '<button class="small" data-a="sup">🛠️ Entrar como soporte</button>' : ""}
         ${p.pet_name && !p.disabled ? '<button class="small" data-a="msg">📣 Mandar anuncio</button>' : ""}
@@ -833,6 +973,7 @@ async function plateAction(a, p, btn) {
       <p class="muted" style="font-size:12px;margin-top:6px">Sirve 1 hora y solo en la pestaña que se abre. No compartas este enlace.</p>`;
     return;
   }
+  if (a === "ficha") return openFicha(p.code);
   if (a === "msg") { showTab("anuncios"); $("to").value = p.code; preview(); $("title").focus(); return; }
   if (a === "pin") {
     if (!await ask(`¿Borrar el PIN de ${name}?`, "La familia podrá entrar sin PIN y crear uno nuevo. Hazlo solo si te lo pidió la familia.", "Borrar PIN")) return;
@@ -881,16 +1022,17 @@ function qrSvg(text) {
 $("printQr").onclick = async () => {
   const f = freePlates(); if (!f.length) return;
   try { if (!window.qrcode) await loadScript(QR_LIB); } catch { alert("No se pudo cargar el generador de QR. Revisa la conexión."); return; }
+  $("printSheet").className = "";
   $("printSheet").innerHTML = f.map(p => `<div class="q">${qrSvg(nfcLink(p.code))}<div>Comitag · ${esc(p.code)}</div></div>`).join("");
   window.print();
 };
 
 // ---------- Números ----------
-function barChart(el, days, vals, unit) {
+function barChart(el, days, vals, unit, lab) {
   const W = 320, H = 150, L = 26, B = 22, T = 8, n = vals.length, mx = Math.max(1, ...vals);
   const top = mx <= 4 ? mx : Math.ceil(mx / 4) * 4, slot = (W - L) / n, bw = Math.min(24, slot - 2);
   const y = v => T + (H - T - B) * (1 - v / top);
-  const lbl = d => new Date(d + "T12:00:00").toLocaleDateString("es-CL", { day: "numeric", month: "short" });
+  const lbl = lab || (d => new Date(d + "T12:00:00").toLocaleDateString("es-CL", { day: "numeric", month: "short" }));
   let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(unit)} por día">`;
   [0, top / 2, top].forEach(v => { s += `<line class="gl" x1="${L}" x2="${W}" y1="${y(v)}" y2="${y(v)}"/><text class="ax" x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${Math.round(v)}</text>`; });
   vals.forEach((v, i) => {
@@ -928,6 +1070,13 @@ async function loadStats() {
   barChart($("cMeals"), d.days, d.meals, "comidas");
   barChart($("cNew"), d.days, d.new, "familias nuevas");
   barChart($("cAlerts"), d.days, d.alerts, "avisos");
+  let r2; try { r2 = await api({ action: "stats2" }); } catch { return; }
+  if (r2.status !== 200 || !r2.data.hours) return;
+  const e = r2.data, hrs = e.hours, mx = Math.max(...hrs);
+  $("sPets").textContent = e.pets_total; $("sMonth").textContent = e.active_30d;
+  $("sComp").textContent = e.compliance == null ? "–" : e.compliance + "%";
+  $("sPeak").textContent = mx ? `${String(hrs.indexOf(mx)).padStart(2, "0")}:00` : "–";
+  barChart($("cHours"), hrs.map((_, i) => i), hrs, "comidas", h => `${String(h).padStart(2, "0")}:00`);
 }
 
 // ---------- Sistema ----------
@@ -963,10 +1112,352 @@ async function loadHealth() {
 }
 $("healthBtn").onclick = loadHealth;
 
+// ================= Extras del panel =================
+const OLD_FN = "Falta actualizar la función “anuncio” en Supabase.";
+const failTxt = (r, def) => r.status === 400 ? OLD_FN : def || "No se pudo. Intenta de nuevo.";
+const say = (id, html) => { $(id).innerHTML = html; $(id).classList.remove("hidden"); };
+const dShort = d => new Date(d).toLocaleDateString("es-CL", { day: "numeric", month: "short", year: "numeric" });
+const nameOf = code => { const p = plates.find(x => x.code === code); return p && p.pet_name ? p.pet_name : code; };
+
+// ---------- Ajustes (respuestas rápidas, mantenimiento) ----------
+let settings = { quick: [], maintenance: "", owner_devices: 0 }, quick = [], settingsAt = 0;
+async function loadSettings(force) {
+  if (!force && Date.now() - settingsAt < 10000) return;
+  let r; try { r = await api({ action: "settings" }); } catch { return; }
+  if (r.status !== 200) { $("qList").innerHTML = `<p class="muted err">${OLD_FN}</p>`; return; }
+  settingsAt = Date.now(); settings = r.data; quick = settings.quick || [];
+  renderQuick(); maintUI(); tileStats();
+  if (msgs.length && !$("msgList").querySelector(".replyBox:not(.hidden)")) renderMsgs();
+}
+function renderQuick() {
+  $("qList").innerHTML = quick.length ? quick.map((q, i) => `<div class="qitem"><p>${esc(q)}</p><button class="link annDel" data-qdel="${i}" style="font-size:14px">Borrar</button></div>`).join("")
+    : '<p class="muted">Todavía no guardas respuestas rápidas.</p>';
+  $("qList").querySelectorAll("[data-qdel]").forEach(b => b.onclick = () => saveQuick(quick.filter((_, i) => i !== +b.dataset.qdel)));
+}
+async function saveQuick(list) {
+  let r; try { r = await api({ action: "quick_set", replies: list }); } catch { r = { status: 0 }; }
+  if (r.status !== 200) { say("qMsg", `<span class="err">${failTxt(r)}</span>`); return false; }
+  quick = settings.quick = r.data.quick; renderQuick();
+  if (msgs.length && !$("msgList").querySelector(".replyBox:not(.hidden)")) renderMsgs();
+  return true;
+}
+$("qAdd").onclick = async () => {
+  const t = $("qNew").value.trim(); if (!t) return;
+  if (quick.length >= 20) return say("qMsg", '<span class="err">Puedes guardar hasta 20.</span>');
+  $("qAdd").disabled = true;
+  if (await saveQuick([...quick.filter(x => x !== t), t])) { $("qNew").value = ""; say("qMsg", "✅ Guardada. La verás al responder."); }
+  $("qAdd").disabled = false;
+};
+
+// ---------- Modo mantenimiento ----------
+function maintUI() {
+  const on = !!settings.maintenance;
+  if (document.activeElement !== $("mText")) $("mText").value = settings.maintenance || $("mText").value;
+  $("mCount").textContent = $("mText").value.length + "/200";
+  $("mOn").textContent = on ? "Cambiar aviso" : "Activar aviso";
+  $("mOff").classList.toggle("hidden", !on);
+}
+$("mText").oninput = () => { $("mCount").textContent = $("mText").value.length + "/200"; };
+async function setMaint(text) {
+  $("mOn").disabled = $("mOff").disabled = true;
+  let r; try { r = await api({ action: "maintenance_set", text }); } catch { r = { status: 0 }; }
+  $("mOn").disabled = $("mOff").disabled = false;
+  if (r.status !== 200) return say("mMsg", `<span class="err">${failTxt(r)}</span>`);
+  settings.maintenance = r.data.maintenance; if (!text) $("mText").value = "";
+  maintUI(); tileStats();
+  say("mMsg", text ? "🚧 Activado. Las familias ya ven el aviso arriba de su página." : "✅ Aviso quitado. La página se ve normal.");
+}
+$("mOn").onclick = () => {
+  const t = $("mText").value.trim() || "Estamos haciendo mejoras. Si algo falla, intenta en unos minutos.";
+  $("mText").value = t; setMaint(t);
+};
+$("mOff").onclick = () => setMaint("");
+$("maintHome").onclick = () => showTab("sistema");
+
+// ---------- Avisos al dueño en este teléfono ----------
+const VAPID = "BCFMLLdbNHMbvwnAqw_1p5K5GFEh2DrJbSxsN0CbNYHA_4Au_MFU4qem_UZ4tgp1k3eAIZrI9jDYg_N7ATMRoD4";
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const standalone = () => window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+function u8(b64) { const s = atob((b64 + "=".repeat((4 - b64.length % 4) % 4)).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(s, c => c.charCodeAt(0)); }
+const ownEp = () => { try { return localStorage.getItem("comitag_admin_push") || ""; } catch { return ""; } };
+async function ownUI() {
+  const can = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  let txt = "";
+  if (!can) txt = isIOS && !standalone() ? "En iPhone primero agrega el panel a la pantalla de inicio: botón Compartir → “Agregar a inicio”. Después ábrelo desde ese ícono y vuelve aquí."
+    : "Este navegador no puede recibir avisos.";
+  else if (Notification.permission === "denied") txt = "Bloqueaste las notificaciones para el panel. Actívalas en Ajustes del teléfono → Notificaciones.";
+  $("ownIos").textContent = txt; $("ownIos").classList.toggle("hidden", !txt);
+  let on = false;
+  if (can && ownEp()) { try { const reg = await navigator.serviceWorker.getRegistration("/"); const sub = reg && await reg.pushManager.getSubscription(); on = !!sub && sub.endpoint === ownEp(); } catch {} }
+  $("ownOn").classList.toggle("hidden", on); $("ownOn").disabled = !can || Notification.permission === "denied";
+  $("ownTest").classList.toggle("hidden", !on); $("ownOff").classList.toggle("hidden", !on);
+  if (on && $("ownMsg").classList.contains("hidden")) say("ownMsg", "✅ Activados en este teléfono.");
+}
+$("ownOn").onclick = async () => {
+  $("ownOn").disabled = true; say("ownMsg", "Activando…");
+  try {
+    if (await Notification.requestPermission() !== "granted") { say("ownMsg", '<span class="err">Sin permiso no te pueden llegar avisos.</span>'); return ownUI(); }
+    const reg = await navigator.serviceWorker.register("/sw.js"); await navigator.serviceWorker.ready;
+    // Si este teléfono ya recibe avisos de una mascota, se usa la misma suscripción (no se borra la de la familia)
+    const sub = await reg.pushManager.getSubscription() || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: u8(VAPID) });
+    const r = await api({ action: "owner_push_save", sub: sub.toJSON() });
+    if (r.status !== 200) { say("ownMsg", `<span class="err">${failTxt(r, "No se pudo guardar. ¿Se corrió panel_extras.sql?")}</span>`); return ownUI(); }
+    try { localStorage.setItem("comitag_admin_push", sub.endpoint); } catch {}
+    say("ownMsg", "✅ Listo. Te avisaremos cuando llegue un mensaje o falle algo.");
+  } catch (e) { say("ownMsg", '<span class="err">No se pudo activar en este teléfono.</span>'); }
+  ownUI();
+};
+$("ownTest").onclick = async () => {
+  $("ownTest").disabled = true;
+  const r = await api({ action: "owner_push_test" }).catch(() => ({ status: 0 }));
+  $("ownTest").disabled = false;
+  say("ownMsg", r.status === 200 ? `📨 Prueba enviada a ${plural(r.data.sent, "teléfono", "teléfonos")}.` : `<span class="err">${failTxt(r)}</span>`);
+};
+$("ownOff").onclick = async () => {
+  await api({ action: "owner_push_delete", endpoint: ownEp() }).catch(() => {});
+  try { localStorage.removeItem("comitag_admin_push"); } catch {}
+  say("ownMsg", "Avisos desactivados en este teléfono."); ownUI();
+};
+
+// ---------- Familias que dejaron de usarlo ----------
+function idlePlates() {
+  const wk = Date.now() - 7 * 86400000;
+  return plates.filter(p => p.pet_name && !p.disabled && !p.entries_7d && (p.last_entry || (p.created_at && new Date(p.created_at) < wk)))
+    .sort((a, b) => new Date(b.last_entry || 0) - new Date(a.last_entry || 0));
+}
+function renderIdle() {
+  const list = idlePlates();
+  $("idleCard").classList.toggle("hidden", !list.length);
+  $("idleList").innerHTML = list.map(p => `<div class="item"><div class="row"><b>${esc(p.pet_name)}</b><span class="tag warn">${p.last_entry ? esc(ago(p.last_entry)) : "sin registros"}</span></div>
+    <div class="annBtns"><button class="link" data-imsg="${esc(p.code)}">📣 Mandarles un mensaje</button><button class="link" data-ific="${esc(p.code)}">📇 Ficha</button></div></div>`).join("");
+  $("idleList").querySelectorAll("[data-imsg]").forEach(b => b.onclick = () => {
+    const p = plates.find(x => x.code === b.dataset.imsg);
+    showTab("anuncios"); $("to").value = p.code;
+    $("title").value = "¿Todo bien con Comitag?";
+    $("body").value = `¡Hola! Vimos que hace unos días no registran las comidas de ${p.pet_name}. Si tienen algún problema, escríbannos desde el menú → Contacto y ayuda 🐾`;
+    preview(); $("body").focus();
+  });
+  $("idleList").querySelectorAll("[data-ific]").forEach(b => b.onclick = () => openFicha(b.dataset.ific));
+}
+$("idleBtn").onclick = () => { showTab("platos"); setTimeout(() => $("idleCard").scrollIntoView({ behavior: "smooth", block: "start" }), 50); };
+
+// ---------- Inventario ----------
+let invFilter = "all";
+function renderInv() {
+  const all = plates.filter(p => !(!p.pet_name && !p.delivered_to && !p.delivered_at && !p.paid));   // los sin entregar están arriba
+  const list = all.filter(p => invFilter === "all" || (invFilter === "unpaid" ? !p.paid : !p.delivered_to && !p.delivered_at));
+  const paid = all.filter(p => p.paid).length;
+  $("invSum").textContent = plates.length && "paid" in (plates[0] || {}) ? `${paid}/${all.length} pagados` : "–";
+  if (plates.length && !("paid" in plates[0])) { $("invList").innerHTML = '<p class="muted err">Falta correr panel_extras.sql en Supabase.</p>'; return; }
+  $("invList").innerHTML = list.length ? list.map(p => `<div class="inv" data-inv="${esc(p.code)}"><div style="min-width:0">
+      <b>${esc(p.pet_name || "Sin configurar")}</b> <span class="muted" style="font-size:12px">${esc(p.code)}</span>
+      <div class="meta">${p.delivered_to ? "Entregado a " + esc(p.delivered_to) : "Sin datos de entrega"}${p.delivered_at ? " · " + esc(dShort(p.delivered_at + "T12:00:00")) : ""}${p.first_entry ? " · activado el " + esc(dShort(p.first_entry)) : " · sin activar"}${p.inv_note ? " · " + esc(p.inv_note) : ""}</div>
+    </div><span class="tag ${p.paid ? "ok" : "warn"}">${p.paid ? "✅ Pagado" : "💸 Sin pagar"}</span></div>`).join("")
+    : '<p class="muted">No hay dispositivos con este filtro.</p>';
+  $("invList").querySelectorAll("[data-inv]").forEach(el => el.onclick = () => openFicha(el.dataset.inv));
+}
+$("invF").querySelectorAll("button").forEach(b => b.onclick = () => {
+  invFilter = b.dataset.f; $("invF").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); renderInv();
+});
+
+// ---------- Etiquetas para imprimir ----------
+async function printLabels(list) {
+  if (!list.length) return;
+  try { if (!window.qrcode) await loadScript(QR_LIB); } catch { alert("No se pudo cargar el generador de QR. Revisa la conexión."); return; }
+  $("printSheet").className = "labels";
+  $("printSheet").innerHTML = list.map(p => `<div class="lab">${qrSvg(`${SITE}/p/${p.code}`)}<div>
+    <b>${esc(p.pet_name || "Mi mascota")}</b><small>Acerca tu teléfono al plato o escanea el código para registrar su comida.</small>
+    <small style="margin-top:2mm">Comitag 🐾 · ${esc(p.code)}</small></div></div>`).join("");
+  window.print();
+}
+$("labelsAll").onclick = () => printLabels(plates.filter(p => p.pet_name && !p.disabled));
+
+// ---------- Ficha de una familia ----------
+let fichaCode = "", ficha = null;
+function openFicha(code) {
+  fichaCode = code; ficha = null;
+  try { sessionStorage.setItem("comitag_admin_ficha", code); } catch {}
+  showTab("ficha");
+}
+async function loadFicha() {
+  const code = fichaCode;
+  $("secTitle").textContent = "📇 " + nameOf(code);
+  if (!ficha || ficha.code !== code) $("fichaBody").innerHTML = '<p class="muted" style="margin-top:16px">Cargando…</p>';
+  let r; try { r = await api({ action: "plate_detail", code }); } catch { r = { status: 0 }; }
+  if (code !== fichaCode) return;
+  if (r.status !== 200) { $("fichaBody").innerHTML = `<div class="card"><p class="err">${r.status === 404 ? "Este plato ya no existe." : failTxt(r, "No se pudo cargar. ¿Se corrió panel_extras.sql?")}</p></div>`; return; }
+  ficha = r.data; renderFicha();
+}
+function renderFicha() {
+  const f = ficha, p = plates.find(x => x.code === f.code) || {}, s = stateOf({ ...p, ...f, entries_7d: p.entries_7d });
+  const pets = (f.pets && f.pets.length ? f.pets : f.pet_name ? [f.pet_name] : []);
+  const sched = (f.schedule || []).filter(Boolean);
+  const roles = (f.roles || []).filter(Boolean);
+  const fact = (t, v) => `<div class="fact"><b>${v}</b>${t}</div>`;
+  $("secTitle").textContent = "📇 " + (f.pet_name || f.code);
+  $("fichaBody").innerHTML = `
+  <div class="card">
+    <div class="row"><h2 style="margin:0">${esc(pets.join(", ") || "Sin configurar")}</h2><span class="tag ${s.cls}">${s.label}</span></div>
+    <p class="muted" style="margin-top:2px">${esc(f.code)}${p.first_entry ? " · usa Comitag desde el " + esc(dShort(p.first_entry)) : ""}</p>
+    <div class="facts">
+      ${fact(pets.length === 1 ? "mascota" : "mascotas", pets.length || "–")}
+      ${fact(f.people === 1 ? "persona registra" : "personas registran", f.people || 0)}
+      ${fact("teléfonos con avisos", f.phones)}
+      ${fact("avisos “no ha comido” (30 días)", f.alerts_30d)}
+      ${fact("horarios", sched.length ? esc(sched.join(" · ")) : "–")}
+      ${fact("seguridad", [f.has_pin ? "🔒 PIN" : "Sin PIN", f.has_email ? "📧 correo" : ""].filter(Boolean).join(" · "))}
+    </div>
+    ${roles.length ? `<p class="muted" style="margin-top:10px">Quiénes: ${esc(roles.join(", "))}</p>` : ""}
+    <div class="actions">
+      ${f.pet_name && !f.disabled ? '<button class="small" data-fa="msg">📣 Mandar anuncio</button>' : ""}
+      <button class="small" data-fa="label">🏷️ Imprimir etiqueta</button>
+      <button class="small" data-fa="copy">Copiar link NFC</button>
+    </div>
+  </div>
+  <div class="card"><h2 style="margin:0">Comidas por día</h2><p class="muted">Últimos 30 días</p><div class="chart" id="fMeals"></div></div>
+  <div class="card">
+    <h2>📝 Notas privadas</h2>
+    <p class="muted">Solo tú las ves. Ej: “le borré el PIN el martes”, “quiere otro dispositivo”.</p>
+    <textarea id="nNewNote" maxlength="1000" placeholder="Escribe una nota…" style="margin-top:10px;min-height:70px"></textarea>
+    <button class="wide" id="nAdd" style="margin-top:8px">Guardar nota</button>
+    <p id="nMsg" class="msg hidden"></p>
+    <div id="nList" style="margin-top:8px">${f.notes.length ? f.notes.map(n => `<div class="note"><p>${esc(n.body)}</p><div class="row" style="margin-top:4px"><span class="muted" style="font-size:12px">${esc(fmtDate(n.at))}</span><button class="link annDel" data-ndel="${n.id}" style="font-size:13px;padding:0">Borrar</button></div></div>`).join("") : '<p class="muted">Sin notas todavía.</p>'}</div>
+  </div>
+  <div class="card">
+    <h2>📦 Inventario</h2>
+    <label class="lbl" for="iTo">Entregado a</label>
+    <input id="iTo" type="text" maxlength="80" placeholder="Nombre de quien lo recibió" value="${esc(f.delivered_to || "")}">
+    <label class="lbl" for="iAt">Fecha de entrega</label>
+    <input id="iAt" type="date" value="${esc(f.delivered_at || "")}">
+    <label class="chk"><input type="checkbox" id="iPaid"${f.paid ? " checked" : ""}> <span>Ya lo pagó</span></label>
+    <label class="lbl" for="iNote">Detalle (opcional)</label>
+    <input id="iNote" type="text" maxlength="200" placeholder="Ej: pagó por transferencia, color azul" value="${esc(f.inv_note || "")}">
+    <button class="primary wide" id="iSave" style="margin-top:12px">Guardar inventario</button>
+    <p id="iMsg" class="msg hidden"></p>
+    <p class="muted" style="font-size:12px;margin-top:8px">${p.first_entry ? "Activado (primer registro) el " + esc(dShort(p.first_entry)) : "Todavía no lo activan (no hay registros)."}</p>
+  </div>
+  <div class="card">
+    <h2>💬 Mensajes de esta familia</h2>
+    ${f.messages.length ? f.messages.map(m => `<div class="item"><div class="row"><b style="font-size:14px">${m.kind === "ayuda" ? "🆘 Ayuda" : "💡 Sugerencia"}</b><span class="tag${m.replied ? " ok" : ""}">${m.replied ? "Respondido" : "Sin responder"}</span></div>
+      <p style="margin:4px 0 0;font-size:14px;white-space:pre-wrap">${esc(m.body)}</p><p class="muted" style="font-size:12px;margin-top:4px">${esc(fmtDate(m.at))}</p></div>`).join("") : '<p class="muted">No ha mandado mensajes.</p>'}
+  </div>`;
+  barChart($("fMeals"), f.days, f.meals, "comidas");
+  const B = $("fichaBody");
+  B.querySelectorAll("[data-fa]").forEach(b => b.onclick = async () => {
+    const a = b.dataset.fa;
+    if (a === "msg") { showTab("anuncios"); $("to").value = f.code; preview(); $("title").focus(); }
+    if (a === "label") printLabels([{ code: f.code, pet_name: pets.join(" y ") || f.pet_name }]);
+    if (a === "copy") { try { await navigator.clipboard.writeText(nfcLink(f.code)); b.textContent = "✓ Copiado"; } catch { b.textContent = nfcLink(f.code); } }
+  });
+  $("nAdd").onclick = async () => {
+    const text = $("nNewNote").value.trim(); if (!text) return;
+    $("nAdd").disabled = true;
+    let r; try { r = await api({ action: "note_add", code: f.code, text }); } catch { r = { status: 0 }; }
+    $("nAdd").disabled = false;
+    if (r.status !== 200) return say("nMsg", `<span class="err">${failTxt(r)}</span>`);
+    f.notes.unshift({ id: r.data.note.id, body: r.data.note.body, at: r.data.note.created_at });
+    if (p.code) p.notes = (p.notes || 0) + 1;
+    renderFicha();
+  };
+  B.querySelectorAll("[data-ndel]").forEach(b => b.onclick = async () => {
+    if (!await ask("¿Borrar esta nota?", "Se borra para siempre.", "Borrar")) return;
+    const r = await api({ action: "note_delete", id: +b.dataset.ndel }).catch(() => ({ status: 0 }));
+    if (r.status === 200) { f.notes = f.notes.filter(n => n.id !== +b.dataset.ndel); renderFicha(); }
+  });
+  $("iSave").onclick = async () => {
+    const body = { action: "device_update", code: f.code, delivered_to: $("iTo").value.trim(), delivered_at: $("iAt").value, paid: $("iPaid").checked, inv_note: $("iNote").value.trim() };
+    $("iSave").disabled = true;
+    let r; try { r = await api(body); } catch { r = { status: 0 }; }
+    $("iSave").disabled = false;
+    if (r.status !== 200) return say("iMsg", `<span class="err">${failTxt(r)}</span>`);
+    Object.assign(f, { delivered_to: body.delivered_to || null, delivered_at: body.delivered_at || null, paid: body.paid, inv_note: body.inv_note || null });
+    if (p.code) Object.assign(p, { delivered_to: f.delivered_to, delivered_at: f.delivered_at, paid: f.paid, inv_note: f.inv_note });
+    renderInv(); say("iMsg", "✅ Inventario guardado.");
+  };
+}
+
+// ---------- Encuestas ----------
+let pollsCache = [];
+function optRow(v = "") { return `<div class="optRow"><input type="text" maxlength="60" placeholder="Opción" value="${esc(v)}"><button class="small" data-odel aria-label="Quitar opción">✕</button></div>`; }
+function pollForm(reset) {
+  if (reset) $("pOpts").innerHTML = optRow() + optRow() + optRow();
+  const rows = $("pOpts").querySelectorAll(".optRow");
+  rows.forEach(r => r.querySelector("[data-odel]").onclick = () => { if ($("pOpts").children.length > 2) { r.remove(); pollForm(); } });
+  $("pAddOpt").classList.toggle("hidden", rows.length >= 6);
+}
+pollForm(true);
+$("pAddOpt").onclick = () => { $("pOpts").insertAdjacentHTML("beforeend", optRow()); pollForm(); $("pOpts").lastElementChild.querySelector("input").focus(); };
+$("pQ").oninput = () => { $("pQc").textContent = $("pQ").value.length + "/140"; };
+$("pCreate").onclick = async () => {
+  const question = $("pQ").value.trim(), options = [...$("pOpts").querySelectorAll("input")].map(i => i.value.trim()).filter(Boolean);
+  if (!question) return say("pMsg", '<span class="err">Escribe la pregunta.</span>');
+  if (options.length < 2) return say("pMsg", '<span class="err">Pon al menos 2 opciones.</span>');
+  const open = pollsCache.find(x => x.active);
+  if (!await ask("¿Publicar la encuesta?", (open ? `Se cerrará la encuesta abierta (“${open.question}”). ` : "") + "Aparecerá en la página de todas las familias hasta que la cierres.", "Publicar")) return;
+  $("pCreate").disabled = true;
+  let r; try { r = await api({ action: "poll_create", question, options }); } catch { r = { status: 0 }; }
+  $("pCreate").disabled = false;
+  if (r.status !== 200) return say("pMsg", `<span class="err">${failTxt(r, "No se pudo publicar. ¿Se corrió panel_extras.sql?")}</span>`);
+  $("pQ").value = ""; $("pQc").textContent = "0/140"; pollForm(true);
+  say("pMsg", "✅ Publicada. Ya aparece en la página de las familias.");
+  loadPolls();
+};
+async function loadPolls() {
+  let r; try { r = await api({ action: "polls" }); } catch { return; }
+  if (r.status !== 200) { $("pollList").innerHTML = `<p class="muted err">${failTxt(r, "No se pudo cargar. ¿Se corrió panel_extras.sql?")}</p>`; return; }
+  pollsCache = r.data.items || []; tileStats();
+  $("pollList").innerHTML = pollsCache.length ? pollsCache.map(q => {
+    const mx = Math.max(1, ...q.counts);
+    return `<div class="item"><div class="row"><b>${esc(q.question)}</b><span class="tag ${q.active ? "ok" : ""}">${q.active ? "Abierta" : "Cerrada"}</span></div>
+      <p class="muted" style="font-size:12px;margin-top:2px">${esc(dShort(q.created_at))} · ${plural(q.total, "voto", "votos")} de ${plural(q.families, "familia", "familias")}</p>
+      ${q.options.map((o, i) => { const n = q.counts[i] || 0, pc = q.total ? Math.round(100 * n / q.total) : 0;
+        return `<div class="pollOpt"><div class="row"><span>${esc(o)}${n === mx && q.total ? " 🏆" : ""}</span><span class="muted">${n} · ${pc}%</span></div><div class="bar"><i style="width:${pc}%"></i></div></div>`; }).join("")}
+      <div class="annBtns" style="margin-top:10px">${q.active ? `<button class="link" data-pclose="${q.id}">Cerrar encuesta</button>` : ""}<button class="link annDel" data-pdel="${q.id}">Borrar</button></div></div>`;
+  }).join("") : '<p class="muted">Todavía no haces encuestas.</p>';
+  $("pollList").querySelectorAll("[data-pclose]").forEach(b => b.onclick = async () => {
+    if (!await ask("¿Cerrar la encuesta?", "Deja de aparecer en la página. Los resultados quedan guardados aquí.", "Cerrar")) return;
+    await api({ action: "poll_close", id: +b.dataset.pclose }).catch(() => {}); loadPolls();
+  });
+  $("pollList").querySelectorAll("[data-pdel]").forEach(b => b.onclick = async () => {
+    if (!await ask("¿Borrar la encuesta?", "Se borran la pregunta y todos sus votos para siempre.", "Borrar")) return;
+    await api({ action: "poll_delete", id: +b.dataset.pdel }).catch(() => {}); loadPolls();
+  });
+}
+
+// ---------- Registro de actividad ----------
+let logCache = [];
+const LOG = {
+  send: ["📣", "Mandaste un anuncio"], hide: ["🙈", "Quitaste un anuncio de la página"], hide_all: ["🙈", "Quitaste todos los anuncios"],
+  delete: ["🗑️", "Borraste un anuncio"], delete_all: ["🗑️", "Borraste todos los anuncios"],
+  message_reply: ["✉️", "Respondiste un mensaje"], message_delete: ["🗑️", "Borraste un mensaje"],
+  create_plates: ["📟", "Creaste dispositivos"], support: ["🛠️", "Entraste como soporte"], reset_pin: ["🔢", "Borraste el PIN de un plato"],
+  set_disabled: ["⛔", "Desactivaste un plato"], delete_plates: ["🗑️", "Eliminaste platos"], pin_set: ["🔢", "Cambiaste tu PIN de entrada"],
+  note_add: ["📝", "Agregaste una nota"], note_delete: ["📝", "Borraste una nota"], device_update: ["📦", "Editaste el inventario"],
+  poll_create: ["🗳️", "Publicaste una encuesta"], poll_close: ["🗳️", "Cerraste una encuesta"], poll_delete: ["🗳️", "Borraste una encuesta"],
+  maintenance_set: ["🚧", "Activaste el modo mantenimiento"], contact_set: ["📧", "Cambiaste tu correo de contacto"], quick_set: ["⚡", "Cambiaste las respuestas rápidas"],
+};
+async function loadLog() {
+  let r; try { r = await api({ action: "log" }); } catch { return; }
+  if (r.status !== 200) { $("logList").innerHTML = `<p class="muted err">${failTxt(r, "No se pudo cargar. ¿Se corrió panel_extras.sql?")}</p>`; return; }
+  logCache = r.data.items || []; tileStats();
+  $("logList").innerHTML = logCache.length ? logCache.map(l => {
+    let [ic, txt] = LOG[l.action] || ["•", l.action];
+    let det = String(l.detail || "").split(" · ");
+    const flag = det[det.length - 1];
+    if (l.action === "set_disabled" && flag === "on") { ic = "✅"; txt = "Reactivaste un plato"; }
+    if (l.action === "maintenance_set" && flag === "off") txt = "Quitaste el modo mantenimiento";
+    if (["set_disabled", "maintenance_set"].includes(l.action)) det.pop();
+    if (l.action === "create_plates") { txt = `Creaste ${plural(+det[0] || 1, "dispositivo", "dispositivos")}`; det = []; }
+    det = det.filter(Boolean).map(d => plates.some(p => p.code === d) ? `${nameOf(d)} (${d})` : d);
+    return `<div class="logRow"><span class="ic" aria-hidden="true">${ic}</span><div style="flex:1;min-width:0"><div>${esc(txt)}</div>${det.length ? `<div class="muted" style="font-size:13px;overflow-wrap:anywhere">${esc(det.join(" · "))}</div>` : ""}</div><span class="muted" style="white-space:nowrap">${esc(ago(l.at))}</span></div>`;
+  }).join("") : '<p class="muted">Todavía no hay actividad registrada.</p>';
+}
+$("logBtn").onclick = loadLog;
+
 function openPanel() {
+  let t = "home"; try { t = sessionStorage.getItem("comitag_admin_tab") || t; } catch {}   // se lee antes: entrar muestra el inicio
   enter().then(ok => {
     if (!ok) { $("key").value = ""; if ($("login").classList.contains("hidden")) showLogin(); return; }
-    let t = "home"; try { t = sessionStorage.getItem("comitag_admin_tab") || t; } catch {}
     showTab("home");                                   // el inicio queda detrás, para volver con ‹ Inicio
     if (t !== "home") showTab(t);
   });
