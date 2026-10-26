@@ -176,6 +176,17 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .note{background:var(--ok-bg);color:var(--ok);border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:14px;display:flex;align-items:center;gap:10px}
 .note span{flex:1}
 .note .link{color:var(--ok);font-weight:700;text-decoration:underline;padding:4px 0}
+/* Última comida / agua: mascotas agrupadas con su foto */
+.lpList{display:grid;gap:8px;margin-top:6px}
+.lpRow{display:flex;align-items:center;gap:8px;min-width:0}
+.lpPics{display:flex;flex:none}
+.lpPics>*{width:26px;height:26px;border-radius:50%;object-fit:cover;border:2px solid var(--card,#fff);margin-left:-9px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;box-sizing:border-box}
+.lpPics>*:first-child{margin-left:0}
+.lpPics .more{background:#9ca3af;color:#fff;font-size:10.5px}
+.lpRow.col{flex-direction:column;align-items:flex-start;gap:5px}
+.lpTxt{min-width:0;line-height:1.2}
+.lpTxt b{display:block;font-size:13.5px;font-weight:600;color:var(--text,inherit);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lpTxt span{display:block;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .enote{display:block;color:var(--muted);font-size:12px;font-style:italic;margin-top:2px;overflow-wrap:anywhere}
 .hx{background:none;border:none;color:var(--muted);width:auto;padding:4px 6px;font-size:14px;cursor:pointer}
 .hrow{display:flex;align-items:center;gap:4px}
@@ -1150,25 +1161,41 @@ function showName() {
   $("hello").textContent = me ? `Hola, ${me}` : "";
 }
 
+// Agrupa las mascotas que comparten el mismo último registro y las muestra con su foto
+function lastByPet(kind, pets) {
+  const groups = [];
+  pets.forEach((p, i) => {
+    const e = log.find(x => x.kind === kind && (!x.pet || x.pet === p)) || null;
+    const key = e ? e.t.getTime() + "|" + e.who : "none";
+    let g = groups.find(x => x.key === key);
+    if (!g) groups.push(g = { key, e, pets: [] });
+    g.pets.push({ p, i });
+  });
+  const pic = ({ p, i }) => { const src = photoOf(p);
+    return src ? `<img src="${src}" alt="${esc(p)}" title="${esc(p)}">` : `<b style="background:${petColor(i)}" title="${esc(p)}">${esc(p.charAt(0).toUpperCase())}</b>`; };
+  return `<div class="lpList">${groups.map(g => {
+    const col = g.pets.length > 2;                          // varias: fotos arriba y texto abajo
+    const shown = g.pets.length > 6 ? g.pets.slice(0, 5) : g.pets;
+    const more = g.pets.length - shown.length;
+    const who = g.pets.length === pets.length && pets.length > 1 ? "Todas" : joinNames(g.pets.map(x => x.p));
+    return `<div class="lpRow${col ? " col" : ""}"><span class="lpPics">${shown.map(pic).join("")}${more ? `<span class="more">+${more}</span>` : ""}</span>
+      <span class="lpTxt"><b>${g.e ? esc(ago(g.e.t)) : "Sin registros"}${g.e && g.e.queued ? " ⏳" : ""}</b><span>${esc(who)}${g.e ? " · " + esc(g.e.who) : ""}</span></span></div>`;
+  }).join("")}</div>`;
+}
+
 function render() {
   const f = last("comida"), w = last("agua"), pets = petsOf();
   $("fT").textContent = f ? fmt(f.t) : "--";
   if (pets.length) {
     // Varias mascotas: la última comida de cada una
-    $("fB").innerHTML = pets.map(p => {
-      const e = log.find(x => x.kind === "comida" && (!x.pet || x.pet === p));
-      return `<b>${esc(p)}</b>: ${e ? `${ago(e.t)} · ${esc(e.who)}${e.queued ? " ⏳" : ""}` : "sin registros"}`;
-    }).join("<br>");
+    $("fB").innerHTML = lastByPet("comida", pets);
   } else {
     $("fB").textContent = f ? `${ago(f.t)} · ${f.who}${f.queued ? " · ⏳ por enviar" : ""}` : "Sin registros";
   }
   $("wT").textContent = w ? fmt(w.t) : "--";
   if (pets.length) {
     // Varias mascotas: el último cambio de agua de cada una
-    $("wB").innerHTML = pets.map(p => {
-      const e = log.find(x => x.kind === "agua" && (!x.pet || x.pet === p));
-      return `<b>${esc(p)}</b>: ${e ? `${ago(e.t)} · ${esc(e.who)}${e.queued ? " ⏳" : ""}` : "sin registros"}`;
-    }).join("<br>");
+    $("wB").innerHTML = lastByPet("agua", pets);
   } else {
     $("wB").textContent = w ? `${ago(w.t)} · ${w.who}${w.queued ? " · ⏳ por enviar" : ""}` : "Sin registros";
   }
