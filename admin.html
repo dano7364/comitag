@@ -466,11 +466,13 @@ function renderMsgs() {
   $("msgBadge").textContent = unread > 9 ? "9+" : unread; $("msgBadge").classList.toggle("hidden", !unread);
   const list = msgs.filter(m => msgFilter === "all" || (msgFilter === "unread" ? !m.read : m.kind === msgFilter));
   $("msgList").innerHTML = list.length ? list.map(m => {
-    const rep = m.reply_to || "", canReply = MAIL_RE.test(rep);
-    const answered = m.replied_at ? `<div class="answered"><p class="muted" style="font-size:12px;margin:0">✅ Respondiste el ${esc(fmtDate(m.replied_at))} a ${esc(rep)}</p>
-        <p style="margin:4px 0 0;white-space:pre-wrap">${esc(m.reply_body || "")}</p></div>` : "";
-    const replyInfo = canReply ? `<p class="muted" style="font-size:13px;margin-top:4px">✉️ ${esc(rep)}</p>`
-      : `<p class="muted" style="font-size:13px;margin-top:4px">${rep ? `Dejó: ${esc(rep)} (no es un correo, no se puede responder desde aquí)` : "No dejó correo para responder."}</p>`;
+    const rep = m.reply_to || "", hasMail = MAIL_RE.test(rep), canReply = hasMail || m.has_client;
+    const dest = [m.has_client ? "la campana 🔔 de su página" : "", hasMail ? esc(rep) : ""].filter(Boolean).join(" y ");
+    const answered = m.replied_at ? `<div class="answered"><p class="muted" style="font-size:12px;margin:0">✅ Respondiste el ${esc(fmtDate(m.replied_at))}${dest ? " · llegó a " + dest : ""}</p>
+        <p style="margin:4px 0 0;white-space:pre-wrap">${esc(m.reply_body || "")}</p>${m._warn ? `<p class="err" style="font-size:13px;margin:6px 0 0">${esc(m._warn)}</p>` : ""}</div>` : "";
+    const replyInfo = `<p class="muted" style="font-size:13px;margin-top:4px">${canReply
+      ? `La respuesta le llega a ${dest}.`
+      : rep ? `Dejó: ${esc(rep)} (no es un correo, no se puede responder desde aquí)` : "No se puede responder: no dejó correo."}</p>`;
     return `<div class="item msg${m.read ? "" : " unread"}">
       <div class="row"><b>${m.kind === "ayuda" ? "🆘 Pide ayuda" : "💡 Sugerencia"}</b><span class="tag${m.read ? "" : " warn"}">${m.read ? "Leído" : "Nuevo"}</span></div>
       <p style="margin:6px 0 0;white-space:pre-wrap">${esc(m.body)}</p>
@@ -504,9 +506,10 @@ function renderMsgs() {
     b.disabled = false;
     if (r.status !== 200) return say(`<span class="err">${r.status === 400 ? "Falta actualizar la función “anuncio” en Supabase."
       : r.status === 502 ? "Brevo no pudo enviar el correo. Intenta de nuevo en un rato."
-      : r.status === 422 ? "Ese mensaje no tiene un correo válido." : "No se pudo enviar. Intenta de nuevo."}</span>`);
+      : r.status === 422 ? "Ese mensaje no tiene a dónde responder." : "No se pudo enviar. Intenta de nuevo."}</span>`);
     const m = msgs.find(x => x.id === id);
-    Object.assign(m, { reply_body: text, replied_at: r.data.replied_at, read: true });
+    Object.assign(m, { reply_body: text, replied_at: r.data.replied_at, read: true,
+      _warn: MAIL_RE.test(m.reply_to || "") && r.data.mailed === false ? "Quedó en la campana de su página, pero el correo no se pudo enviar." : "" });
     renderMsgs();
   });
   $("msgList").querySelectorAll("[data-mread]").forEach(b => b.onclick = async () => {

@@ -238,6 +238,7 @@ main{position:relative}
 .nlist .ni:first-child{border-top:none}
 .nlist .ni .nDel{flex:none;align-self:center;font-size:15px;padding:8px}
 .nlist .ni.gone{opacity:0;transform:translateX(30px);transition:opacity .2s,transform .2s}
+.ndOrig{margin-top:12px;font-size:13px;padding:10px 12px;border-radius:12px;background:var(--line)}
 .nDelAll{display:block;margin:10px auto 0;color:var(--danger,#dc2626)!important;font-size:14px}
 .nlist .ni .ic{font-size:20px;line-height:1.3}
 .nlist .ni .nt{font-weight:700;margin:0}
@@ -739,21 +740,44 @@ async function start() {
 
 // ---- Anuncios del dueño de Comitag ----
 // ================= Campana de notificaciones (se vacía a las 00:00) =================
-let missedToday = [], annToday = [];
+let missedToday = [], annToday = [], myReplies = [];
 const todayKey = () => new Date().toDateString();
+// Las respuestas a "Contacto y ayuda" no se borran a las 00:00: su "vista" y "borrada" se guardan aparte
+const respKey = () => "comitag_resp_" + code;
+function respState() { try { const o = JSON.parse(localStorage.getItem(respKey()) || "{}"); return { seen: o.seen || [], del: o.del || [] }; } catch { return { seen: [], del: [] }; } }
+function respSave(st) { try { localStorage.setItem(respKey(), JSON.stringify({ seen: st.seen.slice(-60), del: st.del.slice(-60) })); } catch {} }
 function notifSeen() {
-  try { const o = JSON.parse(localStorage.getItem("comitag_notif_vistas") || "{}"); return o.d === todayKey() ? new Set(o.k || []) : new Set(); }
-  catch { return new Set(); }
+  let day = new Set();
+  try { const o = JSON.parse(localStorage.getItem("comitag_notif_vistas") || "{}"); if (o.d === todayKey()) day = new Set(o.k || []); } catch {}
+  respState().seen.forEach(k => day.add(k));
+  return day;
+}
+// Identificador de este teléfono (solo para que la respuesta llegue a quien preguntó)
+function deviceId() {
+  try {
+    let id = localStorage.getItem("comitag_dev");
+    if (!id) { id = Array.from(crypto.getRandomValues(new Uint8Array(12)), b => b.toString(16).padStart(2, "0")).join(""); localStorage.setItem("comitag_dev", id); }
+    return id;
+  } catch { return null; }
+}
+async function loadReplies() {
+  const id = deviceId(); if (!id || !code) return;
+  const r = await db.rpc("my_replies", { p_code: code, p_client: id });
+  if (!r.error && Array.isArray(r.data)) { myReplies = r.data; notifUpdate(); }
 }
 // Borradas en este teléfono (por plato; se olvidan a las 00:00 como el resto)
 const notifDelKey = () => "comitag_notif_borradas_" + code;
 function notifDeleted() {
-  try { const o = JSON.parse(localStorage.getItem(notifDelKey()) || "{}"); return o.d === todayKey() ? new Set(o.k || []) : new Set(); }
-  catch { return new Set(); }
+  let day = new Set();
+  try { const o = JSON.parse(localStorage.getItem(notifDelKey()) || "{}"); if (o.d === todayKey()) day = new Set(o.k || []); } catch {}
+  respState().del.forEach(k => day.add(k));
+  return day;
 }
 function notifDelete(keys) {
-  const k = notifDeleted(); keys.forEach(x => k.add(x));
-  try { localStorage.setItem(notifDelKey(), JSON.stringify({ d: todayKey(), k: [...k] })); } catch {}
+  const k = notifDeleted(), st = respState();
+  keys.forEach(x => { k.add(x); if (x.startsWith("r") && !st.del.includes(x)) st.del.push(x); });
+  respSave(st);
+  try { localStorage.setItem(notifDelKey(), JSON.stringify({ d: todayKey(), k: [...k].filter(x => !x.startsWith("r")) })); } catch {}
 }
 function notifItems() {
   const del = notifDeleted();
@@ -766,6 +790,10 @@ function notifAll() {
     const n = m.pets.length ? joinNames(m.pets) : plate.pet_name, many = m.pets.length > 1;
     out.push({ key: "m" + m.s.getHours() + ":" + m.s.getMinutes() + "|" + m.pets.join(","), at: m.s, ic: "⚠️", pets: m.pets,
       t: `${n} no ${many ? "comieron" : "comió"}`, b: `Su comida era a las ${fmt(m.s)} y nadie la registró.` });
+  }
+  for (const r of myReplies) {
+    out.push({ key: "r" + r.id + "@" + r.at, at: new Date(r.at), ic: "💬", reply: true, orig: r.body,
+      t: "Te respondimos", b: r.reply || "" });
   }
   return out.sort((a, b) => b.at - a.at);
 }
@@ -787,15 +815,18 @@ async function loadAnnToday() {
 }
 function openNotifs() {
   const list = notifItems(), seen = notifSeen();
-  openModal(`<p style="font-size:18px;margin-top:4px"><b>🔔 Notificaciones de hoy</b></p>
+  const hasReply = list.some(x => x.reply);
+  const when = d => d.toDateString() === todayKey() ? fmt(d) : d.toLocaleDateString("es-CL", { weekday: "short", day: "numeric", month: "short" }) + ", " + fmt(d);
+  openModal(`<p style="font-size:18px;margin-top:4px"><b>🔔 Notificaciones${hasReply ? "" : " de hoy"}</b></p>
     <div class="nlist" style="margin-top:6px">${list.length ? list.map((x, i) => `<div class="ni${seen.has(x.key) ? "" : " new"}" role="button" tabindex="0" data-n="${i}"><span class="ic" aria-hidden="true">${x.ic}</span><div style="flex:1;min-width:0">
       <p class="nt">${esc(x.t)}</p><p class="nb">${esc(x.b)}</p>
-      <div class="nh">${fmt(x.at)}</div></div><button class="hx nDel" data-del="${i}" title="Borrar" aria-label="Borrar esta notificación">✕</button></div>`).join("")
+      <div class="nh">${when(x.at)}</div></div><button class="hx nDel" data-del="${i}" title="Borrar" aria-label="Borrar esta notificación">✕</button></div>`).join("")
       : `<p class="muted" style="padding:14px 0">No hay notificaciones hoy. 🐾</p>`}</div>
     ${list.length > 1 ? `<button class="link nDelAll" id="nDelAll">Borrar todas</button>` : ""}
-    <p class="muted" style="font-size:12px;margin-top:10px">${list.length ? "Al borrarlas desaparecen solo de este teléfono. " : ""}Las notificaciones se borran solas a las 00:00.</p>
+    <p class="muted" style="font-size:12px;margin-top:10px">${list.length ? "Al borrarlas desaparecen solo de este teléfono. " : ""}${hasReply ? "Las respuestas quedan hasta que las borres; lo demás se borra solo a las 00:00." : "Las notificaciones se borran solas a las 00:00."}</p>
     <button class="link" style="display:block;margin:8px auto 0" onclick="closeModal()">Cerrar</button>`);
-  try { localStorage.setItem("comitag_notif_vistas", JSON.stringify({ d: todayKey(), k: list.map(x => x.key) })); } catch {}
+  try { localStorage.setItem("comitag_notif_vistas", JSON.stringify({ d: todayKey(), k: list.map(x => x.key).filter(k => !k.startsWith("r")) })); } catch {}
+  const st = respState(); list.forEach(x => { if (x.reply && !st.seen.includes(x.key)) st.seen.push(x.key); }); respSave(st);
   notifUpdate();
   $("modalBody").querySelectorAll(".ni").forEach(el => {
     const open = () => openNotif(list[+el.dataset.n]);
@@ -825,11 +856,13 @@ function openNotif(x) {
   }
   const safe = x.link && /^https:\/\//.test(x.link) ? x.link : "";
   const missed = x.key.startsWith("m");
+  const day = x.at.toDateString() === todayKey() ? "hoy " + fmt(x.at) : x.at.toLocaleDateString("es-CL", { day: "numeric", month: "long" }) + ", " + fmt(x.at);
   box.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-labelledby="ndT">
     <div class="ndIc" aria-hidden="true">${x.ic}</div>
-    <p class="ndK">${missed ? "Comida olvidada" : "Aviso de Comitag"} · hoy ${fmt(x.at)}</p>
+    <p class="ndK">${missed ? "Comida olvidada" : x.reply ? "Respuesta de Comitag" : "Aviso de Comitag"} · ${day}</p>
     <p id="ndT" class="ndT">${esc(x.t)}</p>
-    <p class="ndB">${esc(x.b)}</p>
+    <p class="ndB" style="white-space:pre-wrap">${esc(x.b)}</p>
+    ${x.reply && x.orig ? `<p class="muted ndOrig">Tu mensaje: “${esc(x.orig)}”</p>` : ""}
     ${missed ? `<p class="muted" style="margin-top:10px">¿Sí comió y nadie lo anotó? Puedes registrarlo ahora.</p>` : ""}
     <div class="grid" style="margin-top:16px">
       <button onclick="closeNotif()">Cerrar</button>
@@ -938,7 +971,7 @@ async function refresh() {
     }
   }
   render();
-  if (ready) { loadWa(); loadAnnToday(); }
+  if (ready) { loadWa(); loadAnnToday(); loadReplies(); }
 }
 
 // Entrada escalonada (solo la primera vez)
@@ -2425,7 +2458,9 @@ function openAddPet() {
 
 // ================= Sugerencias y contacto =================
 async function sendMsg(kind, body, reply) {
-  const r = await db.rpc("send_message", { p_code: code, p_kind: kind, p_who: me || null, p_body: body, p_reply: reply || null });
+  const args = { p_code: code, p_kind: kind, p_who: me || null, p_body: body, p_reply: reply || null };
+  let r = await db.rpc("send_message", { ...args, p_client: deviceId() });
+  if (r.error && r.error.code === "PGRST202") r = await db.rpc("send_message", args);   // Supabase con la versión anterior
   if (r.error) return r.error.code === "PGRST202" ? "Esta opción aún no está activa. Intenta más tarde."
     : netErr(r.error) ? "No hay internet. Intenta cuando vuelva la conexión." : "No se pudo enviar. Intenta de nuevo.";
   if (r.data === "demasiados") return "Ya mandaste varios mensajes hoy. Intenta de nuevo mañana.";
@@ -2456,7 +2491,7 @@ async function openHelp() {
     <p class="eLbl" style="margin-top:14px">O cuéntanos aquí qué pasó</p>
     <textarea id="hpIn" maxlength="600" rows="4" placeholder="Ej: no me llegan los avisos, olvidé el PIN…" style="width:100%;box-sizing:border-box;font:inherit;padding:12px;border-radius:12px;border:1px solid var(--border);resize:vertical"></textarea>
     <input id="hpReply" type="email" inputmode="email" autocapitalize="off" spellcheck="false" maxlength="120" autocomplete="email" placeholder="Tu correo para responderte" style="margin-top:8px">
-    <p class="muted" style="font-size:12px;margin-top:6px">Junto con tu mensaje llega a qué mascota corresponde, para poder ayudarte.</p>
+    <p class="muted" style="font-size:12px;margin-top:6px">La respuesta te llegará a la campana 🔔 de este teléfono (y a tu correo, si lo dejas). Junto con tu mensaje llega a qué mascota corresponde, para poder ayudarte.</p>
     <p id="hpErr" class="muted warn" style="margin-top:6px"></p>
     <div class="grid" style="margin-top:8px"><button onclick="closeModal()">Cerrar</button><button class="primary" id="hpOk">Enviar</button></div>`);
   $("hpOk").onclick = async () => {
@@ -2467,7 +2502,7 @@ async function openHelp() {
     const ok = await sendMsg("ayuda", t, rp);
     $("hpOk").disabled = false;
     if (ok !== true) { $("hpErr").textContent = ok; return; }
-    closeModal(); showNote(rp ? "✅ Mensaje enviado. Te responderemos a tu correo." : "✅ Mensaje enviado. Gracias por avisarnos.");
+    closeModal(); showNote(rp ? "✅ Mensaje enviado. La respuesta te llegará a tu correo y a la campana 🔔." : "✅ Mensaje enviado. La respuesta te llegará a la campana 🔔.");
   };
   // Botón directo para escribir al correo del dueño, si está configurado
   const r = await db.rpc("get_contact");
