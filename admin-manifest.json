@@ -1,0 +1,14 @@
+{
+  "name": "Comitag · Panel del dueño",
+  "short_name": "Comitag Admin",
+  "start_url": "/admin",
+  "scope": "/admin",
+  "display": "standalone",
+  "background_color": "#f4f3ef",
+  "theme_color": "#1a2a5c",
+  "lang": "es",
+  "icons": [
+    { "src": "/admin-icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/admin-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
