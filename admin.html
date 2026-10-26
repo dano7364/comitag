@@ -115,24 +115,23 @@ table.tv td:last-child,table.tv th:last-child{text-align:right;font-variant-nume
 <main>
   <p class="brand">COMITAG 🐾</p>
 
-  <!-- Desbloquear con Face ID (si se activó en este teléfono) -->
-  <section id="lock" class="card hidden" style="text-align:center">
-    <div class="lockIc" aria-hidden="true">🔐</div>
-    <h1>Panel del dueño</h1>
-    <p class="muted" id="lockText">Este teléfono está protegido con Face ID.</p>
-    <button class="primary wide" id="unlockBtn">Desbloquear con Face ID</button>
-    <p id="lockErr" class="msg err"></p>
-    <button class="link" id="useKey" style="margin-top:6px">Usar mi clave</button>
-  </section>
-
   <!-- Entrar con la clave de dueño -->
   <section id="login" class="card hidden">
     <h1>Panel del dueño</h1>
+    <div id="faceBox" class="hidden" style="text-align:center">
+      <div class="lockIc" aria-hidden="true">🔐</div>
+      <button class="primary wide" id="faceLoginBtn">Entrar con Face ID</button>
+      <p id="faceErr" class="msg err"></p>
+      <button class="link" id="useKey" style="margin-top:4px">Usar mi clave</button>
+    </div>
+    <div id="keyBox">
     <p class="muted">Solo para el dueño de Comitag. Escribe tu clave de dueño.</p>
     <label for="key">Clave de dueño</label>
     <input id="key" type="password" autocomplete="current-password">
     <p id="loginErr" class="msg err"></p>
     <button class="primary wide" id="loginBtn">Entrar</button>
+    <button class="link hidden" id="useFace" style="display:block;margin:12px auto 0">🔐 Entrar con Face ID</button>
+    </div>
   </section>
 
   <div id="panel" class="hidden">
@@ -294,13 +293,15 @@ function ago(d) {
   const days = Math.round(h / 24); return days < 60 ? `hace ${plural(days, "día", "días")}` : `hace ${Math.round(days / 30)} meses`;
 }
 
-let key = "";
+let key = "", session = "";
 try { key = localStorage.getItem("comitag_admin") || ""; } catch {}
+try { session = sessionStorage.getItem("comitag_admin_sesion") || ""; } catch {}
 let phones = 0, plates = [];
 
 async function api(body) {
   const r = await fetch(FN, { method: "POST",
-    headers: { "Content-Type": "application/json", "x-admin-secret": key, apikey: PUB }, body: JSON.stringify(body) });
+    headers: { "Content-Type": "application/json", apikey: PUB, ...(session ? { "x-admin-session": session } : { "x-admin-secret": key }) },
+    body: JSON.stringify(body) });
   let d = {}; try { d = await r.json(); } catch {}
   return { status: r.status, data: d };
 }
@@ -325,10 +326,13 @@ async function enter() {
   let r;
   try { r = await api({ action: "count" }); }
   catch { $("loginErr").textContent = "No hay conexión, o falta crear la función “anuncio” en Supabase."; return false; }
-  if (r.status === 401) { $("loginErr").textContent = "Clave incorrecta."; return false; }
+  if (r.status === 401) {
+    if (session) { session = ""; try { sessionStorage.removeItem("comitag_admin_sesion"); } catch {} showLogin(); return false; }
+    $("loginErr").textContent = "Clave incorrecta."; return false;
+  }
   if (r.status !== 200) { $("loginErr").textContent = "Algo falló. Intenta de nuevo."; return false; }
   phones = r.data.phones;
-  $("login").classList.add("hidden"); $("lock").classList.add("hidden"); $("panel").classList.remove("hidden");
+  $("login").classList.add("hidden"); $("panel").classList.remove("hidden");
   faceUI();
   loadAnn(); loadPlates(); loadMsgs();
   return true;
@@ -336,72 +340,104 @@ async function enter() {
 $("loginBtn").onclick = async () => {
   key = $("key").value.trim(); if (!key) return;
   $("loginBtn").disabled = true;
-  if (await enter()) { try { localStorage.setItem("comitag_admin", key); sessionStorage.setItem(FID_OK, "1"); } catch {} }
+  session = "";
+  if (await enter()) {
+    // Con Face ID activado la clave no queda guardada en el teléfono
+    const st = await api({ action: "face_status" }).catch(() => null);
+    const hasFace = st && st.status === 200 && st.data.count > 0;
+    try { hasFace ? localStorage.removeItem("comitag_admin") : localStorage.setItem("comitag_admin", key); } catch {}
+  }
   $("loginBtn").disabled = false;
 };
 $("key").onkeydown = e => { if (e.key === "Enter") $("loginBtn").click(); };
-$("logout").onclick = () => { try { localStorage.removeItem("comitag_admin"); localStorage.removeItem(FID); sessionStorage.removeItem(FID_OK); } catch {} location.reload(); };
+$("logout").onclick = async () => {
+  if (session) await api({ action: "logout" }).catch(() => {});
+  try { localStorage.removeItem("comitag_admin"); sessionStorage.removeItem("comitag_admin_sesion"); } catch {}
+  location.reload();
+};
 
-// ---------- Face ID (llave de acceso del teléfono) ----------
-// Protege este teléfono: para abrir el panel hay que pasar Face ID (o huella / código del teléfono).
-const FID = "comitag_admin_faceid", FID_OK = "comitag_admin_desbloqueado";
-const fidGet = () => { try { return localStorage.getItem(FID) || ""; } catch { return ""; } };
+// ---------- Face ID (llave de acceso / passkey, revisada por Supabase) ----------
+// Se activa una vez (entrando con la clave). Desde ahí el panel se abre solo con Face ID:
+// la llave vive en tu iPhone (Llavero de iCloud) y la función "anuncio" revisa su firma cada vez.
+try { localStorage.removeItem("comitag_admin_faceid"); } catch {}      // versión anterior (solo local)
 const isApple = /iPhone|iPad|Macintosh/.test(navigator.userAgent);
-const bioName = isApple ? "Face ID" : "tu huella o bloqueo de pantalla";
-const rand = n => crypto.getRandomValues(new Uint8Array(n));
-const b64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));
-const unb64 = t => Uint8Array.from(atob(t), c => c.charCodeAt(0));
-async function fidAvailable() {
-  try { return !!window.PublicKeyCredential && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable(); } catch { return false; }
+const bioName = isApple ? "Face ID" : "huella o bloqueo de pantalla";
+const b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const unb64u = t => { t = t.replace(/-/g, "+").replace(/_/g, "/"); while (t.length % 4) t += "="; return Uint8Array.from(atob(t), c => c.charCodeAt(0)); };
+const canFace = () => !!(window.PublicKeyCredential && navigator.credentials);
+function showLogin(msg) {
+  $("panel").classList.add("hidden"); $("login").classList.remove("hidden");
+  const face = canFace();
+  $("faceBox").classList.toggle("hidden", !face); $("keyBox").classList.toggle("hidden", face);
+  $("useFace").classList.toggle("hidden", !face);
+  $("faceLoginBtn").textContent = `Entrar con ${bioName === "Face ID" ? "Face ID" : "huella o código"}`;
+  if (msg) $("faceErr").textContent = msg;
 }
+$("useKey").onclick = () => { $("faceBox").classList.add("hidden"); $("keyBox").classList.remove("hidden"); $("key").focus(); };
+$("useFace").onclick = () => { $("keyBox").classList.add("hidden"); $("faceBox").classList.remove("hidden"); $("faceErr").textContent = ""; };
+$("faceLoginBtn").onclick = async () => {
+  $("faceErr").textContent = ""; $("faceLoginBtn").disabled = true;
+  try {
+    const o = await api({ action: "face_options" });
+    if (o.status !== 200) throw { msg: o.status === 400 ? "Falta actualizar la función “anuncio” en Supabase." : "No se pudo conectar. Intenta de nuevo." };
+    const c = await navigator.credentials.get({ publicKey: {
+      challenge: unb64u(o.data.challenge), rpId: location.hostname, userVerification: "required", timeout: 60000,
+    } });
+    const r = await api({ action: "face_login", cred: b64u(c.rawId), clientData: b64u(c.response.clientDataJSON),
+      authData: b64u(c.response.authenticatorData), sig: b64u(c.response.signature) });
+    if (r.status !== 200 || !r.data.session) throw { msg: r.status === 401 ? "Esta llave no está activada. Entra con tu clave y toca “Activar Face ID”." : "No se pudo entrar. Intenta de nuevo." };
+    session = r.data.session; key = "";
+    try { sessionStorage.setItem("comitag_admin_sesion", session); localStorage.removeItem("comitag_admin"); } catch {}
+    openPanel();
+  } catch (e) {
+    $("faceErr").textContent = e && e.msg ? e.msg : e && e.name === "NotAllowedError" ? `No se pudo verificar. Si todavía no activas ${bioName}, entra con tu clave y actívalo al final del panel.` : `No se pudo usar ${bioName}. Usa tu clave.`;
+  }
+  $("faceLoginBtn").disabled = false;
+};
 async function faceUI() {
-  if (!(await fidAvailable())) return;
-  const on = !!fidGet();
-  $("faceBtn").textContent = on ? `🔓 Desactivar ${bioName === "Face ID" ? "Face ID" : "el desbloqueo"}` : `🔐 Activar ${bioName === "Face ID" ? "Face ID" : "huella o bloqueo de pantalla"}`;
+  if (!canFace()) return;
+  const st = await api({ action: "face_status" }).catch(() => null);
+  if (!st || st.status !== 200) return;                 // función sin actualizar: no se muestra
+  const n = st.data.count;
+  $("faceBtn").textContent = n ? `🔓 Desactivar ${bioName === "Face ID" ? "Face ID" : "el desbloqueo"}` : `🔐 Activar ${bioName === "Face ID" ? "Face ID" : "huella o bloqueo de pantalla"}`;
+  $("faceBtn").dataset.on = n ? "1" : "";
+  if (n && key && !session) try { localStorage.removeItem("comitag_admin"); } catch {}
   $("faceBtn").classList.remove("hidden");
 }
 function faceSay(t) { $("faceMsg").innerHTML = t; $("faceMsg").classList.remove("hidden"); }
 $("faceBtn").onclick = async () => {
-  if (fidGet()) {
-    try { localStorage.removeItem(FID); } catch {}
-    faceSay(`Listo: ya no se pide ${bioName} para entrar.`); faceUI(); return;
+  if ($("faceBtn").dataset.on) {
+    if (!await ask(`¿Desactivar ${bioName}?`, "Vas a volver a entrar al panel con tu clave de dueño, en todos tus dispositivos.", "Desactivar")) return;
+    const r = await api({ action: "face_clear" }).catch(() => ({ status: 0 }));
+    if (r.status !== 200) return faceSay('<span class="err">No se pudo. Intenta de nuevo.</span>');
+    if (session) { session = ""; try { sessionStorage.removeItem("comitag_admin_sesion"); } catch {} }
+    faceSay(`Listo. Desde ahora entras con tu clave.${key ? "" : " Escríbela la próxima vez que abras el panel."}`);
+    if (key) try { localStorage.setItem("comitag_admin", key); } catch {}
+    faceUI(); return;
   }
   try {
-    const cred = await navigator.credentials.create({ publicKey: {
-      rp: { name: "Comitag · Panel del dueño" },
-      user: { id: rand(16), name: "dueno-comitag", displayName: "Dueño de Comitag" },
-      challenge: rand(32),
+    const o = await api({ action: "face_reg_options" });
+    if (o.status !== 200) throw { msg: o.status === 400 ? "Falta actualizar la función “anuncio” en Supabase." : "No se pudo. ¿Corriste face_id.sql en Supabase?" };
+    const c = await navigator.credentials.create({ publicKey: {
+      rp: { name: "Comitag · Panel del dueño", id: location.hostname },
+      user: { id: crypto.getRandomValues(new Uint8Array(16)), name: "dueno-comitag", displayName: "Dueño de Comitag" },
+      challenge: unb64u(o.data.challenge),
       pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
-      authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required", residentKey: "preferred" },
-      timeout: 60000,
+      authenticatorSelection: { residentKey: "required", requireResidentKey: true, userVerification: "required" },
+      attestation: "none", timeout: 60000,
     } });
-    if (!cred) throw new Error("sin llave");
-    localStorage.setItem(FID, b64(cred.rawId));
-    try { sessionStorage.setItem(FID_OK, "1"); } catch {}
-    faceSay(`✅ ${bioName === "Face ID" ? "Face ID activado" : "Desbloqueo activado"}. La próxima vez que abras el panel en este teléfono te lo pedirá.`);
+    const pk = c.response.getPublicKey && c.response.getPublicKey();
+    if (!pk) throw { msg: "Este navegador es muy antiguo para Face ID. Actualiza el iPhone." };
+    const r = await api({ action: "face_register", cred: b64u(c.rawId), publicKey: b64u(pk),
+      alg: c.response.getPublicKeyAlgorithm(), clientData: b64u(c.response.clientDataJSON) });
+    if (r.status !== 200) throw { msg: "No se pudo guardar la llave. Intenta de nuevo." };
+    try { localStorage.removeItem("comitag_admin"); } catch {}
+    faceSay(`✅ ${bioName === "Face ID" ? "Face ID activado" : "Listo"}. Desde ahora el panel se abre con ${bioName}, y tu clave ya no queda guardada en este teléfono.`);
   } catch (e) {
-    faceSay(`<span class="err">${e && e.name === "NotAllowedError" ? "Se canceló. Puedes intentarlo de nuevo." : "Este teléfono no permitió activarlo."}</span>`);
+    faceSay(`<span class="err">${e && e.msg ? e.msg : e && e.name === "NotAllowedError" ? "Se canceló. Puedes intentarlo de nuevo." : "Este teléfono no permitió activarlo."}</span>`);
   }
   faceUI();
 };
-async function unlock() {
-  $("lockErr").textContent = ""; $("unlockBtn").disabled = true;
-  try {
-    const cred = await navigator.credentials.get({ publicKey: {
-      challenge: rand(32), allowCredentials: [{ type: "public-key", id: unb64(fidGet()) }],
-      userVerification: "required", timeout: 60000,
-    } });
-    if (!cred) throw new Error("sin llave");
-    try { sessionStorage.setItem(FID_OK, "1"); } catch {}
-    $("lock").classList.add("hidden");
-    openPanel();
-  } catch (e) {
-    $("lockErr").textContent = e && e.name === "NotAllowedError" ? "No se pudo verificar. Intenta de nuevo." : `No se pudo usar ${bioName}. Entra con tu clave.`;
-  }
-  $("unlockBtn").disabled = false;
-}
-$("unlockBtn").onclick = unlock;
-$("useKey").onclick = () => { $("lock").classList.add("hidden"); $("login").classList.remove("hidden"); $("key").focus(); };
 
 // ---------- Pestañas ----------
 const loaded = {};
@@ -856,18 +892,13 @@ $("healthBtn").onclick = loadHealth;
 
 function openPanel() {
   enter().then(ok => {
-    if (!ok) { $("key").value = ""; $("login").classList.remove("hidden"); return; }
+    if (!ok) { $("key").value = ""; if ($("login").classList.contains("hidden")) showLogin(); return; }
     let t = "anuncios"; try { t = sessionStorage.getItem("comitag_admin_tab") || t; } catch {}
     showTab(t);
   });
 }
-let unlocked = false; try { unlocked = !!sessionStorage.getItem(FID_OK); } catch {}
-if (key && fidGet() && !unlocked) {
-  $("lockText").textContent = `Este teléfono está protegido con ${bioName}.`;
-  $("unlockBtn").textContent = `Desbloquear con ${bioName === "Face ID" ? "Face ID" : "huella o código"}`;
-  $("lock").classList.remove("hidden");
-} else if (key) openPanel();
-else $("login").classList.remove("hidden");
+if (session || key) openPanel();
+else showLogin();
 </script>
 </body>
 </html>
