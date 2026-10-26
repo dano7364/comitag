@@ -173,6 +173,37 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .offline{background:var(--off-bg);color:var(--off);border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:14px}
 .q{color:var(--pend);font-size:12px}
 .diff{margin:-2px 0 6px;font-size:12px}
+/* Horarios: línea de tiempo con fotos que se encienden */
+.tl{position:relative;margin-top:6px}
+.tlItem{position:relative;padding:4px 0 16px 34px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.tlItem:last-child{padding-bottom:4px}
+.tlItem:not(:last-child)::before{content:"";position:absolute;left:11px;top:28px;bottom:2px;width:2px;background:var(--border,#e3dccf);border-radius:2px}
+.tlItem.done:not(:last-child)::before{background:#86efac}
+.tlDot{position:absolute;left:0;top:5px;width:24px;height:24px;border-radius:50%;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff;border:2px solid var(--border,#cfc6b6);background:var(--card,#fff)}
+.tlItem.done .tlDot{background:#22c55e;border-color:#22c55e}
+.tlItem.part .tlDot{background:#f59e0b;border-color:#f59e0b}
+.tlItem.miss .tlDot{background:#ef4444;border-color:#ef4444}
+.tlItem.now .tlDot{border-color:#f59e0b;box-shadow:0 0 0 4px rgba(245,158,11,.18)}
+.tlHead{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.tlTime{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.tlItem.later .tlTime{color:var(--muted)}
+.tlTime small{font-size:14px;font-weight:600;color:var(--muted)}
+.tlSide{font-size:13px;color:var(--muted);white-space:nowrap}
+.tlItem.done .tlSide{color:var(--ok,#15803d);font-weight:600}
+.tlItem.part .tlSide,.tlItem.now .tlSide{color:#b45309;font-weight:600}
+.tlItem.miss .tlSide{color:#dc2626;font-weight:600}
+.tlPics{display:flex;flex-wrap:wrap;margin:8px 0 0 6px}
+.tlPics>*{width:32px;height:32px;border-radius:50%;object-fit:cover;box-sizing:border-box;border:2.5px solid #22c55e;margin-left:-6px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700;background-clip:padding-box}
+.tlPics>.off{border-color:var(--card,#fff);filter:grayscale(1);opacity:.4}
+.tlSum{font-size:13px;color:var(--muted);margin:5px 0 0}
+.tlMore{display:none;margin-top:6px}
+.tlItem.open .tlMore{display:block}
+.tlMore p{margin:2px 0;font-size:12.5px;color:var(--muted)}
+.bellSw{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;margin-top:14px;padding:11px 14px;border-radius:16px;font-size:15px;text-align:left}
+.bellSw .sw{flex:none;width:44px;height:26px;border-radius:99px;background:#cbd5e1;position:relative;transition:background .2s}
+.bellSw .sw::after{content:"";position:absolute;left:3px;top:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:left .2s}
+.bellSw.on .sw{background:#22c55e}
+.bellSw.on .sw::after{left:21px}
 .note{background:var(--ok-bg);color:var(--ok);border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:14px;display:flex;align-items:center;gap:10px}
 .note span{flex:1}
 .note .link{color:var(--ok);font-weight:700;text-decoration:underline;padding:4px 0}
@@ -523,7 +554,7 @@ body::before{animation:drift 28s ease-in-out infinite alternate;will-change:tran
     <div class="card" style="margin-top:12px">
       <div class="head"><p><b>Horarios de comida</b></p><button class="link" id="schedEditBtn" onclick="editSched()">✏️ Editar</button></div>
       <div id="sched"></div>
-      <button class="bell hidden" id="bellBtn" onclick="toggleBell()">🔔 Avisarme si se olvida un horario</button>
+      <button class="bellSw hidden" id="bellBtn" role="switch" aria-checked="false" onclick="toggleBell()"><span id="bellLbl">🔔 Avisarme si se olvida</span><span class="sw" aria-hidden="true"></span></button>
       <p class="muted hidden" id="bellMsg" style="margin-top:8px"></p>
       <div id="schedEdit" class="hidden">
         <p class="muted" style="margin-bottom:10px">Pon las horas en que hay que darle comida cada día.</p>
@@ -1236,21 +1267,41 @@ function render() {
     return Date.now() >= to && miss.length ? { s: it.d, to, pets: miss.filter(Boolean) } : null;
   }).filter(Boolean);
   notifUpdate();
-  $("sched").innerHTML = items.length ? items.map((it, idx) => {
+  // Línea de tiempo: un punto por horario y las fotos de las mascotas que se encienden al comer
+  const shortDiff = (t, slot) => { const m = Math.round((t - slot) / 60000); if (!m) return "a la hora";
+    const a = Math.abs(m), h = Math.floor(a / 60), r = a % 60; return `${h ? `${h} h${r ? ` ${r}` : ""}` : `${a} min`} ${m < 0 ? "antes" : "después"}`; };
+  const until = d => { const m = Math.round((d - Date.now()) / 60000); return m < 60 ? `en ${Math.max(1, m)} min` : `en ${Math.round(m / 60)} h`; };
+  const avatar = (p, on) => { const i = Math.max(0, pets.indexOf(p)), src = photoOf(p);
+    return src ? `<img class="${on ? "" : "off"}" src="${src}" alt="${esc(p)}" title="${esc(p)}">`
+               : `<b class="${on ? "" : "off"}" style="background:${petColor(i)}" title="${esc(p)}">${esc(p.charAt(0).toUpperCase())}</b>`; };
+  $("sched").innerHTML = items.length ? `<div class="tl">${items.map((it, idx) => {
     const s = it.d, who = it.p ? [it.p] : (pets.length ? pets : [""]);
     const got = who.filter(p => res[idx][p].e), miss = who.filter(p => !res[idx][p].e);
     const to = Math.max(...who.map(p => res[idx][p].to));
-    const waiting = Date.now() < s ? `<span class="muted">Más tarde</span>`
-      : Date.now() < to ? `<span class="pend">Pendiente</span>` : `<span class="pend">No se registró</span>`;
-    let status;
-    if (who.length === 1) { const e = res[idx][who[0]].e; status = e ? `<span class="ok">Dado ${fmt(e.t)} · ${esc(e.who)}</span>` : waiting; }
-    else status = !got.length ? waiting : !miss.length ? `<span class="ok">Dado a todos</span>` : `<span class="pend">Falta ${esc(joinNames(miss))}</span>`;
-    const details = got.map(p => { const e = res[idx][p].e;
-      return who.length > 1
-        ? `<p class="muted diff"><b>${esc(p)}</b>: ${fmt(e.t)} · ${esc(e.who)} · ${diffText(e.t, s).replace("Se registró ", "")}</p>`
-        : `<p class="muted diff">${diffText(e.t, s)}</p>`; }).join("");
-    return `<div class="row"><span>${fmt(s)}${it.p ? ` · <b>${esc(it.p)}</b>` : ""}</span>${status}</div>` + details;
-  }).join("") : `<p class="muted">Aún no hay horarios. Toca “Editar” para agregarlos.</p>`;
+    const st = !miss.length ? "done" : Date.now() < s ? (got.length ? "part" : "later") : Date.now() < to ? (got.length ? "part" : "now") : (got.length ? "part" : "miss");
+    const many = who.length > 1;
+    const first = got.length ? res[idx][got[0]].e : null;
+    const side = st === "done" ? shortDiff(first.t, s) : st === "part" ? `${got.length} de ${who.length}`
+      : st === "later" ? until(s) : st === "now" ? "Pendiente" : "No se registró";
+    const dot = st === "done" ? "✓" : st === "miss" ? "!" : st === "part" ? "…" : "";
+    // Quién dio y a qué hora (juntando a los que se registraron juntos)
+    const givers = [];
+    got.forEach(p => { const e = res[idx][p].e, k = e.who + "|" + fmt(e.t); let g = givers.find(x => x.k === k);
+      if (!g) givers.push(g = { k, who: e.who, t: e.t, pets: [] }); g.pets.push(p); });
+    let sum = "";
+    if (givers.length === 1 && !miss.length) sum = `${many ? "Todas · " : ""}${esc(givers[0].who)} · ${fmt(givers[0].t)}`;
+    else if (givers.length) sum = givers.map(g => `${esc(g.who)} ${fmt(g.t)}${many ? ` (${esc(joinNames(g.pets))})` : ""}`).join(" · ");
+    if (miss.length && got.length && many) sum += `${sum ? " · " : ""}Falta ${esc(joinNames(miss))}`;
+    const more = got.map(p => { const e = res[idx][p].e;
+      return `<p>${many ? `<b>${esc(p)}</b>: ` : ""}${fmt(e.t)} · ${esc(e.who)} · ${shortDiff(e.t, s)}</p>`; }).join("");
+    return `<div class="tlItem ${st}"${more && many ? ` onclick="this.classList.toggle('open')" title="Toca para ver el detalle"` : ""}>
+      <span class="tlDot">${dot}</span>
+      <div class="tlHead"><span class="tlTime">${fmt(s)}${it.p ? ` <small>· ${esc(it.p)}</small>` : ""}</span><span class="tlSide">${side}</span></div>
+      ${pets.length && (got.length || Date.now() >= s) ? `<div class="tlPics">${who.map(p => avatar(p, !!res[idx][p].e)).join("")}</div>` : ""}
+      ${sum ? `<p class="tlSum">${sum}</p>` : ""}
+      ${more && many ? `<div class="tlMore">${more}</div>` : ""}
+    </div>`;
+  }).join("")}</div>` : `<p class="muted">Aún no hay horarios. Toca “Editar” para agregarlos.</p>`;
 
   // Cada vez que se marca la comida cuenta una sola vez, aunque sea para varias mascotas
   const events = e => new Set(e.map(x => x.created_at + "|" + x.who)).size;
@@ -2546,8 +2597,8 @@ function bellUI() {
   if (!plate || !$("schedEdit").classList.contains("hidden")) return;
   const on = bellOn();
   $("bellBtn").classList.toggle("hidden", !(plate.schedule || []).length && !on);
-  $("bellBtn").textContent = on ? "🔕 Dejar de avisarme" : "🔔 Avisarme si se olvida un horario";
-  if (on) { $("bellMsg").textContent = "Este teléfono recibirá un aviso si pasan 15 minutos de un horario y nadie registró la comida."; $("bellMsg").classList.remove("hidden"); }
+  $("bellBtn").classList.toggle("on", on); $("bellBtn").setAttribute("aria-checked", on);
+  $("bellLbl").textContent = "🔔 Avisarme si se olvida";
 }
 async function toggleBell() {
   const say = t => { $("bellMsg").textContent = t; $("bellMsg").classList.remove("hidden"); };
