@@ -184,6 +184,7 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .lpPics>*:first-child{margin-left:0}
 .lpPics .more{background:#9ca3af;color:#fff;font-size:10.5px}
 .lpRow.col{flex-direction:column;align-items:flex-start;gap:5px}
+.lpRow.col .lpTxt span{white-space:normal}
 .lpTxt{min-width:0;line-height:1.2}
 .lpTxt b{display:block;font-size:13.5px;font-weight:600;color:var(--text,inherit);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lpTxt span{display:block;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1173,6 +1174,7 @@ function lastByPet(kind, pets) {
   });
   const pic = ({ p, i }) => { const src = photoOf(p);
     return src ? `<img src="${src}" alt="${esc(p)}" title="${esc(p)}">` : `<b style="background:${petColor(i)}" title="${esc(p)}">${esc(p.charAt(0).toUpperCase())}</b>`; };
+  groups.sort((a, b) => (b.e ? b.e.t : 0) - (a.e ? a.e.t : 0));   // lo más reciente primero
   return `<div class="lpList">${groups.map(g => {
     const col = g.pets.length > 2;                          // varias: fotos arriba y texto abajo
     const shown = g.pets.length > 6 ? g.pets.slice(0, 5) : g.pets;
@@ -1396,17 +1398,31 @@ function renderPetChips() {
   if (!pets.length) return;
   $("cPets").innerHTML = `<p class="muted" style="margin-bottom:8px">${pending === "agua" ? "¿A quién le cambiaste el agua?" : "¿A quién le diste?"}</p>` +
     `<button type="button" class="chip on" id="cAll" aria-pressed="true" onclick="chipsAll()">Todos</button>` + pets.map(p =>
-    `<button type="button" class="chip on" data-p="${esc(p)}" aria-pressed="true" onclick="this.classList.toggle('on'); this.setAttribute('aria-pressed', this.classList.contains('on')); chipsAllSync()">${esc(p)}</button>`).join("");
+    `<button type="button" class="chip on" data-p="${esc(p)}" aria-pressed="true" onclick="chipTap(this)">${esc(p)}</button>`).join("") +
+    `<p class="muted" id="cSel" style="margin:10px 0 0;font-size:13px"></p>`;
+  chipsAllSync();
 }
-// "Todos": marca todas (o las desmarca si ya estaban todas)
+// Tocar una mascota: si estaban todas marcadas, queda solo esa; si no, se marca o desmarca
+function chipTap(b) {
+  const chips = [...$("cPets").querySelectorAll(".chip[data-p]")];
+  if (chips.length > 1 && chips.every(x => x.classList.contains("on"))) chips.forEach(x => x.classList.toggle("on", x === b));
+  else b.classList.toggle("on");
+  chips.forEach(x => x.setAttribute("aria-pressed", x.classList.contains("on")));
+  chipsAllSync();
+}
+// "Todos": marca todas
 function chipsAll() {
-  const chips = [...$("cPets").querySelectorAll(".chip[data-p]")], all = chips.every(b => b.classList.contains("on"));
-  chips.forEach(b => { b.classList.toggle("on", !all); b.setAttribute("aria-pressed", !all); });
+  [...$("cPets").querySelectorAll(".chip[data-p]")].forEach(b => { b.classList.add("on"); b.setAttribute("aria-pressed", true); });
   chipsAllSync();
 }
 function chipsAllSync() {
   const chips = [...$("cPets").querySelectorAll(".chip[data-p]")], all = chips.length && chips.every(b => b.classList.contains("on"));
   if ($("cAll")) { $("cAll").classList.toggle("on", !!all); $("cAll").setAttribute("aria-pressed", !!all); }
+  // Dice claramente a quién se le va a registrar
+  const sel = chips.filter(b => b.classList.contains("on")).map(b => b.dataset.p);
+  if ($("cSel")) $("cSel").textContent = !sel.length ? "Toca a quién se lo diste." : all && chips.length > 1 ? "Se registrará para todas. Toca una para elegir solo esa."
+    : `Se registrará solo para ${joinNames(sel)}.`;
+  if ($("cYes")) $("cYes").disabled = !sel.length;
 }
 const chosenPets = () => [...$("cPets").querySelectorAll(".chip.on[data-p]")].map(b => b.dataset.p);
 
