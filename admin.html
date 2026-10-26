@@ -106,6 +106,7 @@ table.tv td:last-child,table.tv th:last-child{text-align:right;font-variant-nume
 .supBox{margin-top:10px}
 .supLink{display:block;text-align:center;padding:12px;border-radius:12px;background:var(--text);color:var(--card)!important;text-decoration:none;font-weight:600}
 .lockIc{font-size:44px;margin:4px 0 6px}
+input.pinIn{text-align:center;font-size:26px;letter-spacing:12px;padding:12px 8px;margin-top:10px}
 .annBtns{display:flex;gap:18px;flex-wrap:wrap;margin-top:6px}
 .annBtns .link{padding:0}
 .annDel{color:#dc2626!important}
@@ -146,10 +147,12 @@ section[data-pane] > .card:first-child{margin-top:16px}
   <!-- Entrar con la clave de dueño -->
   <section id="login" class="card hidden">
     <h1>Panel del dueño</h1>
-    <div id="faceBox" class="hidden" style="text-align:center">
-      <div class="lockIc" aria-hidden="true">🔐</div>
-      <button class="primary wide" id="faceLoginBtn">Entrar con Face ID</button>
-      <p id="faceErr" class="msg err"></p>
+    <div id="pinBox" style="text-align:center">
+      <div class="lockIc" aria-hidden="true">🔢</div>
+      <p class="muted">Escribe tu PIN de entrada</p>
+      <input id="pinIn" class="pinIn" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="6" aria-label="PIN">
+      <button class="primary wide" id="pinLoginBtn">Entrar</button>
+      <p id="pinErr" class="msg err"></p>
       <button class="link" id="useKey" style="margin-top:4px">Usar mi clave</button>
     </div>
     <div id="keyBox">
@@ -158,7 +161,7 @@ section[data-pane] > .card:first-child{margin-top:16px}
     <input id="key" type="password" autocomplete="current-password">
     <p id="loginErr" class="msg err"></p>
     <button class="primary wide" id="loginBtn">Entrar</button>
-    <button class="link hidden" id="useFace" style="display:block;margin:12px auto 0">🔐 Entrar con Face ID</button>
+    <button class="link" id="usePin" style="display:block;margin:12px auto 0">🔢 Entrar con PIN</button>
     </div>
   </section>
 
@@ -306,12 +309,25 @@ section[data-pane] > .card:first-child{margin-top:16px}
     </section>
 
     <div id="homeFoot" class="homeFoot">
-      <p style="text-align:center;margin:0"><button class="link hidden" id="faceBtn"></button></p>
-      <p id="faceMsg" class="msg hidden" style="text-align:center"></p>
+      <p style="text-align:center;margin:0"><button class="link hidden" id="pinBtn"></button></p>
+      <p id="pinMsg" class="msg hidden" style="text-align:center"></p>
       <p style="text-align:center;margin-top:6px"><button class="link" id="logout">Salir de este teléfono</button></p>
     </div>
   </div>
 </main>
+
+<div id="pinSetBox" class="overlay hidden">
+  <div class="modal">
+    <p style="font-size:18px;margin:0 0 8px"><b>🔢 PIN de entrada</b></p>
+    <p class="muted">Con este PIN entras al panel en cualquier teléfono. Tu clave de dueño sigue sirviendo de respaldo.</p>
+    <label for="psA">PIN nuevo (4 a 6 números)</label>
+    <input id="psA" class="pinIn" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="6">
+    <label for="psB">Repite el PIN</label>
+    <input id="psB" class="pinIn" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="6">
+    <p id="psErr" class="msg err"></p>
+    <div class="grid2"><button id="psCancel">Cancelar</button><button class="primary" id="psOk">Guardar PIN</button></div>
+  </div>
+</div>
 
 <div id="confirm" class="overlay hidden">
   <div class="modal">
@@ -382,7 +398,7 @@ async function enter() {
   phones = r.data.phones;
   $("login").classList.add("hidden"); $("panel").classList.remove("hidden");
   if ($("secBar").classList.contains("hidden")) showTab("home", false);
-  faceUI();
+  pinUI();
   loadAnn(); loadPlates(); loadMsgs(); loadHealth();
   return true;
 }
@@ -391,10 +407,10 @@ $("loginBtn").onclick = async () => {
   $("loginBtn").disabled = true;
   session = "";
   if (await enter()) {
-    // Con Face ID activado la clave no queda guardada en el teléfono
-    const st = await api({ action: "face_status" }).catch(() => null);
-    const hasFace = st && st.status === 200 && st.data.count > 0;
-    try { hasFace ? localStorage.removeItem("comitag_admin") : localStorage.setItem("comitag_admin", key); } catch {}
+    // Con PIN creado, la clave no queda guardada en el teléfono
+    const st = await api({ action: "pin_status" }).catch(() => null);
+    const hasPin = st && st.status === 200 && st.data.has_pin;
+    try { hasPin ? localStorage.removeItem("comitag_admin") : localStorage.setItem("comitag_admin", key); } catch {}
   }
   $("loginBtn").disabled = false;
 };
@@ -405,87 +421,61 @@ $("logout").onclick = async () => {
   location.reload();
 };
 
-// ---------- Face ID (llave de acceso / passkey, revisada por Supabase) ----------
-// Se activa una vez (entrando con la clave). Desde ahí el panel se abre solo con Face ID:
-// la llave vive en tu iPhone (Llavero de iCloud) y la función "anuncio" revisa su firma cada vez.
-try { localStorage.removeItem("comitag_admin_faceid"); } catch {}      // versión anterior (solo local)
-const isApple = /iPhone|iPad|Macintosh/.test(navigator.userAgent);
-const bioName = isApple ? "Face ID" : "huella o bloqueo de pantalla";
-const b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-const unb64u = t => { t = t.replace(/-/g, "+").replace(/_/g, "/"); while (t.length % 4) t += "="; return Uint8Array.from(atob(t), c => c.charCodeAt(0)); };
-const canFace = () => !!(window.PublicKeyCredential && navigator.credentials);
-function showLogin(msg) {
+// ---------- Entrar con PIN (lo revisa Supabase; 5 intentos fallidos = 15 min bloqueado) ----------
+try { localStorage.removeItem("comitag_admin_faceid"); } catch {}      // restos de Face ID
+function showLogin(msg, keyFirst) {
   $("panel").classList.add("hidden"); $("login").classList.remove("hidden");
-  const face = canFace();
-  $("faceBox").classList.toggle("hidden", !face); $("keyBox").classList.toggle("hidden", face);
-  $("useFace").classList.toggle("hidden", !face);
-  $("faceLoginBtn").textContent = `Entrar con ${bioName === "Face ID" ? "Face ID" : "huella o código"}`;
-  if (msg) $("faceErr").textContent = msg;
+  $("pinBox").classList.toggle("hidden", !!keyFirst); $("keyBox").classList.toggle("hidden", !keyFirst);
+  $("pinErr").textContent = msg || ""; $("pinIn").value = "";
+  setTimeout(() => (keyFirst ? $("key") : $("pinIn")).focus(), 60);
 }
-$("useKey").onclick = () => { $("faceBox").classList.add("hidden"); $("keyBox").classList.remove("hidden"); $("key").focus(); };
-$("useFace").onclick = () => { $("keyBox").classList.add("hidden"); $("faceBox").classList.remove("hidden"); $("faceErr").textContent = ""; };
-$("faceLoginBtn").onclick = async () => {
-  $("faceErr").textContent = ""; $("faceLoginBtn").disabled = true;
-  try {
-    const o = await api({ action: "face_options" });
-    if (o.status !== 200) throw { msg: o.status === 400 ? "Falta actualizar la función “anuncio” en Supabase." : "No se pudo conectar. Intenta de nuevo." };
-    const c = await navigator.credentials.get({ publicKey: {
-      challenge: unb64u(o.data.challenge), rpId: location.hostname, userVerification: "required", timeout: 60000,
-    } });
-    const r = await api({ action: "face_login", cred: b64u(c.rawId), clientData: b64u(c.response.clientDataJSON),
-      authData: b64u(c.response.authenticatorData), sig: b64u(c.response.signature) });
-    if (r.status !== 200 || !r.data.session) throw { msg: r.status === 401 ? "Esta llave no está activada. Entra con tu clave y toca “Activar Face ID”." : "No se pudo entrar. Intenta de nuevo." };
+$("useKey").onclick = () => { $("pinBox").classList.add("hidden"); $("keyBox").classList.remove("hidden"); $("key").focus(); };
+$("usePin").onclick = () => { $("keyBox").classList.add("hidden"); $("pinBox").classList.remove("hidden"); $("pinErr").textContent = ""; $("pinIn").focus(); };
+async function pinLogin() {
+  const pin = $("pinIn").value.trim();
+  if (!/^[0-9]{4,6}$/.test(pin)) { $("pinErr").textContent = "El PIN es de 4 a 6 números."; return; }
+  $("pinErr").textContent = ""; $("pinLoginBtn").disabled = true;
+  let r; try { r = await api({ action: "pin_login", pin }); } catch { r = { status: 0, data: {} }; }
+  $("pinLoginBtn").disabled = false;
+  if (r.status === 200 && r.data.session) {
     session = r.data.session; key = "";
     try { sessionStorage.setItem("comitag_admin_sesion", session); localStorage.removeItem("comitag_admin"); } catch {}
-    openPanel();
-  } catch (e) {
-    $("faceErr").textContent = e && e.msg ? e.msg : e && e.name === "NotAllowedError" ? `No se pudo verificar. Si todavía no activas ${bioName}, entra con tu clave y actívalo al final del panel.` : `No se pudo usar ${bioName}. Usa tu clave.`;
+    $("pinIn").value = ""; openPanel(); return;
   }
-  $("faceLoginBtn").disabled = false;
-};
-async function faceUI() {
-  if (!canFace()) return;
-  const st = await api({ action: "face_status" }).catch(() => null);
-  if (!st || st.status !== 200) return;                 // función sin actualizar: no se muestra
-  const n = st.data.count;
-  $("faceBtn").textContent = n ? `🔓 Desactivar ${bioName === "Face ID" ? "Face ID" : "el desbloqueo"}` : `🔐 Activar ${bioName === "Face ID" ? "Face ID" : "huella o bloqueo de pantalla"}`;
-  $("faceBtn").dataset.on = n ? "1" : "";
-  if (n && key && !session) try { localStorage.removeItem("comitag_admin"); } catch {}
-  $("faceBtn").classList.remove("hidden");
+  $("pinIn").value = ""; $("pinIn").focus();
+  const e = r.data && r.data.error;
+  if (e === "sin pin") { showLogin("", true); $("loginErr").textContent = "Todavía no creas tu PIN. Entra con tu clave y créalo abajo en el inicio del panel."; return; }
+  $("pinErr").textContent = e === "incorrecto" ? "PIN incorrecto." : e === "bloqueado" ? "Demasiados intentos. Espera 15 minutos o entra con tu clave."
+    : r.status === 400 ? "Falta actualizar la función “anuncio” en Supabase." : "No se pudo conectar. Intenta de nuevo.";
 }
-function faceSay(t) { $("faceMsg").innerHTML = t; $("faceMsg").classList.remove("hidden"); }
-$("faceBtn").onclick = async () => {
-  if ($("faceBtn").dataset.on) {
-    if (!await ask(`¿Desactivar ${bioName}?`, "Vas a volver a entrar al panel con tu clave de dueño, en todos tus dispositivos.", "Desactivar")) return;
-    const r = await api({ action: "face_clear" }).catch(() => ({ status: 0 }));
-    if (r.status !== 200) return faceSay('<span class="err">No se pudo. Intenta de nuevo.</span>');
-    if (session) { session = ""; try { sessionStorage.removeItem("comitag_admin_sesion"); } catch {} }
-    faceSay(`Listo. Desde ahora entras con tu clave.${key ? "" : " Escríbela la próxima vez que abras el panel."}`);
-    if (key) try { localStorage.setItem("comitag_admin", key); } catch {}
-    faceUI(); return;
-  }
-  try {
-    const o = await api({ action: "face_reg_options" });
-    if (o.status !== 200) throw { msg: o.status === 400 ? "Falta actualizar la función “anuncio” en Supabase." : "No se pudo. ¿Corriste face_id.sql en Supabase?" };
-    const c = await navigator.credentials.create({ publicKey: {
-      rp: { name: "Comitag · Panel del dueño", id: location.hostname },
-      user: { id: crypto.getRandomValues(new Uint8Array(16)), name: "dueno-comitag", displayName: "Dueño de Comitag" },
-      challenge: unb64u(o.data.challenge),
-      pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
-      authenticatorSelection: { residentKey: "required", requireResidentKey: true, userVerification: "required" },
-      attestation: "none", timeout: 60000,
-    } });
-    const pk = c.response.getPublicKey && c.response.getPublicKey();
-    if (!pk) throw { msg: "Este navegador es muy antiguo para Face ID. Actualiza el iPhone." };
-    const r = await api({ action: "face_register", cred: b64u(c.rawId), publicKey: b64u(pk),
-      alg: c.response.getPublicKeyAlgorithm(), clientData: b64u(c.response.clientDataJSON) });
-    if (r.status !== 200) throw { msg: "No se pudo guardar la llave. Intenta de nuevo." };
-    try { localStorage.removeItem("comitag_admin"); } catch {}
-    faceSay(`✅ ${bioName === "Face ID" ? "Face ID activado" : "Listo"}. Desde ahora el panel se abre con ${bioName}, y tu clave ya no queda guardada en este teléfono.`);
-  } catch (e) {
-    faceSay(`<span class="err">${e && e.msg ? e.msg : e && e.name === "NotAllowedError" ? "Se canceló. Puedes intentarlo de nuevo." : "Este teléfono no permitió activarlo."}</span>`);
-  }
-  faceUI();
+$("pinLoginBtn").onclick = pinLogin;
+$("pinIn").onkeydown = e => { if (e.key === "Enter") pinLogin(); };
+async function pinUI() {
+  const st = await api({ action: "pin_status" }).catch(() => null);
+  if (!st || st.status !== 200) return;                 // función sin actualizar: no se muestra
+  const has = !!st.data.has_pin;
+  $("pinBtn").textContent = has ? "🔢 Cambiar PIN de entrada" : "🔢 Crear PIN de entrada";
+  if (has && key && !session) try { localStorage.removeItem("comitag_admin"); } catch {}
+  $("pinBtn").classList.remove("hidden");
+}
+function pinSay(t) { $("pinMsg").innerHTML = t; $("pinMsg").classList.remove("hidden"); }
+$("pinBtn").onclick = () => {
+  $("pinSetBox").classList.remove("hidden"); $("psA").value = ""; $("psB").value = ""; $("psErr").textContent = "";
+  setTimeout(() => $("psA").focus(), 60);
+};
+$("psCancel").onclick = () => $("pinSetBox").classList.add("hidden");
+$("psOk").onclick = async () => {
+  const a = $("psA").value.trim(), b = $("psB").value.trim();
+  if (!/^[0-9]{4,6}$/.test(a)) { $("psErr").textContent = "El PIN tiene que ser de 4 a 6 números."; return; }
+  if (a !== b) { $("psErr").textContent = "Los dos PIN no coinciden."; return; }
+  $("psOk").disabled = true; $("psErr").textContent = "Guardando…";
+  let r; try { r = await api({ action: "pin_set", pin: a }); } catch { r = { status: 0 }; }
+  $("psOk").disabled = false;
+  if (r.status !== 200) { $("psErr").textContent = r.status === 400 ? "Falta actualizar la función “anuncio” en Supabase." : "No se pudo guardar. Intenta de nuevo."; return; }
+  $("pinSetBox").classList.add("hidden");
+  try { localStorage.removeItem("comitag_admin"); } catch {}
+  pinSay("✅ PIN guardado. Desde ahora entras al panel con tu PIN.");
+  pinUI();
 };
 
 // ---------- Pestañas ----------
