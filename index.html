@@ -217,6 +217,10 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .hx{background:none;border:none;color:var(--muted);width:auto;padding:4px 6px;font-size:14px;cursor:pointer}
 .hrow{display:flex;align-items:center;gap:4px}
 button:disabled{opacity:.4;cursor:default;box-shadow:none}
+.histBtn{display:flex;align-items:center;justify-content:space-between;width:100%;margin-top:14px;padding:12px 14px;border-radius:14px;font-size:15px;text-align:left}
+.histBtn small{color:var(--muted);font-weight:400;font-size:13px}
+.histBtn i{font-style:normal;font-size:22px;line-height:1;color:var(--muted);transition:transform .2s}
+.histBtn[aria-expanded="true"] i{transform:rotate(90deg)}
 .clearAll{display:block;margin:14px auto 2px;color:var(--danger,#dc2626)!important;font-size:14px}
 .hday{margin:14px 0 2px;font-size:12px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
 .hday:first-child{margin-top:4px}
@@ -562,8 +566,9 @@ body::before{animation:drift 28s ease-in-out infinite alternate;will-change:tran
         </div>
       </div>
     </div>
-    <div class="card"><p><b>Últimos 7 días</b></p><div id="weekCtl" class="wkCtl hidden"></div><div id="week"></div><div id="weekInfo" class="wkInfo hidden" aria-live="polite"></div><div id="hist" style="margin-top:12px"></div>
-      <button class="link clearAll hidden" id="clearAllBtn" onclick="askClearAll()">🗑️ Borrar todo el historial</button></div>
+    <div class="card"><p><b>Últimos 7 días</b></p><div id="weekCtl" class="wkCtl hidden"></div><div id="week"></div><div id="weekInfo" class="wkInfo hidden" aria-live="polite"></div><button class="histBtn hidden" id="histBtn" aria-expanded="false" aria-controls="histBox" onclick="toggleHist()"><span>📋 <b>Ver historial</b> <small id="histN"></small></span><i aria-hidden="true">›</i></button>
+      <div id="histBox" class="hidden"><div id="hist" style="margin-top:8px"></div>
+      <button class="link clearAll hidden" id="clearAllBtn" onclick="askClearAll()">🗑️ Borrar todo el historial</button></div></div>
     <button class="notifBtn" id="notifBtn" aria-label="Notificaciones" onclick="openNotifs()">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 4.5 1.6 6.4 2.4 7.2.3.3.1.8-.3.8H3.9c-.4 0-.6-.5-.3-.8C4.4 15.4 6 13.5 6 9Z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M10 20.2a2.2 2.2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
       <span class="nbadge hidden" id="nBadge"></span>
@@ -1306,15 +1311,33 @@ function render() {
   for (const e of log) {
     const g = hist.find(h => h.kind === e.kind && h.who === e.who && h.created_at === e.created_at);
     if (g) { g.items.push(e); if (e.pet) g.pets.push(e.pet); }
-    else { if (hist.length >= 8) break; hist.push({ kind: e.kind, who: e.who, created_at: e.created_at, t: e.t, note: e.note, queued: e.queued, items: [e], pets: e.pet ? [e.pet] : [] }); }
+    else { if (hist.length >= 40) break; hist.push({ kind: e.kind, who: e.who, created_at: e.created_at, t: e.t, note: e.note, queued: e.queued, items: [e], pets: e.pet ? [e.pet] : [] }); }
   }
   const order = petsOf();
   hist.forEach(g => g.pets.sort((x, y) => order.indexOf(x) - order.indexOf(y)));
   histShown = hist;
   $("hist").innerHTML = histHtml(hist, order);
+  // Botón "Ver historial": el historial queda guardado hasta que se toca
+  $("histBtn").classList.toggle("hidden", !log.length);
+  $("histN").textContent = log.length ? `· ${hist.length === 1 ? "1 registro" : hist.length + " registros"}` : "";
+  if (!log.length) histOpen(false);
   $("clearAllBtn").classList.toggle("hidden", !log.length);
   bellUI();
 }
+
+// Mostrar u ocultar el historial (se recuerda mientras la página esté abierta)
+function histOpen(on) {
+  $("histBox").classList.toggle("hidden", !on);
+  $("histBtn").setAttribute("aria-expanded", on);
+  $("histBtn").querySelector("b").textContent = on ? "Ocultar historial" : "Ver historial";
+  try { sessionStorage.setItem("comitag_hist_" + code, on ? "1" : ""); } catch {}
+}
+function toggleHist() {
+  const on = $("histBox").classList.contains("hidden");
+  histOpen(on);
+  if (on) setTimeout(() => $("histBtn").scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+}
+document.addEventListener("DOMContentLoaded", () => { try { if (sessionStorage.getItem("comitag_hist_" + code)) histOpen(true); } catch {} });
 
 // ---- Historial: agrupado por día, con ícono, hora grande y mini fotos ----
 function dayTitle(d) {
