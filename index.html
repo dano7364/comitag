@@ -207,18 +207,12 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .note{background:var(--ok-bg);color:var(--ok);border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:14px;display:flex;align-items:center;gap:10px}
 .note span{flex:1}
 .note .link{color:var(--ok);font-weight:700;text-decoration:underline;padding:4px 0}
-/* Última comida / agua: mascotas agrupadas con su foto */
-.lpList{display:grid;gap:8px;margin-top:6px}
-.lpRow{display:flex;align-items:center;gap:8px;min-width:0}
-.lpPics{display:flex;flex:none}
-.lpPics>*{width:26px;height:26px;border-radius:50%;object-fit:cover;border:2px solid var(--card,#fff);margin-left:-9px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;box-sizing:border-box}
-.lpPics>*:first-child{margin-left:0}
-.lpPics .more{background:#9ca3af;color:#fff;font-size:10.5px}
-.lpRow.col{flex-direction:column;align-items:flex-start;gap:5px}
-.lpRow.col .lpTxt b{white-space:normal}
-.lpTxt{min-width:0;line-height:1.2}
-.lpTxt b{display:block;font-size:13.5px;font-weight:600;color:var(--text,inherit);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.lpTxt span{display:block;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Última comida / agua: mascotas agrupadas (sin fotos) */
+.lpList{margin-top:4px}
+.lpRow{padding:8px 0 8px 10px;border-left:3px solid var(--blue,#2563eb);margin-top:8px;border-radius:2px}
+.lpRow.old{border-left-color:var(--border,#d6cfc4)}
+.lpRow b{display:block;font-size:14.5px;font-weight:700;line-height:1.25;color:var(--text,inherit);overflow-wrap:anywhere}
+.lpRow span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
 .enote{display:block;color:var(--muted);font-size:12px;font-style:italic;margin-top:2px;overflow-wrap:anywhere}
 .hx{background:none;border:none;color:var(--muted);width:auto;padding:4px 6px;font-size:14px;cursor:pointer}
 .hrow{display:flex;align-items:center;gap:4px}
@@ -1203,16 +1197,10 @@ function lastByPet(kind, pets) {
     if (!g) groups.push(g = { key, e, pets: [] });
     g.pets.push({ p, i });
   });
-  const pic = ({ p, i }) => { const src = photoOf(p);
-    return src ? `<img src="${src}" alt="${esc(p)}" title="${esc(p)}">` : `<b style="background:${petColor(i)}" title="${esc(p)}">${esc(p.charAt(0).toUpperCase())}</b>`; };
   groups.sort((a, b) => (b.e ? b.e.t : 0) - (a.e ? a.e.t : 0));   // lo más reciente primero
-  return `<div class="lpList">${groups.map(g => {
-    const col = g.pets.length > 2;                          // varias: fotos arriba y texto abajo
-    const shown = g.pets.length > 6 ? g.pets.slice(0, 5) : g.pets;
-    const more = g.pets.length - shown.length;
+  return `<div class="lpList">${groups.map((g, k) => {
     const who = g.pets.length === pets.length && pets.length > 1 ? "Todas" : joinNames(g.pets.map(x => x.p));
-    return `<div class="lpRow${col ? " col" : ""}"><span class="lpPics">${shown.map(pic).join("")}${more ? `<span class="more">+${more}</span>` : ""}</span>
-      <span class="lpTxt"><b>${esc(who)}</b><span>${g.e ? esc(ago(g.e.t)) + " · " + esc(g.e.who) + (g.e.queued ? " ⏳" : "") : "Sin registros"}</span></span></div>`;
+    return `<div class="lpRow${k ? " old" : ""}"><b>${esc(who)}</b><span>${g.e ? esc(ago(g.e.t)) + " · " + esc(g.e.who) + (g.e.queued ? " ⏳" : "") : "Sin registros"}</span></div>`;
   }).join("")}</div>`;
 }
 
