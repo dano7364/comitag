@@ -171,6 +171,13 @@ section[data-pane] > .card:first-child{margin-top:16px}
 .inv{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:10px 0;border-top:1px solid var(--line);cursor:pointer}
 .inv:first-child{border-top:none}
 .inv .meta{color:var(--muted);font-size:12.5px;margin-top:2px}
+.qrMini{display:flex;flex-direction:column;align-items:center;gap:4px;flex:none}
+.qrMini .qi{width:64px;height:64px;background:#fff;border-radius:8px;padding:3px;border:1px solid var(--line)}
+.qrMini .qi svg{width:100%;height:100%;display:block}
+.qrMini button{font-size:12px;padding:4px 8px;border-radius:8px}
+.qrBig{display:flex;gap:14px;align-items:center;margin-top:12px;padding:12px;border-radius:14px;background:var(--bg)}
+.qrBig .qi{width:112px;height:112px;background:#fff;border-radius:10px;padding:4px;flex:none}
+.qrBig .qi svg{width:100%;height:100%;display:block}
 .switchRow{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px}
 input[type=date]{width:100%;font:inherit;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--bg);color:var(--text)}
 @media print{
@@ -1249,12 +1256,50 @@ function renderInv() {
   const paid = all.filter(p => p.paid).length;
   $("invSum").textContent = plates.length && "paid" in (plates[0] || {}) ? `${paid}/${all.length} pagados` : "–";
   if (plates.length && !("paid" in plates[0])) { $("invList").innerHTML = '<p class="muted err">Falta correr panel_extras.sql en Supabase.</p>'; return; }
-  $("invList").innerHTML = list.length ? list.map(p => `<div class="inv" data-inv="${esc(p.code)}"><div style="min-width:0">
+  const qrOk = !!window.qrcode;
+  if (!qrOk && list.some(p => p.pet_name)) ensureQR().then(ok => ok && renderInv());
+  $("invList").innerHTML = list.length ? list.map(p => `<div class="inv" data-inv="${esc(p.code)}">${p.pet_name && qrOk ? `<div class="qrMini"><div class="qi">${qrSvg(petUrl(p.code))}</div><button class="small" data-qdl="${esc(p.code)}">⬇️ QR</button></div>` : ""}<div style="min-width:0;flex:1">
       <b>${esc(p.pet_name || "Sin configurar")}</b> <span class="muted" style="font-size:12px">${esc(p.code)}</span>
       <div class="meta">${p.delivered_to ? "Entregado a " + esc(p.delivered_to) : "Sin datos de entrega"}${p.delivered_at ? " · " + esc(dShort(p.delivered_at + "T12:00:00")) : ""}${p.first_entry ? " · activado el " + esc(dShort(p.first_entry)) : " · sin activar"}${p.inv_note ? " · " + esc(p.inv_note) : ""}</div>
     </div><span class="tag ${p.paid ? "ok" : "warn"}">${p.paid ? "✅ Pagado" : "💸 Sin pagar"}</span></div>`).join("")
     : '<p class="muted">No hay dispositivos con este filtro.</p>';
-  $("invList").querySelectorAll("[data-inv]").forEach(el => el.onclick = () => openFicha(el.dataset.inv));
+  $("invList").querySelectorAll("[data-inv]").forEach(el => el.onclick = e => { if (!e.target.closest("[data-qdl]")) openFicha(el.dataset.inv); });
+  $("invList").querySelectorAll("[data-qdl]").forEach(b => b.onclick = e => {
+    e.stopPropagation(); const p = plates.find(x => x.code === b.dataset.qdl); downloadQR(p.code, p.pet_name, b);
+  });
+}
+
+// ---------- QR para descargar (imagen PNG con el nombre de la mascota) ----------
+const petUrl = c => `${SITE}/p/${c}`;
+async function ensureQR() {
+  if (window.qrcode) return true;
+  try { await loadScript(QR_LIB); return true; } catch { return false; }
+}
+async function downloadQR(code, name, btn) {
+  if (!await ensureQR()) { alert("No se pudo cargar el generador de QR. Revisa la conexión."); return; }
+  const qr = qrcode(0, "M"); qr.addData(petUrl(code)); qr.make();
+  const n = qr.getModuleCount(), S = 1000, pad = 70, cell = Math.floor((S - pad * 2) / n), off = Math.floor((S - cell * n) / 2);
+  const cv = document.createElement("canvas"); cv.width = S; cv.height = S + 190;
+  const g = cv.getContext("2d");
+  g.fillStyle = "#fff"; g.fillRect(0, 0, cv.width, cv.height); g.fillStyle = "#000";
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) g.fillRect(off + c * cell, off + r * cell, cell, cell);
+  g.textAlign = "center"; g.fillStyle = "#111";
+  let fs = 72; g.font = `bold ${fs}px -apple-system, Segoe UI, Roboto, sans-serif`;
+  const title = name || "Comitag";
+  while (g.measureText(title).width > S - 80 && fs > 30) { fs -= 4; g.font = `bold ${fs}px -apple-system, Segoe UI, Roboto, sans-serif`; }
+  g.fillText(title, S / 2, S + 60);
+  g.font = "36px -apple-system, Segoe UI, Roboto, sans-serif"; g.fillStyle = "#666";
+  g.fillText("Comitag 🐾 · " + code, S / 2, S + 125);
+  const file = `QR ${(name || code).replace(/[\\/:*?"<>|]/g, "")}.png`;
+  const blob = await new Promise(ok => cv.toBlob(ok, "image/png"));
+  const f = new File([blob], file, { type: "image/png" });
+  // En iPhone se abre el menú para "Guardar imagen"; en el computador se descarga directo
+  if (isIOS && navigator.canShare && navigator.canShare({ files: [f] })) {
+    try { await navigator.share({ files: [f], title: file }); return; } catch (e) { if (e && e.name === "AbortError") return; }
+  }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = file;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  if (btn) { const t = btn.textContent; btn.textContent = "✓ Listo"; setTimeout(() => btn.textContent = t, 1500); }
 }
 $("invF").querySelectorAll("button").forEach(b => b.onclick = () => {
   invFilter = b.dataset.f; $("invF").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); renderInv();
@@ -1287,6 +1332,7 @@ async function loadFicha() {
   if (code !== fichaCode) return;
   if (r.status !== 200) { $("fichaBody").innerHTML = `<div class="card"><p class="err">${r.status === 404 ? "Este plato ya no existe." : failTxt(r, "No se pudo cargar. ¿Se corrió panel_extras.sql?")}</p></div>`; return; }
   ficha = r.data; renderFicha();
+  if (!window.qrcode && await ensureQR() && code === fichaCode) renderFicha();
 }
 function renderFicha() {
   const f = ficha, p = plates.find(x => x.code === f.code) || {}, s = stateOf({ ...p, ...f, entries_7d: p.entries_7d });
@@ -1308,6 +1354,7 @@ function renderFicha() {
       ${fact("seguridad", [f.has_pin ? "🔒 PIN" : "Sin PIN", f.has_email ? "📧 correo" : ""].filter(Boolean).join(" · "))}
     </div>
     ${roles.length ? `<p class="muted" style="margin-top:10px">Quiénes: ${esc(roles.join(", "))}</p>` : ""}
+    ${window.qrcode ? `<div class="qrBig"><div class="qi">${qrSvg(petUrl(f.code))}</div><div><b>Código QR</b><p class="muted" style="font-size:13px;margin-top:2px">Lleva a la página de ${esc(pets.join(" y ") || "esta mascota")}.</p><button class="small primary" data-fa="qrdl" style="margin-top:8px">⬇️ Descargar QR</button></div></div>` : ""}
     <div class="actions">
       ${f.pet_name && !f.disabled ? '<button class="small" data-fa="msg">📣 Mandar anuncio</button>' : ""}
       <button class="small" data-fa="label">🏷️ Imprimir etiqueta</button>
@@ -1346,6 +1393,7 @@ function renderFicha() {
   B.querySelectorAll("[data-fa]").forEach(b => b.onclick = async () => {
     const a = b.dataset.fa;
     if (a === "msg") { showTab("anuncios"); $("to").value = f.code; preview(); $("title").focus(); }
+    if (a === "qrdl") downloadQR(f.code, pets.join(" y ") || f.pet_name, b);
     if (a === "label") printLabels([{ code: f.code, pet_name: pets.join(" y ") || f.pet_name }]);
     if (a === "copy") { try { await navigator.clipboard.writeText(nfcLink(f.code)); b.textContent = "✓ Copiado"; } catch { b.textContent = nfcLink(f.code); } }
   });
