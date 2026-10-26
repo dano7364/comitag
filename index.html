@@ -83,16 +83,28 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .ann .annF{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
 .ann .annF a{color:var(--blue);text-decoration:none;font-weight:600}
 /* Guía de notificaciones */
-.osPick{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
-.osPick button{padding:12px 8px;font-size:15px;border-radius:14px}
-.osPick button.on{border-color:var(--blue);color:var(--blue);font-weight:700;box-shadow:0 0 0 1px var(--blue) inset}
-.nSteps{list-style:none;counter-reset:st;padding:0;margin:14px 0 0}
-.nSteps li{counter-increment:st;position:relative;padding:0 0 12px 40px;line-height:1.4}
-.nSteps li::before{content:counter(st);position:absolute;left:0;top:-2px;width:28px;height:28px;border-radius:50%;background:var(--blue);color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center}
-.nSteps li b{display:block}
-.nSteps li span{font-size:14px;color:var(--muted)}
-.nTip{font-size:13px;color:var(--muted);background:var(--glass-input, rgba(0,0,0,.04));border-radius:12px;padding:10px 12px;margin-top:4px}
-.nOk{border-radius:12px;padding:10px 12px;margin-top:12px;font-size:14px;background:rgba(34,197,94,.12);color:inherit}
+.ngHero{text-align:center;margin:2px 0 4px}
+.ngPets{display:inline-flex;align-items:center;justify-content:center;position:relative;margin:4px 0 10px;padding-right:10px}
+.ngPets>*{width:64px;height:64px;border-radius:50%;border:3px solid var(--card,#fff);object-fit:cover;margin-left:-16px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:26px;font-weight:700;box-shadow:0 4px 12px rgba(0,0,0,.12)}
+.ngPets>*:first-child{margin-left:0}
+.ngPets .ngBell{position:absolute;right:-8px;bottom:-4px;width:34px;height:34px;margin:0;font-size:18px;background:#f59e0b;border-width:3px}
+.ngT{font-size:20px;font-weight:800;margin:0;letter-spacing:-.2px}
+.ngS{font-size:14px;color:var(--muted);margin:4px 8px 0}
+.osPick{display:flex;gap:4px;margin:16px 0 4px;padding:4px;border-radius:14px;background:var(--glass-input,rgba(0,0,0,.05))}
+.osPick button{flex:1;border:none;background:none;box-shadow:none;padding:9px 6px;font-size:15px;border-radius:10px;color:inherit}
+.osPick button.on{background:var(--card,#fff);font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.12)}
+.nSteps{list-style:none;padding:0;margin:12px 0 0;display:grid;gap:8px}
+.nSteps li{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:14px;background:var(--glass-input,rgba(0,0,0,.04));font-size:15px;line-height:1.3}
+.nSteps .ic{flex:none;width:36px;height:36px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:19px;background:var(--card,#fff);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.nSteps small{display:block;color:var(--muted);font-size:12.5px;margin-top:1px}
+.nSteps li.done{opacity:.55}
+.nSteps li.done .ic{background:#22c55e;color:#fff;font-size:16px}
+.nSteps li.now{box-shadow:0 0 0 2px var(--blue) inset}
+.nHelp{margin-top:12px;font-size:13.5px}
+.nHelp summary{cursor:pointer;color:var(--blue);font-weight:600;list-style:none;text-align:center}
+.nHelp summary::-webkit-details-marker{display:none}
+.nHelp p{margin:8px 0 0;color:var(--muted);line-height:1.4}
+.nOk{border-radius:14px;padding:12px;margin-top:14px;font-size:15px;font-weight:600;text-align:center;background:rgba(34,197,94,.14)}
 .maint{display:flex;gap:10px;align-items:flex-start;background:#fef3c7;color:#7c4a03;border:1px solid #f5d77a;border-radius:14px;padding:11px 14px;margin-bottom:12px;font-size:14px;line-height:1.4}
 @media (prefers-color-scheme:dark){.maint{background:#33290f;color:#fbd56b;border-color:#5a4512}}
 .poll{padding:16px 18px;margin-bottom:14px}
@@ -2527,36 +2539,41 @@ let guideOS = null;
 function openNotifGuide(os) {
   if (os) { guideOS = os; try { localStorage.setItem("comitag_os", os); } catch {} }
   if (!guideOS) { try { guideOS = localStorage.getItem("comitag_os"); } catch {} }
-  if (!guideOS) guideOS = isIOS ? "ios" : isAndroid ? "android" : "";
+  if (!guideOS) guideOS = isIOS ? "ios" : "android";
   const on = bellOn(), hasSched = !!(plate && (plate.schedule || []).length);
-  const step = (t, d) => `<li><b>${t}</b>${d ? `<span>${d}</span>` : ""}</li>`;
-  const ios = guideOS === "ios", android = guideOS === "android";
-  const here = ios ? isIOS : android ? isAndroid : false;      // ¿eligió el mismo tipo de teléfono que está usando?
-  let steps = "";
-  if (ios) steps = `<ol class="nSteps">
-      ${step("Abre Comitag en Safari", "No sirve desde Chrome, WhatsApp ni Instagram: copia el link y ábrelo en Safari.")}
-      ${step("Toca el botón Compartir", "Es el cuadrado con una flecha hacia arriba ⬆️, abajo en el centro (o arriba a la derecha).")}
-      ${step("Elige “Agregar a inicio” y luego “Agregar”", "Si no lo ves, desliza la lista hacia abajo.")}
-      ${step("Abre Comitag desde el nuevo ícono", "Busca el ícono de Comitag en tu pantalla de inicio. Desde ahí sí se pueden recibir avisos.")}
-      ${step("Toca “🔔 Avisarme” y luego “Permitir”", "El botón está en la tarjeta “Horarios de comida”, o usa el botón de abajo.")}
-    </ol>
-    <p class="nTip">📱 Necesitas iOS 16.4 o más nuevo (Ajustes → General → Información).<br>🚫 ¿Tocaste “No permitir”? Ve a Ajustes → Notificaciones → Comitag y activa “Permitir notificaciones”.</p>
-    ${isIOS && !isStandalone() ? `<p class="nTip" style="margin-top:8px">👉 Ahora mismo estás en el navegador. Haz los pasos 2 a 4 y vuelve a abrir esta guía desde el ícono.</p>` : ""}`;
-  if (android) steps = `<ol class="nSteps">
-      ${step("Abre Comitag en Chrome", "Si lo abriste desde WhatsApp o Instagram, toca ⋮ y “Abrir en Chrome”.")}
-      ${step("Toca “🔔 Avisarme” y luego “Permitir”", "El botón está en la tarjeta “Horarios de comida”, o usa el botón de abajo.")}
-      ${step("Opcional: instálalo como app", "En Chrome toca ⋮ (arriba a la derecha) → “Agregar a la pantalla principal” o “Instalar app”.")}
-    </ol>
-    <p class="nTip">🚫 ¿Tocaste “Bloquear”? Toca el ícono junto a la dirección de la página → Permisos → Notificaciones → Permitir. También puedes ir a Ajustes del teléfono → Apps → Chrome → Notificaciones.<br>🔋 Si los avisos llegan tarde, en Ajustes → Batería quita el “ahorro de batería” para Chrome.</p>`;
-  const canBtn = !on && here && hasSched && !(isIOS && !isStandalone());
-  openModal(`<p style="font-size:18px;margin-top:4px"><b>🔔 Activar notificaciones</b></p>
-    <p class="muted">Te llega un aviso si pasan 15 minutos de un horario y nadie registró la comida, y también los anuncios de Comitag. Se activa en cada teléfono por separado.</p>
-    ${on ? `<p class="nOk">✅ Este teléfono ya tiene las notificaciones activadas.</p>` : ""}
-    <p class="eLbl" style="margin-top:14px">¿Qué teléfono tienes?</p>
-    <div class="osPick"><button class="${ios ? "on" : ""}" onclick="openNotifGuide('ios')">📱 iPhone</button><button class="${android ? "on" : ""}" onclick="openNotifGuide('android')">🤖 Android</button></div>
-    ${steps || '<p class="muted" style="margin-top:12px">Elige tu teléfono para ver los pasos.</p>'}
-    ${(ios || android) && !hasSched && !on ? `<p class="nTip" style="margin-top:8px">⏰ Primero agrega al menos un horario de comida en la tarjeta “Horarios de comida”: los avisos dependen de esos horarios.</p>` : ""}
-    ${canBtn ? `<button class="primary" style="width:100%;margin-top:14px" onclick="closeModal();guideActivate()">🔔 Activar en este teléfono</button>` : ""}
+  const ios = guideOS === "ios", here = ios ? isIOS : isAndroid;
+  const app = isStandalone();
+  // Fotos de las mascotas arriba (o su inicial)
+  const names = petsOf().length ? petsOf() : [(plate && plate.pet_name) || "Mascota"];
+  const pics = names.slice(0, 3).map((p, k) => {
+    const src = names.length > 1 ? photoOf(p) : platePhoto;
+    return src ? `<img src="${src}" alt="">` : `<b style="background:${petColor(k)}">${esc(p.charAt(0).toUpperCase())}</b>`;
+  }).join("");
+  // Pasos cortos; en el iPhone se marcan los que ya están hechos
+  const st = (ic, t, d, cls = "") => `<li class="${cls}"><span class="ic">${cls === "done" ? "✓" : ic}</span><span>${t}${d ? `<small>${d}</small>` : ""}</span></li>`;
+  const inApp = here && app;
+  const steps = ios
+    ? st("🧭", "Ábrelo en <b>Safari</b>", "No desde WhatsApp ni Instagram", inApp ? "done" : "") +
+      st("⬆️", "Toca <b>Compartir</b> → <b>Agregar a inicio</b>", "", inApp ? "done" : (here ? "now" : "")) +
+      st("📱", "Abre Comitag desde el <b>ícono</b>", "", inApp ? "done" : "") +
+      st("🔔", "Toca <b>Avisarme</b> → <b>Permitir</b>", "", on ? "done" : inApp ? "now" : "")
+    : st("🌐", "Ábrelo en <b>Chrome</b>", "No desde WhatsApp ni Instagram", here ? "done" : "") +
+      st("🔔", "Toca <b>Avisarme</b> → <b>Permitir</b>", "", on ? "done" : here ? "now" : "");
+  const help = ios
+    ? `<p>🚫 <b>¿Tocaste “No permitir”?</b> Ajustes → Notificaciones → Comitag → Permitir.</p><p>📱 Necesitas iOS 16.4 o más nuevo (Ajustes → General → Información).</p>`
+    : `<p>🚫 <b>¿Tocaste “Bloquear”?</b> Toca el ícono junto a la dirección → Permisos → Notificaciones → Permitir.</p><p>🔋 <b>¿Llegan tarde?</b> Ajustes → Batería: quita el ahorro de batería para Chrome.</p><p>📲 Puedes instalarlo como app: en Chrome toca ⋮ → “Instalar app”.</p>`;
+  const canBtn = !on && here && hasSched && !(isIOS && !app);
+  openModal(`<div class="ngHero">
+      <div class="ngPets">${pics}<span class="ngBell">🔔</span></div>
+      <p class="ngT">${on ? "Avisos activados" : "Activa los avisos"}</p>
+      <p class="ngS">Te avisamos si pasan 15 minutos de un horario y nadie le dio comida a ${esc(joinNames(names))}.</p>
+    </div>
+    ${on ? `<p class="nOk">✅ Este teléfono ya recibe los avisos</p>` : `
+    <div class="osPick" role="tablist"><button role="tab" class="${ios ? "on" : ""}" onclick="openNotifGuide('ios')">📱 iPhone</button><button role="tab" class="${ios ? "" : "on"}" onclick="openNotifGuide('android')">🤖 Android</button></div>
+    <ol class="nSteps">${steps}</ol>
+    ${!hasSched ? `<p class="ngS" style="margin-top:10px">⏰ Primero agrega un horario de comida.</p>` : ""}
+    ${canBtn ? `<button class="primary" style="width:100%;margin-top:14px" onclick="closeModal();guideActivate()">🔔 Activar avisos</button>` : ""}
+    <details class="nHelp"><summary>¿Problemas?</summary>${help}</details>`}
     <button class="link" style="display:block;margin:10px auto 0" onclick="closeModal()">Cerrar</button>`);
 }
 async function guideActivate() {
