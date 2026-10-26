@@ -82,6 +82,17 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .ann .annB{margin:0;line-height:1.45;white-space:pre-line}
 .ann .annF{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
 .ann .annF a{color:var(--blue);text-decoration:none;font-weight:600}
+/* Guía de notificaciones */
+.osPick{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.osPick button{padding:12px 8px;font-size:15px;border-radius:14px}
+.osPick button.on{border-color:var(--blue);color:var(--blue);font-weight:700;box-shadow:0 0 0 1px var(--blue) inset}
+.nSteps{list-style:none;counter-reset:st;padding:0;margin:14px 0 0}
+.nSteps li{counter-increment:st;position:relative;padding:0 0 12px 40px;line-height:1.4}
+.nSteps li::before{content:counter(st);position:absolute;left:0;top:-2px;width:28px;height:28px;border-radius:50%;background:var(--blue);color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center}
+.nSteps li b{display:block}
+.nSteps li span{font-size:14px;color:var(--muted)}
+.nTip{font-size:13px;color:var(--muted);background:var(--glass-input, rgba(0,0,0,.04));border-radius:12px;padding:10px 12px;margin-top:4px}
+.nOk{border-radius:12px;padding:10px 12px;margin-top:12px;font-size:14px;background:rgba(34,197,94,.12);color:inherit}
 .maint{display:flex;gap:10px;align-items:flex-start;background:#fef3c7;color:#7c4a03;border:1px solid #f5d77a;border-radius:14px;padding:11px 14px;margin-bottom:12px;font-size:14px;line-height:1.4}
 @media (prefers-color-scheme:dark){.maint{background:#33290f;color:#fbd56b;border-color:#5a4512}}
 .poll{padding:16px 18px;margin-bottom:14px}
@@ -522,6 +533,7 @@ body::before{animation:drift 28s ease-in-out infinite alternate;will-change:tran
       <div id="menuList" class="menuList" role="menu">
         <button role="menuitem" onclick="menuDo(openAuto)"><i class="mi">📲</i><span>Registrar al acercar</span></button>
         <button role="menuitem" onclick="menuDo(openInvite)"><i class="mi">👨‍👩‍👧</i><span>Invitar a la familia</span></button>
+        <button role="menuitem" onclick="menuDo(openNotifGuide)"><i class="mi">🔔</i><span>Activar notificaciones</span></button>
         <button role="menuitem" onclick="menuDo(openWaMenu)"><i class="mi">💬</i><span>Avisos por WhatsApp</span></button>
         <button role="menuitem" onclick="menuDo(openAddPet)"><i class="mi">＋</i><span>Agregar otra mascota</span></button>
         <button role="menuitem" onclick="menuDo(openPinSettings)"><i class="mi">🔒</i><span id="pinLink">PIN familiar</span></button>
@@ -2507,6 +2519,51 @@ async function toggleBell() {
     if (error) return say(error.code === "PGRST202" ? "Falta configurar los avisos en Supabase (parte 2)." : "No se pudo activar. Intenta de nuevo.");
     lsSet(bellKey(), true); bellUI();
   } catch (e) { console.error(e); say("No se pudo activar los avisos en este teléfono."); }
+}
+
+// ================= Guía para activar las notificaciones (iPhone / Android) =================
+const isAndroid = /Android/i.test(navigator.userAgent);
+let guideOS = null;
+function openNotifGuide(os) {
+  if (os) { guideOS = os; try { localStorage.setItem("comitag_os", os); } catch {} }
+  if (!guideOS) { try { guideOS = localStorage.getItem("comitag_os"); } catch {} }
+  if (!guideOS) guideOS = isIOS ? "ios" : isAndroid ? "android" : "";
+  const on = bellOn(), hasSched = !!(plate && (plate.schedule || []).length);
+  const step = (t, d) => `<li><b>${t}</b>${d ? `<span>${d}</span>` : ""}</li>`;
+  const ios = guideOS === "ios", android = guideOS === "android";
+  const here = ios ? isIOS : android ? isAndroid : false;      // ¿eligió el mismo tipo de teléfono que está usando?
+  let steps = "";
+  if (ios) steps = `<ol class="nSteps">
+      ${step("Abre Comitag en Safari", "No sirve desde Chrome, WhatsApp ni Instagram: copia el link y ábrelo en Safari.")}
+      ${step("Toca el botón Compartir", "Es el cuadrado con una flecha hacia arriba ⬆️, abajo en el centro (o arriba a la derecha).")}
+      ${step("Elige “Agregar a inicio” y luego “Agregar”", "Si no lo ves, desliza la lista hacia abajo.")}
+      ${step("Abre Comitag desde el nuevo ícono", "Busca el ícono de Comitag en tu pantalla de inicio. Desde ahí sí se pueden recibir avisos.")}
+      ${step("Toca “🔔 Avisarme” y luego “Permitir”", "El botón está en la tarjeta “Horarios de comida”, o usa el botón de abajo.")}
+    </ol>
+    <p class="nTip">📱 Necesitas iOS 16.4 o más nuevo (Ajustes → General → Información).<br>🚫 ¿Tocaste “No permitir”? Ve a Ajustes → Notificaciones → Comitag y activa “Permitir notificaciones”.</p>
+    ${isIOS && !isStandalone() ? `<p class="nTip" style="margin-top:8px">👉 Ahora mismo estás en el navegador. Haz los pasos 2 a 4 y vuelve a abrir esta guía desde el ícono.</p>` : ""}`;
+  if (android) steps = `<ol class="nSteps">
+      ${step("Abre Comitag en Chrome", "Si lo abriste desde WhatsApp o Instagram, toca ⋮ y “Abrir en Chrome”.")}
+      ${step("Toca “🔔 Avisarme” y luego “Permitir”", "El botón está en la tarjeta “Horarios de comida”, o usa el botón de abajo.")}
+      ${step("Opcional: instálalo como app", "En Chrome toca ⋮ (arriba a la derecha) → “Agregar a la pantalla principal” o “Instalar app”.")}
+    </ol>
+    <p class="nTip">🚫 ¿Tocaste “Bloquear”? Toca el ícono junto a la dirección de la página → Permisos → Notificaciones → Permitir. También puedes ir a Ajustes del teléfono → Apps → Chrome → Notificaciones.<br>🔋 Si los avisos llegan tarde, en Ajustes → Batería quita el “ahorro de batería” para Chrome.</p>`;
+  const canBtn = !on && here && hasSched && !(isIOS && !isStandalone());
+  openModal(`<p style="font-size:18px;margin-top:4px"><b>🔔 Activar notificaciones</b></p>
+    <p class="muted">Te llega un aviso si pasan 15 minutos de un horario y nadie registró la comida, y también los anuncios de Comitag. Se activa en cada teléfono por separado.</p>
+    ${on ? `<p class="nOk">✅ Este teléfono ya tiene las notificaciones activadas.</p>` : ""}
+    <p class="eLbl" style="margin-top:14px">¿Qué teléfono tienes?</p>
+    <div class="osPick"><button class="${ios ? "on" : ""}" onclick="openNotifGuide('ios')">📱 iPhone</button><button class="${android ? "on" : ""}" onclick="openNotifGuide('android')">🤖 Android</button></div>
+    ${steps || '<p class="muted" style="margin-top:12px">Elige tu teléfono para ver los pasos.</p>'}
+    ${(ios || android) && !hasSched && !on ? `<p class="nTip" style="margin-top:8px">⏰ Primero agrega al menos un horario de comida en la tarjeta “Horarios de comida”: los avisos dependen de esos horarios.</p>` : ""}
+    ${canBtn ? `<button class="primary" style="width:100%;margin-top:14px" onclick="closeModal();guideActivate()">🔔 Activar en este teléfono</button>` : ""}
+    <button class="link" style="display:block;margin:10px auto 0" onclick="closeModal()">Cerrar</button>`);
+}
+async function guideActivate() {
+  await toggleBell();
+  const c = $("bellBtn").closest(".card");
+  if (c) c.scrollIntoView({ behavior: "smooth", block: "center" });
+  if (bellOn()) showNote("🔔 Listo: este teléfono recibirá las notificaciones.");
 }
 
 // ================= Abrir una mascota con su link o código =================
