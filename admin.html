@@ -596,6 +596,11 @@ async function pinLogin() {
   $("pinLoginBtn").disabled = false;
   if (r.status === 200 && r.data.session) {
     session = r.data.session; key = "";
+    // El PIN ya trae todo el panel: no hay que pedirlo de nuevo
+    if (r.data.boot && r.data.boot.count) {
+      cacheFill(r.data.boot, Date.now());
+      try { localStorage.setItem(SNAP, JSON.stringify({ at: Date.now(), parts: r.data.boot })); } catch {}
+    }
     try { sessionStorage.setItem("comitag_admin_sesion", session); localStorage.removeItem("comitag_admin"); } catch {}
     $("pinIn").value = ""; openPanel(); return;
   }
@@ -1535,7 +1540,8 @@ $("logBtn").onclick = loadLog;
 function openPanel() {
   let t = "home"; try { t = sessionStorage.getItem("comitag_admin_tab") || t; } catch {}   // se lee antes: entrar muestra el inicio
   // Se muestra al tiro lo último que viste y se actualiza por detrás
-  const snap = snapRead();
+  const justLoaded = rcache.count && Date.now() - rcache.count.at < 10000;   // recién llegó con el PIN
+  const snap = justLoaded ? null : snapRead();
   let fresh = null;
   if (snap) { cacheFill(snap.parts, Date.now()); fresh = boot(); }
   enter().then(ok => {
