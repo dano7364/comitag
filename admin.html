@@ -489,7 +489,35 @@ try { key = localStorage.getItem("comitag_admin") || ""; } catch {}
 try { session = sessionStorage.getItem("comitag_admin_sesion") || ""; } catch {}
 let phones = 0, plates = [];
 
+// ---------- Rapidez: un solo pedido al entrar y lo último visto guardado ----------
+// Lo que solo se lee se guarda 30 s; cualquier cambio borra lo guardado.
+const READS = new Set(["count", "pin_status", "list", "plates", "messages", "settings", "polls", "log", "health", "contact_get"]);
+const SNAP = "comitag_admin_snap";
+let rcache = {};
+function cacheFill(parts, at) { for (const [k, v] of Object.entries(parts || {})) if (READS.has(k) && v && v.status === 200) rcache[k] = { at, res: v }; }
+function snapRead() { try { const s = JSON.parse(localStorage.getItem(SNAP) || "null"); return s && s.parts ? s : null; } catch { return null; } }
+function snapClear() { try { localStorage.removeItem(SNAP); } catch {} }
+async function boot() {
+  let r; try { r = await apiRaw({ action: "boot" }); } catch { return 0; }
+  if (r.status === 200 && r.data && r.data.count) {
+    cacheFill(r.data, Date.now());
+    try { localStorage.setItem(SNAP, JSON.stringify({ at: Date.now(), parts: r.data })); } catch {}
+  }
+  return r.status;
+}
 async function api(body) {
+  const a = body && body.action, only = body && Object.keys(body).length === 1;
+  if (READS.has(a) && only) {
+    const c = rcache[a];
+    if (c && Date.now() - c.at < 30000) return JSON.parse(JSON.stringify(c.res));
+    const r = await apiRaw(body);
+    if (r.status === 200) rcache[a] = { at: Date.now(), res: JSON.parse(JSON.stringify(r)) };
+    return r;
+  }
+  if (!READS.has(a) && a !== "boot") rcache = {};          // algo cambió: se vuelve a pedir lo nuevo
+  return apiRaw(body);
+}
+async function apiRaw(body) {
   const r = await fetch(FN, { method: "POST",
     headers: { "Content-Type": "application/json", apikey: PUB, ...(session ? { "x-admin-session": session } : { "x-admin-secret": key }) },
     body: JSON.stringify(body) });
@@ -515,9 +543,11 @@ function ask(title, text, okLabel = "Sí", word = "") {
 async function enter() {
   $("loginErr").textContent = "";
   let r;
+  if (!rcache.count) await boot();
   try { r = await api({ action: "count" }); }
   catch { $("loginErr").textContent = "No hay conexión, o falta crear la función “anuncio” en Supabase."; return false; }
   if (r.status === 401) {
+    rcache = {}; snapClear();
     if (session) { session = ""; try { sessionStorage.removeItem("comitag_admin_sesion"); } catch {} showLogin(); return false; }
     $("loginErr").textContent = "Clave incorrecta."; return false;
   }
@@ -545,7 +575,7 @@ $("key").onkeydown = e => { if (e.key === "Enter") $("loginBtn").click(); };
 $("logout").onclick = async () => {
   if (session) await api({ action: "logout" }).catch(() => {});
   try { localStorage.removeItem("comitag_admin"); sessionStorage.removeItem("comitag_admin_sesion"); } catch {}
-  location.reload();
+  snapClear(); location.reload();
 };
 
 // ---------- Entrar con PIN (lo revisa Supabase; 5 intentos fallidos = 15 min bloqueado) ----------
@@ -1504,7 +1534,16 @@ $("logBtn").onclick = loadLog;
 
 function openPanel() {
   let t = "home"; try { t = sessionStorage.getItem("comitag_admin_tab") || t; } catch {}   // se lee antes: entrar muestra el inicio
+  // Se muestra al tiro lo último que viste y se actualiza por detrás
+  const snap = snapRead();
+  let fresh = null;
+  if (snap) { cacheFill(snap.parts, Date.now()); fresh = boot(); }
   enter().then(ok => {
+    if (ok && fresh) fresh.then(st => {
+      if (st === 401) { rcache = {}; snapClear(); enter(); return; }     // la sesión venció: pide entrar de nuevo
+      if (st !== 200) return;
+      pinUI(); loadAnn(); loadPlates(true); loadMsgs(); loadHealth(); loadSettings(true); loadPolls(); loadLog();
+    });
     if (!ok) { $("key").value = ""; if ($("login").classList.contains("hidden")) showLogin(); return; }
     showTab("home");                                   // el inicio queda detrás, para volver con ‹ Inicio
     if (t !== "home") showTab(t);
