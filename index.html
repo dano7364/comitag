@@ -513,7 +513,7 @@ body::before{animation:drift 28s ease-in-out infinite alternate;will-change:tran
         <button role="menuitem" onclick="menuDo(openAddPet)"><i class="mi">＋</i><span>Agregar otra mascota</span></button>
         <button role="menuitem" onclick="menuDo(openPinSettings)"><i class="mi">🔒</i><span id="pinLink">PIN familiar</span></button>
         <button role="menuitem" onclick="menuDo(() => startTour(true))"><i class="mi">💡</i><span>Ver tutorial</span></button>
-        <button role="menuitem" onclick="menuDo(openSuggest)"><i class="mi">💡</i><span>Enviar sugerencia</span></button>
+        <button role="menuitem" onclick="menuDo(openSuggest)"><i class="mi">✍️</i><span>Enviar sugerencia</span></button>
         <button role="menuitem" onclick="menuDo(openHelp)"><i class="mi">🆘</i><span>Contacto y ayuda</span></button>
         <button role="menuitem" onclick="cycleTheme()"><i class="mi">🌓</i><span class="themeLbl">Tema</span></button>
         <button role="menuitem" class="mdanger" onclick="menuDo(askRemoveHere)"><i class="mi">🗑️</i><span>Quitar de este teléfono</span></button>
@@ -2433,7 +2433,7 @@ async function sendMsg(kind, body, reply) {
   return r.data === "ok" ? true : "No se pudo enviar. Intenta de nuevo.";
 }
 function openSuggest() {
-  openModal(`<p style="font-size:18px;margin-top:4px"><b>💡 Enviar sugerencia</b></p>
+  openModal(`<p style="font-size:18px;margin-top:4px"><b>✍️ Enviar sugerencia</b></p>
     <p class="muted">¿Qué te gustaría que tuviera Comitag, o qué mejorarías? Lo leemos todo.</p>
     <textarea id="sgIn" maxlength="600" rows="5" placeholder="Ej: que se pueda anotar cuánta comida le di" style="margin-top:12px;width:100%;box-sizing:border-box;font:inherit;padding:12px;border-radius:12px;border:1px solid var(--border);resize:vertical"></textarea>
     <p id="sgErr" class="muted warn" style="margin-top:8px"></p>
@@ -2446,7 +2446,7 @@ function openSuggest() {
     const ok = await sendMsg("sugerencia", t);
     $("sgOk").disabled = false;
     if (ok !== true) { $("sgErr").textContent = ok; return; }
-    closeModal(); showNote("💡 ¡Gracias! Tu sugerencia llegó.");
+    closeModal(); showNote("✍️ ¡Gracias! Tu sugerencia llegó.");
   };
 }
 async function openHelp() {
