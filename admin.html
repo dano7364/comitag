@@ -109,6 +109,34 @@ table.tv td:last-child,table.tv th:last-child{text-align:right;font-variant-nume
 .annBtns{display:flex;gap:18px;flex-wrap:wrap;margin-top:6px}
 .annBtns .link{padding:0}
 .annDel{color:#dc2626!important}
+/* ===== Inicio con cuadros ===== */
+.homeHead{margin:2px 2px 12px}
+.homeHead h1{font-size:26px;letter-spacing:-.3px}
+.sumRow{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.sum{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 10px;text-align:center;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+.sum b{display:block;font-size:24px;line-height:1.1;font-variant-numeric:tabular-nums}
+.sum span{display:block;font-size:11.5px;color:var(--muted);line-height:1.25;margin-top:3px}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.tile{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;padding:16px 14px 15px;min-height:132px;
+  border-radius:20px;border:1px solid var(--line);background:linear-gradient(160deg,color-mix(in srgb,var(--c) 9%,var(--card)) 0%,var(--card) 70%);
+  box-shadow:0 1px 2px rgba(0,0,0,.04),0 6px 18px rgba(0,0,0,.04);transition:transform .15s,box-shadow .15s}
+.tile:active{transform:scale(.97)}
+.tile:hover{box-shadow:0 2px 4px rgba(0,0,0,.05),0 10px 24px rgba(0,0,0,.07)}
+.tile .tIc{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:23px;margin-bottom:8px;
+  background:color-mix(in srgb,var(--c) 16%,transparent)}
+.tile b{font-size:17px}
+.tile small{font-size:13px;color:var(--muted);line-height:1.3}
+.tile .tBadge{position:absolute;top:14px;right:14px;margin:0;min-width:22px;height:22px;line-height:22px;border-radius:11px;font-size:12px}
+.homeFoot{margin-top:22px}
+/* ===== Barra de cada sección ===== */
+.secBar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;margin:0 -16px;padding:12px 16px;
+  background:color-mix(in srgb,var(--bg) 85%,transparent);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+.secBar .back{border:none;background:var(--chip);border-radius:99px;padding:7px 13px;font-size:15px;font-weight:600;color:var(--blue)}
+.secTitle{font-weight:700;font-size:18px}
+/* Cuadros de cada sección un poco más marcados */
+.card{border-radius:20px;box-shadow:0 1px 2px rgba(0,0,0,.03),0 6px 18px rgba(0,0,0,.035)}
+section[data-pane] > .card:first-child{margin-top:16px}
+@media (prefers-color-scheme:dark){.tile,.sum,.card{box-shadow:none}}
 </style>
 </head>
 <body>
@@ -135,17 +163,35 @@ table.tv td:last-child,table.tv th:last-child{text-align:right;font-variant-nume
   </section>
 
   <div id="panel" class="hidden">
-    <nav class="tabs" role="tablist">
-      <button role="tab" data-tab="anuncios" aria-selected="true">📣 Anuncios</button>
-      <button role="tab" data-tab="pegatinas" aria-selected="false">🏷️ Pegatinas</button>
-      <button role="tab" data-tab="platos" aria-selected="false">🍽️ Platos</button>
-      <button role="tab" data-tab="numeros" aria-selected="false">📊 Números</button>
-      <button role="tab" data-tab="mensajes" aria-selected="false">💬 Mensajes<span class="tabBadge hidden" id="msgBadge"></span></button>
-      <button role="tab" data-tab="sistema" aria-selected="false">🚦 Sistema</button>
-    </nav>
+    <!-- ===== Inicio: un cuadro por función ===== -->
+    <div id="home">
+      <div class="homeHead">
+        <h1>Panel del dueño</h1>
+        <p class="muted" id="homeDate"></p>
+      </div>
+      <div class="sumRow">
+        <div class="sum"><b id="sPlates">–</b><span>familias</span></div>
+        <div class="sum"><b id="sPhones">–</b><span>teléfonos con avisos</span></div>
+        <div class="sum"><b id="sWeek">–</b><span>activas esta semana</span></div>
+      </div>
+      <div class="tiles">
+        <button class="tile" data-go="anuncios" style="--c:#2f6bff"><span class="tIc">📣</span><b>Anuncios</b><small id="tAnn">Mandar avisos a las familias</small></button>
+        <button class="tile" data-go="mensajes" style="--c:#d9618f"><span class="tIc">💬</span><b>Mensajes</b><small id="tMsg">Sugerencias y ayuda</small><span class="tabBadge tBadge hidden" id="msgBadge"></span></button>
+        <button class="tile" data-go="platos" style="--c:#eb6834"><span class="tIc">🍽️</span><b>Platos</b><small id="tPlates">Familias y soporte</small></button>
+        <button class="tile" data-go="pegatinas" style="--c:#1baf7a"><span class="tIc">📟</span><b>Dispositivos</b><small id="tFree">Crear y entregar</small></button>
+        <button class="tile" data-go="numeros" style="--c:#7c5cff"><span class="tIc">📊</span><b>Números</b><small>Uso de los últimos 30 días</small></button>
+        <button class="tile" data-go="sistema" style="--c:#e9a000"><span class="tIc">🚦</span><b>Sistema</b><small id="tSys">Estado de los servicios</small></button>
+      </div>
+    </div>
+
+    <!-- Barra de cada sección -->
+    <div id="secBar" class="secBar hidden">
+      <button class="back" id="backBtn" aria-label="Volver al inicio">‹ Inicio</button>
+      <span class="secTitle" id="secTitle"></span>
+    </div>
 
     <!-- ===== Anuncios ===== -->
-    <section data-pane="anuncios">
+    <section data-pane="anuncios" class="hidden">
       <div class="card">
         <h2>Mandar un anuncio</h2>
         <p class="muted">Aparece arriba en la página y, si quieres, llega como notificación.</p>
@@ -181,16 +227,16 @@ table.tv td:last-child,table.tv th:last-child{text-align:right;font-variant-nume
     <!-- ===== Pegatinas ===== -->
     <section data-pane="pegatinas" class="hidden">
       <div class="card">
-        <h2>Crear pegatinas nuevas</h2>
-        <p class="muted">Cada pegatina es un plato nuevo. La familia lo configura la primera vez que acerca el teléfono.</p>
+        <h2>Crear dispositivos nuevos</h2>
+        <p class="muted">Cada dispositivo es un plato nuevo. La familia lo configura la primera vez que acerca el teléfono.</p>
         <label for="nNew">¿Cuántas?</label>
         <input id="nNew" type="number" min="1" max="100" value="10" inputmode="numeric">
-        <button class="primary wide" id="createBtn">Crear pegatinas</button>
+        <button class="primary wide" id="createBtn">Crear dispositivos</button>
         <p id="createMsg" class="msg"></p>
       </div>
       <div class="card" id="newBox">
-        <div class="row"><h2 style="margin:0">Pegatinas sin entregar</h2><span class="tag" id="nFree">–</span></div>
-        <p class="muted" style="margin-top:4px">Graba cada link en una pegatina con NFC Tools (Escribir → Agregar registro → URL). El QR sirve de respaldo.</p>
+        <div class="row"><h2 style="margin:0">Dispositivos sin entregar</h2><span class="tag" id="nFree">–</span></div>
+        <p class="muted" style="margin-top:4px">Graba cada link en un dispositivo con NFC Tools (Escribir → Agregar registro → URL). El QR sirve de respaldo.</p>
         <div class="actions"><button class="small" id="copyAll">Copiar todos los links</button><button class="small" id="printQr">Imprimir QR</button></div>
         <div id="freeList" class="links" style="margin-top:10px"></div>
       </div>
@@ -220,7 +266,7 @@ table.tv td:last-child,table.tv th:last-child{text-align:right;font-variant-nume
         <div class="stat"><b id="sConf">–</b><span>platos configurados</span></div>
         <div class="stat"><b id="sAct">–</b><span>activos esta semana</span></div>
         <div class="stat"><b id="sPh">–</b><span>teléfonos con notificaciones</span></div>
-        <div class="stat"><b id="sFree">–</b><span>pegatinas sin entregar</span></div>
+        <div class="stat"><b id="sFree">–</b><span>dispositivos sin entregar</span></div>
       </div>
       <div class="card"><div class="row"><h2 style="margin:0">Comidas registradas por día</h2><button class="link" data-tv="cMeals">Ver tabla</button></div>
         <p class="muted">Últimos 30 días · una comida para varias mascotas cuenta una vez</p><div class="chart" id="cMeals"></div></div>
@@ -259,9 +305,11 @@ table.tv td:last-child,table.tv th:last-child{text-align:right;font-variant-nume
       </div>
     </section>
 
-    <p style="text-align:center;margin-top:18px"><button class="link hidden" id="faceBtn"></button></p>
-    <p id="faceMsg" class="msg hidden" style="text-align:center"></p>
-    <p style="text-align:center;margin-top:6px"><button class="link" id="logout">Salir de este teléfono</button></p>
+    <div id="homeFoot" class="homeFoot">
+      <p style="text-align:center;margin:0"><button class="link hidden" id="faceBtn"></button></p>
+      <p id="faceMsg" class="msg hidden" style="text-align:center"></p>
+      <p style="text-align:center;margin-top:6px"><button class="link" id="logout">Salir de este teléfono</button></p>
+    </div>
   </div>
 </main>
 
@@ -333,8 +381,9 @@ async function enter() {
   if (r.status !== 200) { $("loginErr").textContent = "Algo falló. Intenta de nuevo."; return false; }
   phones = r.data.phones;
   $("login").classList.add("hidden"); $("panel").classList.remove("hidden");
+  if ($("secBar").classList.contains("hidden")) showTab("home", false);
   faceUI();
-  loadAnn(); loadPlates(); loadMsgs();
+  loadAnn(); loadPlates(); loadMsgs(); loadHealth();
   return true;
 }
 $("loginBtn").onclick = async () => {
@@ -441,16 +490,41 @@ $("faceBtn").onclick = async () => {
 
 // ---------- Pestañas ----------
 const loaded = {};
-function showTab(t) {
-  document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === t));
+const TITLES = { anuncios: "📣 Anuncios", mensajes: "💬 Mensajes", platos: "🍽️ Platos", pegatinas: "📟 Dispositivos", numeros: "📊 Números", sistema: "🚦 Sistema" };
+function showTab(t, push = true) {
+  if (!TITLES[t]) t = "home";
+  const home = t === "home";
+  $("home").classList.toggle("hidden", !home); $("homeFoot").classList.toggle("hidden", !home);
+  $("secBar").classList.toggle("hidden", home); $("secTitle").textContent = TITLES[t] || "";
   document.querySelectorAll("[data-pane]").forEach(p => p.classList.toggle("hidden", p.dataset.pane !== t));
+  if (push) try { history[home ? "replaceState" : "pushState"]({ tab: t }, ""); } catch {}
+  window.scrollTo(0, 0);
+  if (home) { tileStats(); try { sessionStorage.setItem("comitag_admin_tab", t); } catch {} return; }
+  try { sessionStorage.setItem("comitag_admin_tab", t); } catch {}
   if (t === "numeros") loadStats();
   if (t === "sistema" && !loaded.health) loadHealth();
   if (t === "mensajes") { loadMsgs(); if (!loaded.contact) loadContact(); }
   if (t === "platos" || t === "pegatinas") loadPlates();
   try { sessionStorage.setItem("comitag_admin_tab", t); } catch {}
 }
-document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => showTab(b.dataset.tab));
+document.querySelectorAll(".tile").forEach(b => b.onclick = () => showTab(b.dataset.go));
+$("backBtn").onclick = () => { if (history.state && history.state.tab && history.state.tab !== "home") history.back(); else showTab("home"); };
+window.addEventListener("popstate", e => { if (!$("panel").classList.contains("hidden")) showTab((e.state && e.state.tab) || "home", false); });
+// Resumen en el inicio y en cada cuadro
+let annCache = [];
+function tileStats() {
+  const conf = plates.filter(p => p.pet_name && !p.disabled), free = plates.filter(p => !p.pet_name && !p.disabled);
+  const unread = msgs.filter(m => !m.read).length, onPage = annCache.filter(a => a.active && !(a.send_at && new Date(a.send_at) > Date.now())).length;
+  const sched = annCache.filter(a => a.active && a.send_at && new Date(a.send_at) > Date.now()).length;
+  $("sPlates").textContent = plates.length ? conf.length : "–";
+  $("sPhones").textContent = phones || 0;
+  $("sWeek").textContent = plates.length ? conf.filter(p => p.entries_7d > 0).length : "–";
+  $("tPlates").textContent = plates.length ? `${plural(conf.length, "familia", "familias")}${plates.some(p => p.disabled) ? ` · ${plates.filter(p => p.disabled).length} desactivados` : ""}` : "Familias y soporte";
+  $("tFree").textContent = plates.length ? (free.length ? `${plural(free.length, "listo para entregar", "listos para entregar")}` : "Ninguno sin entregar") : "Crear y entregar";
+  $("tAnn").textContent = annCache.length ? (onPage || sched ? [onPage ? `${onPage} en la página` : "", sched ? `${sched} programado${sched > 1 ? "s" : ""}` : ""].filter(Boolean).join(" · ") : "Ninguno activo") : "Mandar avisos a las familias";
+  $("tMsg").textContent = msgOld ? "Sugerencias y ayuda" : unread ? `${unread} sin leer` : msgs.length ? "Todo leído ✓" : "Sugerencias y ayuda";
+  $("homeDate").textContent = new Date().toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" }).replace(/^./, c => c.toUpperCase());
+}
 
 // ---------- Anuncios ----------
 let when = "now";
@@ -509,6 +583,7 @@ $("sendBtn").onclick = async () => {
 async function loadAnn() {
   let r; try { r = await api({ action: "list" }); } catch { return; }
   const items = (r.data && r.data.items) || [];
+  annCache = items; tileStats();
   $("annAll").classList.toggle("hidden", !items.length);
   $("hideAllBtn").disabled = !items.some(a => a.active);
   $("annList").innerHTML = items.length ? items.map(a => {
@@ -575,7 +650,7 @@ async function loadMsgs() {
   renderMsgs();
 }
 function renderMsgs() {
-  const unread = msgs.filter(m => !m.read).length;
+  const unread = msgs.filter(m => !m.read).length; tileStats();
   $("msgBadge").textContent = unread > 9 ? "9+" : unread; $("msgBadge").classList.toggle("hidden", !unread);
   const list = msgs.filter(m => msgFilter === "all" || (msgFilter === "unread" ? !m.read : m.kind === msgFilter));
   $("msgList").innerHTML = list.length ? list.map(m => {
@@ -677,7 +752,7 @@ async function loadPlates(force) {
   $("to").innerHTML = '<option value="">Todas las familias</option>' + plates.filter(p => p.pet_name && !p.disabled)
     .map(p => `<option value="${esc(p.code)}">Solo ${esc(p.pet_name)} (${esc(p.code)})</option>`).join("");
   $("to").value = sel;
-  renderPlates(); renderFree();
+  renderPlates(); renderFree(); tileStats();
 }
 $("q").addEventListener("input", renderPlates);
 $("pf").querySelectorAll("button").forEach(b => b.onclick = () => {
@@ -707,7 +782,7 @@ $("selDel").onclick = async () => {
   const list = plates.filter(p => selected.has(p.code)); if (!list.length) return;
   const used = list.filter(p => p.pet_name);
   const ok = await ask(`¿Eliminar ${plural(list.length, "plato", "platos")}?`,
-    (used.length ? `${used.length === 1 ? (list.length === 1 ? "Lo usa una familia" : "Uno lo usa una familia") : `${used.length} los usan familias`} (${used.slice(0, 3).map(p => p.pet_name).join(", ")}${used.length > 3 ? "…" : ""}): se borrarán sus registros, fotos, horarios y avisos, y su pegatina dejará de funcionar. ` : "Son pegatinas sin configurar. ")
+    (used.length ? `${used.length === 1 ? (list.length === 1 ? "Lo usa una familia" : "Uno lo usa una familia") : `${used.length} los usan familias`} (${used.slice(0, 3).map(p => p.pet_name).join(", ")}${used.length > 3 ? "…" : ""}): se borrarán sus registros, fotos, horarios y avisos, y su dispositivo dejará de funcionar. ` : "Son dispositivos sin configurar. ")
     + "Esto no se puede deshacer.", "Eliminar", used.length ? "ELIMINAR" : "");
   if (!ok) return;
   $("selDel").disabled = true; $("selDel").textContent = "Eliminando…";
@@ -723,7 +798,7 @@ function renderPlates() {
   selUI();
   $("plateList").innerHTML = list.length ? list.map(p => { const s = stateOf(p), on = selected.has(p.code);
     return `<div class="item plate${selMode && on ? " sel" : ""}" data-code="${esc(p.code)}">
-      <div class="row"><span style="display:flex;align-items:center;min-width:0">${selMode ? `<span class="ck" aria-hidden="true">${on ? "✓" : ""}</span>` : ""}<b>${esc(p.pet_name || "Pegatina sin configurar")}</b></span><span class="tag ${s.cls}">${s.label}</span></div>
+      <div class="row"><span style="display:flex;align-items:center;min-width:0">${selMode ? `<span class="ck" aria-hidden="true">${on ? "✓" : ""}</span>` : ""}<b>${esc(p.pet_name || "Dispositivo sin configurar")}</b></span><span class="tag ${s.cls}">${s.label}</span></div>
       <div class="meta">${esc(p.code)} · último registro ${ago(p.last_entry)} · ${plural(p.phones, "teléfono", "teléfonos")} con avisos${p.has_pin ? " · 🔒 PIN" : ""}${p.has_email ? " · 📧 correo" : ""}</div>
       ${!selMode && openCode === p.code ? `<div class="actions">
         <button class="small" data-a="copy">Copiar link</button>
@@ -770,8 +845,8 @@ async function plateAction(a, p, btn) {
   if (a === "dis") {
     const off = !p.disabled;
     if (!await ask(off ? `¿Desactivar ${name}?` : `¿Reactivar ${name}?`,
-      off ? "La pegatina deja de funcionar: nadie podrá ver ni registrar nada, y sus teléfonos dejan de recibir avisos. Puedes reactivarla después."
-          : "La pegatina vuelve a funcionar como antes. Los teléfonos tendrán que activar los avisos de nuevo.", off ? "Desactivar" : "Reactivar")) return;
+      off ? "El dispositivo deja de funcionar: nadie podrá ver ni registrar nada, y sus teléfonos dejan de recibir avisos. Puedes reactivarlo después."
+          : "El dispositivo vuelve a funcionar como antes. Los teléfonos tendrán que activar los avisos de nuevo.", off ? "Desactivar" : "Reactivar")) return;
     await api({ action: "set_disabled", code: p.code, disabled: off });
   }
   await loadPlates(true);
@@ -781,19 +856,19 @@ function renderFree() {
   const f = freePlates();
   $("nFree").textContent = f.length;
   $("freeList").innerHTML = f.length ? f.map(p => `<div class="row" style="padding:6px 0;border-top:1px solid var(--line)"><span>${esc(nfcLink(p.code))}</span><button class="small" data-c="${esc(p.code)}">Copiar</button></div>`).join("")
-    : '<p class="muted">No hay pegatinas sin entregar. Crea nuevas arriba.</p>';
+    : '<p class="muted">No hay dispositivos sin entregar. Crea nuevos arriba.</p>';
   $("freeList").querySelectorAll("[data-c]").forEach(b => b.onclick = async () => {
     try { await navigator.clipboard.writeText(nfcLink(b.dataset.c)); b.textContent = "✓"; } catch {}
   });
 }
 $("createBtn").onclick = async () => {
   const n = Math.min(100, Math.max(1, parseInt($("nNew").value, 10) || 0));
-  if (!await ask(`¿Crear ${plural(n, "pegatina", "pegatinas")}?`, "Se crean platos nuevos sin mascota, listos para grabar en pegatinas.", "Crear")) return;
+  if (!await ask(`¿Crear ${plural(n, "dispositivo", "dispositivos")}?`, "Se crean platos nuevos sin mascota, listos para grabar en los dispositivos.", "Crear")) return;
   $("createBtn").disabled = true; $("createMsg").textContent = "Creando…";
   let r; try { r = await api({ action: "create_plates", n }); } catch { r = { status: 0 }; }
   $("createBtn").disabled = false;
   if (r.status !== 200) { $("createMsg").innerHTML = '<span class="err">No se pudo. ¿Corriste admin.sql en Supabase?</span>'; return; }
-  $("createMsg").textContent = `✅ ${plural(r.data.codes.length, "pegatina creada", "pegatinas creadas")}. Están abajo en “Pegatinas sin entregar”.`;
+  $("createMsg").textContent = `✅ ${plural(r.data.codes.length, "dispositivo creado", "dispositivos creados")}. Están abajo en “Dispositivos sin entregar”.`;
   await loadPlates(true);
 };
 $("copyAll").onclick = async () => {
@@ -887,14 +962,17 @@ async function loadHealth() {
   else if (!h.fail) out.push(light("ok", "Llamadas a las funciones (24 h)", `${plural(h.ok, "llamada", "llamadas")} sin errores.`));
   else out.push(light(h.fail > h.ok / 5 ? "bad" : "warn", "Llamadas a las funciones (24 h)", `${plural(h.fail, "llamada falló", "llamadas fallaron")} de ${h.ok + h.fail}. Si sigue pasando, revisa Edge Functions → Logs en Supabase.`));
   $("health").innerHTML = out.join("");
+  const bad = out.filter(x => x.includes('tag bad')).length, warn = out.filter(x => x.includes('tag warn')).length;
+  $("tSys").textContent = bad ? `🔴 ${plural(bad, "falla", "fallas")}` : warn ? `🟡 ${warn} para revisar` : "🟢 Todo bien";
 }
 $("healthBtn").onclick = loadHealth;
 
 function openPanel() {
   enter().then(ok => {
     if (!ok) { $("key").value = ""; if ($("login").classList.contains("hidden")) showLogin(); return; }
-    let t = "anuncios"; try { t = sessionStorage.getItem("comitag_admin_tab") || t; } catch {}
-    showTab(t);
+    let t = "home"; try { t = sessionStorage.getItem("comitag_admin_tab") || t; } catch {}
+    showTab("home");                                   // el inicio queda detrás, para volver con ‹ Inicio
+    if (t !== "home") showTab(t);
   });
 }
 if (session || key) openPanel();
