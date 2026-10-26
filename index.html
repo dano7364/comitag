@@ -204,6 +204,9 @@ button:disabled{opacity:.4;cursor:default;box-shadow:none}
 #hpDirect{display:flex;flex-direction:column;gap:8px}
 #hpDirect:empty{display:none}
 .hpMail{display:block;text-align:center;padding:13px;border-radius:12px;text-decoration:none;color:var(--text);border:1px solid var(--glass-border,var(--border));background:var(--glass-input,var(--card))}
+.supBar{position:sticky;top:0;z-index:60;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 16px;
+  background:#1b2333;color:#fff;font-size:14px;padding-top:max(10px,env(safe-area-inset-top))}
+.supBar .link{color:#9fc0ff!important;font-size:14px;padding:0;width:auto}
 .hav{display:inline-flex;align-items:center}
 .hav img,.hav b{width:30px;height:30px;border-radius:50%;border:2px solid var(--card);object-fit:cover;margin-left:-8px;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;box-sizing:border-box}
 .hav img:first-child,.hav b:first-child{margin-left:0}
@@ -580,6 +583,22 @@ const RESET_TOKEN = (() => {
   return /^[0-9a-f]{20,100}$/.test(t) ? t : "";
 })();
 const MAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+// Acceso de soporte del dueño (desde su panel): /p/<código>?soporte=sup_… · dura 1 hora y solo en esta pestaña
+(() => {
+  const q = new URLSearchParams(location.search), t = q.get("soporte");
+  if (!t) return;
+  q.delete("soporte");
+  try { history.replaceState(history.state, "", location.pathname + (q.toString() ? "?" + q : "") + location.hash); } catch {}
+  if (/^sup_[0-9a-f]{20,80}$/.test(t)) try { sessionStorage.setItem("comitag_sup_" + code, t); } catch {}
+})();
+function supFor(c) { try { return sessionStorage.getItem("comitag_sup_" + c) || ""; } catch { return ""; } }
+const isSupport = () => !!supFor(code);
+function endSupport(msg) {
+  try { sessionStorage.removeItem("comitag_sup_" + code); } catch {}
+  const b = $("supBar"); if (b) b.remove();
+  document.body.classList.remove("support");
+  if (msg) setTimeout(() => showNote(msg), 300);
+}
 const FROM_NFC = (() => {
   const q = new URLSearchParams(location.search);
   if (!q.has("d") && !q.has("nfc")) return false;   // "?d=1" (nuevos) o "?nfc=1" (los primeros)
@@ -1616,6 +1635,7 @@ function getPets() {
 function savePets(l) { try { localStorage.setItem("comitag_mascotas", JSON.stringify(l)); } catch {} }
 function rememberPet(c, name) {
   const l = getPets(), p = l.find(x => x.code === c);
+  if (!p && isSupport()) return;                       // en modo soporte no se agrega a "mis mascotas"
   if (p) p.name = name; else l.push({ code: c, name });
   savePets(l);
   renderPets();
@@ -1962,9 +1982,15 @@ document.addEventListener("keydown", e => {
 let hasPin = false;
 const PIN_RE = /^[0-9]{4,6}$/;
 const pinKey = () => "comitag_pin_" + code;
-function getPinFor(c) { try { return localStorage.getItem("comitag_pin_" + c) || ""; } catch { return ""; } }
+function getPinFor(c) { const s = supFor(c); if (s) return s; try { return localStorage.getItem("comitag_pin_" + c) || ""; } catch { return ""; } }
 function getPin() { return getPinFor(code); }
-function savePin(p) { try { p ? localStorage.setItem(pinKey(), p) : localStorage.removeItem(pinKey()); } catch {} }
+function savePin(p) {
+  if (isSupport()) {                                   // modo soporte: no se toca el PIN guardado de este teléfono
+    if (!p) endSupport("🛠️ El acceso de soporte venció. Crea otro desde el panel.");
+    return;
+  }
+  try { p ? localStorage.setItem(pinKey(), p) : localStorage.removeItem(pinKey()); } catch {}
+}
 function errText(e, fallback) { return e.cancelled ? "" : (e.friendly || fallback); }
 // Supabase responde "PIN requerido", "PIN incorrecto" o "PIN bloqueado" como texto
 const pinStatus = r => !r.error && typeof r.data === "string" && r.data.startsWith("PIN") ? r.data : "";
@@ -2013,9 +2039,10 @@ function askPin(msg) {
 }
 function openPinSettings() {
   // Si este teléfono ya tiene el PIN guardado, se puede ver y cambiar sin escribir el actual
-  const saved = hasPin ? getPinFor(code) : "";
+  const saved = hasPin ? getPinFor(code) : "", sup = isSupport();
   openModal(`<p style="font-size:18px;margin-top:4px"><b>${hasPin ? "🔒 PIN familiar" : "🔓 Poner PIN familiar"}</b></p>
-    ${saved ? `<div class="pinSaved"><span class="muted">PIN de la familia</span>
+    ${saved && sup ? `<p class="muted">🛠️ Modo soporte: el PIN de la familia está cifrado y no se puede ver. Si lo olvidaron, puedes poner uno nuevo aquí y decírselo.</p>`
+      : saved ? `<div class="pinSaved"><span class="muted">PIN de la familia</span>
         <span id="pinShow" class="pinShow" aria-live="polite">${"•".repeat(saved.length)}</span>
         <button class="link" id="pinEye" aria-pressed="false">Mostrar</button></div>
       <p class="muted" style="margin-top:8px">¿Alguien lo olvidó? Muéstraselo desde aquí. Solo se puede ver en los teléfonos que ya entraron con él.</p>` : ""}
@@ -2053,7 +2080,7 @@ function openPinSettings() {
       const h = await db.rpc("recovery_hint", { p_code: code }); if (!h.error) hint(h.data);
     };
   }
-  if (saved) $("pinEye").onclick = () => {
+  if (saved && !sup) $("pinEye").onclick = () => {
     const show = $("pinEye").getAttribute("aria-pressed") !== "true";
     $("pinShow").textContent = show ? saved : "•".repeat(saved.length);
     $("pinEye").textContent = show ? "Ocultar" : "Mostrar";
@@ -2285,7 +2312,7 @@ function autoChoose(kind, msg, pre) {
 
 function autoRun() {
   const cfg = autoGet();
-  if (!cfg || !me || !openedFromTag()) return;
+  if (!cfg || !me || isSupport() || !openedFromTag()) return;
   try { sessionStorage.setItem("comitag_auto_hecho_" + code, "1"); } catch {}
   const kind = cfg.kind, pets = petsOf();
   let sel = [null], extra = "";
@@ -2456,6 +2483,17 @@ function openAddPet() {
   setTimeout(() => $("addIn") && $("addIn").focus(), 50);
 }
 
+// ================= Franja "modo soporte" =================
+function supportBar() {
+  if (!isSupport() || $("supBar")) return;
+  const b = document.createElement("div");
+  b.id = "supBar"; b.className = "supBar"; b.setAttribute("role", "status");
+  b.innerHTML = `<span>🛠️ <b>Modo soporte</b> · acceso temporal del administrador</span><button class="link" id="supExit">Salir</button>`;
+  document.body.prepend(b); document.body.classList.add("support");
+  $("supExit").onclick = () => { endSupport(); location.href = "/"; };
+}
+supportBar();
+
 // ================= Sugerencias y contacto =================
 async function sendMsg(kind, body, reply) {
   const args = { p_code: code, p_kind: kind, p_who: me || null, p_body: body, p_reply: reply || null };
@@ -2554,7 +2592,7 @@ async function loadMembers() {
   members = r.data; cachePut({ members });
   // Mi perfil de este teléfono aún no está en este plato: subirlo en silencio
   const l = myLocal(), m = members[me] || {};
-  if (me && !memberSynced && (l.role || l.photo) && (l.role !== (m.role || undefined) || l.photo !== (m.photo || undefined))) {
+  if (me && !memberSynced && !isSupport() && (l.role || l.photo) && (l.role !== (m.role || undefined) || l.photo !== (m.photo || undefined))) {
     memberSynced = true;
     const s = await rpcP("set_member", { p_code: code, p_name: me, p_role: l.role || null, p_photo: l.photo || null });
     if (!s.error && s.data === "ok") { members = { ...members, [me]: { role: l.role, photo: l.photo } }; cachePut({ members }); }

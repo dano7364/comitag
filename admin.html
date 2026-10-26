@@ -103,6 +103,8 @@ table.tv td:last-child,table.tv th:last-child{text-align:right;font-variant-nume
 .answered{margin-top:8px;padding:10px 12px;border-radius:12px;background:var(--okbg)}
 .replyBox{margin-top:10px}
 .replyBox textarea{min-height:90px}
+.supBox{margin-top:10px}
+.supLink{display:block;text-align:center;padding:12px;border-radius:12px;background:var(--text);color:var(--card)!important;text-decoration:none;font-weight:600}
 .annBtns{display:flex;gap:18px;flex-wrap:wrap;margin-top:6px}
 .annBtns .link{padding:0}
 .annDel{color:#dc2626!important}
@@ -614,12 +616,14 @@ function renderPlates() {
       <div class="meta">${esc(p.code)} · último registro ${ago(p.last_entry)} · ${plural(p.phones, "teléfono", "teléfonos")} con avisos${p.has_pin ? " · 🔒 PIN" : ""}${p.has_email ? " · 📧 correo" : ""}</div>
       ${!selMode && openCode === p.code ? `<div class="actions">
         <button class="small" data-a="copy">Copiar link</button>
+        ${p.pet_name ? '<button class="small" data-a="sup">🛠️ Entrar como soporte</button>' : ""}
         ${p.pet_name && !p.disabled ? '<button class="small" data-a="msg">📣 Mandar anuncio</button>' : ""}
         ${p.has_pin ? '<button class="small" data-a="pin">Borrar PIN</button>' : ""}
         <button class="small ${p.disabled ? "" : "danger"}" data-a="dis">${p.disabled ? "Reactivar" : "Desactivar"}</button>
-      </div><p class="muted" style="font-size:12px;margin-top:6px">${p.first_entry ? `Usa Comitag desde el ${esc(new Date(p.first_entry).toLocaleDateString("es-CL", { dateStyle: "medium" }))} · ${plural(p.entries_7d, "registro", "registros")} esta semana` : "Todavía no tiene registros"}</p>` : ""}
+      </div><div class="supBox hidden" data-sup="${esc(p.code)}"></div><p class="muted" style="font-size:12px;margin-top:6px">${p.first_entry ? `Usa Comitag desde el ${esc(new Date(p.first_entry).toLocaleDateString("es-CL", { dateStyle: "medium" }))} · ${plural(p.entries_7d, "registro", "registros")} esta semana` : "Todavía no tiene registros"}</p>` : ""}
     </div>`; }).join("") : '<p class="muted" style="margin-top:8px">No hay platos con ese filtro.</p>';
   $("plateList").querySelectorAll(".plate").forEach(el => el.onclick = e => {
+    if (e.target.closest("a, .supBox")) return;          // el enlace de soporte abre su pestaña
     const code = el.dataset.code, p = plates.find(x => x.code === code), a = e.target.dataset && e.target.dataset.a;
     if (selMode) { selected.has(code) ? selected.delete(code) : selected.add(code); renderPlates(); return; }
     if (!a) { openCode = openCode === code ? null : code; renderPlates(); return; }
@@ -630,6 +634,21 @@ async function plateAction(a, p, btn) {
   const name = p.pet_name || p.code;
   if (a === "copy") {
     try { await navigator.clipboard.writeText(nfcLink(p.code)); btn.textContent = "✓ Copiado"; } catch { btn.textContent = nfcLink(p.code); }
+    return;
+  }
+  if (a === "sup") {
+    if (!await ask(`¿Entrar a ${name} como soporte?`, "Se crea un acceso temporal (1 hora) solo para este plato. Úsalo solo para solucionar un problema de la familia: verás y podrás cambiar lo mismo que ellos.", "Crear acceso")) return;
+    const box = document.querySelector(`[data-sup="${p.code}"]`);
+    btn.disabled = true;
+    let r; try { r = await api({ action: "support", code: p.code }); } catch { r = { status: 0 }; }
+    btn.disabled = false; box.classList.remove("hidden");
+    if (r.status !== 200 || !r.data.token) {
+      box.innerHTML = `<p class="err" style="font-size:14px">${r.status === 400 ? "Falta actualizar la función “anuncio” en Supabase." : "No se pudo crear el acceso. ¿Corriste soporte.sql en Supabase?"}</p>`;
+      return;
+    }
+    const url = `${location.origin}/p/${encodeURIComponent(p.code)}?soporte=${encodeURIComponent(r.data.token)}`;
+    box.innerHTML = `<a class="supLink" href="${esc(url)}" target="_blank" rel="noopener">🛠️ Abrir ${esc(name)} en modo soporte →</a>
+      <p class="muted" style="font-size:12px;margin-top:6px">Sirve 1 hora y solo en la pestaña que se abre. No compartas este enlace.</p>`;
     return;
   }
   if (a === "msg") { showTab("anuncios"); $("to").value = p.code; preview(); $("title").focus(); return; }
