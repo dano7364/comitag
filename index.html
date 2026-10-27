@@ -199,12 +199,11 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .petEdTimes .trow{display:flex;gap:8px;margin-bottom:8px}
 .petEdTimes .trow input{flex:1}
 .petHead.multi h1{display:none}
-.petHead.multi .link{position:static;transform:none;display:block;margin:2px auto 0;color:var(--muted);font-size:15px;font-weight:500;letter-spacing:.3px;padding:6px 14px}
-.petHead.multi .link:active{opacity:.6}
-.petHead h1{font-size:32px;margin:0;padding:0 72px;overflow-wrap:anywhere}
+.petHead .link{position:static;transform:none;display:block;margin:2px auto 0;color:var(--muted);font-size:15px;font-weight:500;letter-spacing:.3px;padding:6px 14px}
+.petHead .link:active{opacity:.6}
+.petHead h1{font-size:32px;margin:0;padding:0 16px;overflow-wrap:anywhere}
 /* Nombre de la mascota: letra redondeada de Apple (en otros teléfonos usa la del sistema) */
 .petHead h1,.pp b,.ppName{font-family:ui-rounded,"SF Pro Rounded","SF Compact Rounded",system-ui,-apple-system,sans-serif;font-weight:700;letter-spacing:-.2px}
-.petHead .link{position:absolute;right:0;top:50%;transform:translateY(-50%)}
 .wa{display:block;text-align:center;text-decoration:none;background:#25d366;color:#fff;border-radius:12px;padding:13px;margin-bottom:8px;font-size:16px}
 .wa.alt{background:var(--card);color:var(--wa-text);border:1px solid #25d366}
 .wrow{display:grid;grid-template-columns:1fr 1.3fr 44px;gap:8px;margin-bottom:8px}
@@ -491,7 +490,7 @@ body::before{animation:drift 28s ease-in-out infinite alternate;will-change:tran
   </div>
   <div class="petHead" id="petView">
     <h1 id="pet" onclick="if (ready && !petsOf().length && plate && plate.pet_name) openPetEditor(plate.pet_name)" title="Cambiar nombre y horarios">Cargando…</h1>
-    <button class="link hidden" id="petEditBtn" onclick="editPet()">✏️ Editar</button>
+    <button class="link hidden" id="petEditBtn" onclick="addPetRow()">Agregar mascota</button>
   </div>
   <section id="petEdit" class="card hidden">
     <p><b>Mascotas de este plato</b></p>
@@ -2004,8 +2003,8 @@ function showPhotoMode(many) {
   $("petRow").classList.toggle("hidden", !many);
   $("petView").classList.toggle("multi", many);
   const full = petsOf().length >= MAX_PETS;
-  $("petEditBtn").textContent = !many ? "✏️ Editar" : full ? "Editar mascotas" : "Agregar mascota";
-  $("petEditBtn").onclick = !many || full ? editPet : addPetRow;
+  $("petEditBtn").textContent = full ? "Editar mascotas" : "Agregar mascota";
+  $("petEditBtn").onclick = full ? editPet : addPetRow;
 }
 // Abre la edición con una fila nueva lista para escribir
 function addPetRow() {
