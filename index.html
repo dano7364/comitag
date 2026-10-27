@@ -105,9 +105,9 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .nHelp summary::-webkit-details-marker{display:none}
 .nHelp p{margin:8px 0 0;color:var(--muted);line-height:1.4}
 .nOk{border-radius:14px;padding:12px;margin-top:14px;font-size:15px;font-weight:600;text-align:center;background:rgba(34,197,94,.14)}
-/* ✓ grande al registrar (1 segundo) */
+/* ✓ grande al registrar (3 segundos) */
 #okBig{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;visibility:hidden}
-#okBig.show{visibility:visible;animation:okFade 1.1s ease forwards}
+#okBig.show{visibility:visible;animation:okFade 3s ease forwards}
 #okBig::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 50% 50%,rgba(255,255,255,.85),rgba(255,255,255,.55) 70%)}
 .okCard{position:relative;display:flex;flex-direction:column;align-items:center;gap:10px}
 #okBig svg{width:150px;height:150px;filter:drop-shadow(0 12px 28px rgba(22,163,74,.35))}
@@ -117,7 +117,7 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 #okBig.show .okCircle{animation:okPop .45s cubic-bezier(.2,1.6,.4,1) both}
 #okBig.show .okTick{animation:okDraw .35s .2s ease-out forwards}
 #okBig.show .okTxt{animation:okUp .4s .15s ease-out both}
-@keyframes okFade{0%{opacity:0}12%,78%{opacity:1}100%{opacity:0;visibility:hidden}}
+@keyframes okFade{0%{opacity:0}5%,90%{opacity:1}100%{opacity:0;visibility:hidden}}
 @keyframes okPop{0%{transform:scale(.2)}100%{transform:scale(1)}}
 @keyframes okDraw{to{stroke-dashoffset:0}}
 @keyframes okUp{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:none}}
@@ -1588,7 +1588,7 @@ function closeC() {
 function unlockAudio() {}
 let chimeQuiet = false;   // "Comida y agua": se muestra una sola vez
 let chimeBoth = false;    // "Comida y agua": el ✓ dice las dos
-// Al registrar: un ✓ verde grande y animado durante 1 segundo (sin sonido) + vibración en Android
+// Al registrar: un ✓ verde grande y animado durante 3 segundos (sin sonido) + vibración en Android
 function chime(kind) {
   const both = chimeBoth; chimeBoth = false;
   try {
@@ -1601,7 +1601,7 @@ function chime(kind) {
     el.querySelector(".okTxt").textContent = both ? "🍽️💧 ¡Comida y agua listas!" : kind === "comida" ? "🍽️ ¡Comida registrada!" : "💧 ¡Agua registrada!";
     el.classList.remove("show"); void el.offsetWidth;          // reinicia la animación
     el.classList.add("show");
-    clearTimeout(chime.t); chime.t = setTimeout(() => el.classList.remove("show"), 1100);
+    clearTimeout(chime.t); chime.t = setTimeout(() => el.classList.remove("show"), 3000);
   } catch {}
   try { navigator.vibrate && navigator.vibrate(kind === "comida" ? [60, 50, 60] : 40); } catch {}
 }
