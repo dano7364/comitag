@@ -2423,6 +2423,7 @@ function autoSet(v) { try { v ? localStorage.setItem(autoKey(), JSON.stringify(v
 function openAuto() {
   const cfg = autoGet() || {}, pets = petsOf();
   openModal(`<p style="font-size:18px;margin-top:4px"><b>📲 Registrar al acercar</b></p>
+    ${document.querySelector("#setup .nfcA") ? document.querySelector("#setup .nfcA").outerHTML : ""}
     <p class="muted">Al acercar <b>este teléfono</b> al dispositivo Comitag se abre la página y, después de una cuenta de ${AUTO_SEG} segundos, se registra solo. Puedes tocar <b>Cancelar</b> antes.</p>
     <p class="muted" style="margin-top:8px">Si alguien ya le dio comida hace menos de ${AUTO_REPETIDA_MIN} min, te avisa y no registra nada.</p>
     <p class="muted" style="margin:14px 0 6px"><b>Al acercar este teléfono, registrar:</b></p>
