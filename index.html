@@ -717,6 +717,7 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt = t => t.toLocaleTimeString("es-CL", {hour:"2-digit", minute:"2-digit", hourCycle:"h23"});
 // En modo soporte no se pide "¿Quién eres?": se registra como "Soporte Comitag" y no se guarda nada en el teléfono
+let prefetch = null;   // lo que se pide al abrir la página, todo a la vez
 let histShown = [], matches = new Map(), ready = false, plate = null, log = [], pending = null, me = isSupport() ? "Soporte Comitag" : localStorage.getItem("comitag_nombre");
 
 function ago(t) {
@@ -762,7 +763,8 @@ async function syncQueue() {
   if (syncing || !queueGet().length) return;
   syncing = true;
   try {
-    for (const item of queueGet()) {
+    // Se envían todos a la vez (antes uno por uno: con 6 mascotas eran 6 esperas seguidas)
+    const send = async item => {
       const base = { p_code: item.code, p_kind: item.kind, p_who: item.who, p_at: item.at, p_client_id: item.id };
       let { data, error } = await db.rpc("add_entry_at", { ...base, p_note: item.note || null, p_pin: getPinFor(item.code) || null, p_pet: item.pet || null });
       // Si Supabase todavía tiene una versión anterior de las funciones, usa la que haya
@@ -771,14 +773,19 @@ async function syncQueue() {
       if (error && error.code === "PGRST202") ({ data, error } = await db.rpc("add_entry_at", base));
       if (error && error.code === "PGRST202")
         ({ data, error } = await db.rpc("add_entry", { p_code: item.code, p_kind: item.kind, p_who: item.who }));
-      if (error && netErr(error)) break;      // sigue sin internet: se intenta más tarde
-      if (!error && typeof data === "string" && data.startsWith("PIN")) {   // falta el PIN: queda esperando
-        if (item.code === code) pinLost(data);
-        break;
-      }
+      return { item, data, error };
+    };
+    const results = await Promise.all(queueGet().map(it => send(it).catch(e => ({ item: it, error: e || { message: "red" } }))));
+    const done = new Set();
+    let lost = null;
+    for (const { item, data, error } of results) {
+      if (error && netErr(error)) continue;                        // sigue sin internet: se intenta más tarde
+      if (!error && typeof data === "string" && data.startsWith("PIN")) { if (item.code === code) lost = data; continue; }   // falta el PIN: queda esperando
       if (error) { console.error("Registro rechazado", item, error); rejected.add(item.id); }
-      queueSet(queueGet().filter(x => x.id !== item.id));
+      done.add(item.id);
     }
+    queueSet(queueGet().filter(x => !done.has(x.id)));
+    if (lost) pinLost(lost);
   } finally { syncing = false; }
   updateQueueInfo();
 }
@@ -815,6 +822,10 @@ async function load() {
     $("addPetBox").classList.remove("hidden");
     return;
   }
+  // Se pide todo a la vez (antes era uno tras otro): el plato, el PIN y los registros
+  const safe = pr => Promise.resolve(pr).catch(e => ({ error: e || { message: "red" } }));
+  prefetch = { hp: safe(db.rpc("has_pin", { p_code: code })), vp: getPin() ? safe(db.rpc("verify_pin", { p_code: code, p_pin: getPin() })) : null,
+               ent: safe(rpcP("get_entries2", { p_code: code })) };
   let { data, error } = await getPlate();
   if (error && netErr(error)) {
     // Sin internet: usar la última copia guardada de esta mascota
@@ -840,9 +851,9 @@ async function load() {
     return;
   }
   plate.schedule = sortTimes(plate.schedule || []);
-  if (!plate.pet_name || !String(plate.pet_name).trim()) { showSetup(); return; }
-  if (RESET_TOKEN && !offline) { showGate("reset"); return; }
-  if (await needsGate()) return;
+  if (!plate.pet_name || !String(plate.pet_name).trim()) { prefetch = null; showSetup(); return; }
+  if (RESET_TOKEN && !offline) { prefetch = null; showGate("reset"); return; }
+  if (await needsGate()) { prefetch = null; return; }      // con el PIN nuevo se vuelven a pedir los registros
   start();
 }
 
@@ -1110,8 +1121,12 @@ async function loadAnnouncement() {
 
 async function refresh() {
   await syncQueue();
+  // La primera vez se usan los registros ya pedidos al abrir (y el plato recién cargado)
+  const pf = prefetch && prefetch.ent && !queueGet().length ? prefetch.ent : null;
+  prefetch = null;
+  const plateP = pf ? null : getPlate();                     // el plato se pide al mismo tiempo que los registros
   // get_entries2 trae también las notas; si aún no existe en Supabase, usa la anterior
-  let { data, error } = await rpcP("get_entries2", { p_code: code });
+  let { data, error } = await (pf || rpcP("get_entries2", { p_code: code }));
   if (error && error.code === "PGRST202") ({ data, error } = await db.rpc("get_entries", { p_code: code }));
   if (pinStatus({ data, error })) { pinLost(data); return; }
   if (error) {
@@ -1128,7 +1143,7 @@ async function refresh() {
   cachePut({ entries: data });
   serverLog = data.map(e => ({ ...e, t: new Date(e.created_at) }));
   mergeLog();
-  const p = await getPlate();
+  const p = plateP ? await plateP : { error: true };
   if (!p.error && p.data) {
     cachePut({ plate: p.data });
     plate.schedule = sortTimes(p.data.schedule || []);
@@ -2424,7 +2439,7 @@ function openAuto() {
   const cfg = autoGet() || {}, pets = petsOf();
   openModal(`<p style="font-size:18px;margin-top:4px"><b>📲 Registrar al acercar</b></p>
     ${document.querySelector("#setup .nfcA") ? document.querySelector("#setup .nfcA").outerHTML : ""}
-    <p class="muted">Al acercar <b>este teléfono</b> al dispositivo Comitag se abre la página y, después de una cuenta de ${AUTO_SEG} segundos, se registra solo. Puedes tocar <b>Cancelar</b> antes.</p>
+    <p class="muted">Al acercar <b>este teléfono</b> al dispositivo Comitag se abre la página y se registra al instante. Si fue un error, toca <b>Deshacer</b> en el aviso de abajo.</p>
     <p class="muted" style="margin-top:8px">Si alguien ya le dio comida hace menos de ${AUTO_REPETIDA_MIN} min, te avisa y no registra nada.</p>
     <p class="muted" style="margin:14px 0 6px"><b>Al acercar este teléfono, registrar:</b></p>
     <select id="auKind" class="tqSel" aria-label="Qué registrar">
@@ -2560,20 +2575,9 @@ function autoRun() {
   const qAgua = autoWater ? (autoWater[0] ? joinNames(autoWater) : plate.pet_name) : "";
   const lbl = autoWater ? (qAgua === quien ? `🍽️💧 Registrando comida y agua de ${esc(quien)}` : `🍽️💧 Registrando comida de ${esc(quien)} y agua de ${esc(qAgua)}`)
     : kind === "comida" ? `🍽️ Registrando comida de ${esc(quien)}` : `💧 Registrando agua de ${esc(quien)}`;
-  const many = pets.length;
-  let n = AUTO_SEG;
-  autoSheet(`<p style="margin:0"><b>${lbl}…</b> <span id="auN" class="auN">${n}</span></p>
-    ${extra ? `<p class="muted" style="margin-top:4px">${extra.charAt(0).toUpperCase() + extra.slice(1)}.</p>` : ""}
-    <div class="auBar"><i style="animation-duration:${AUTO_SEG}s"></i></div>
-    ${many ? `<div class="grid"><button class="auCancel" onclick="autoClose(); showNote('Cancelado: no se registró nada.')">Cancelar</button><button class="auCancel" id="auPick">Elegir otras</button></div>`
-           : `<button class="auCancel" onclick="autoClose(); showNote('Cancelado: no se registró nada.')">Cancelar</button>`}`);
-  if (many) $("auPick").onclick = () => autoChoose(kind, "", sel);
-  autoTimer = setInterval(() => {
-    n--;
-    if (n > 0) { const el = $("auN"); if (el) el.textContent = n; return; }
-    autoClose();
-    autoSave(kind, sel);
-  }, 1000);
+  // Se registra al instante (antes había una cuenta de 3 s); si fue un error, "Deshacer"
+  autoSheet(`<p style="margin:0"><b>${lbl}…</b></p>`);
+  autoSave(kind, sel, extra).finally(autoClose);
 }
 let autoWater = null;   // "Comida y agua": a quiénes se les registra el agua después de la comida
 async function autoSaveOne(kind, sel) {
@@ -2587,12 +2591,17 @@ async function autoSaveOne(kind, sel) {
   }
   await save();
 }
-async function autoSave(kind, sel) {
+// Agrega al aviso de abajo lo que no se registró (por ejemplo: "Toby ya comió")
+function noteExtra(extra) {
+  const sp = $("note").querySelector("span");
+  if (extra && sp && !$("note").classList.contains("hidden")) sp.insertAdjacentHTML("beforeend", `<br><small>${extra.charAt(0).toUpperCase() + extra.slice(1)}.</small>`);
+}
+async function autoSave(kind, sel, extra) {
   const water = kind === "comida" ? autoWater : null;
   autoWater = null;
   const before = lastSaved;
   await autoSaveOne(kind, sel);
-  if (!water || lastSaved === before) return;              // sin agua, o la comida no se guardó
+  if (!water || lastSaved === before) { if (lastSaved !== before) noteExtra(extra); return; }   // sin agua, o la comida no se guardó
   const food = lastSaved;
   await autoSaveOne("agua", water);
   if (lastSaved === food) return;
@@ -2602,6 +2611,7 @@ async function autoSave(kind, sel) {
   const same = fp.length === wp.length && fp.every(p => wp.includes(p));
   showNote(!fp.length ? "✅ Comida y agua registradas." : same ? `✅ Comida y agua registradas para ${joinNames(fp)}.`
     : `✅ Comida registrada para ${joinNames(fp)} y agua para ${joinNames(wp)}.`, true);
+  noteExtra(extra);
 }
 async function openInvite() {
   const url = `${location.origin}/p/${code}`, pet = plate.pet_name;
@@ -2966,13 +2976,14 @@ function pinLost(st) {
 // ¿Hay que pedir (o crear) el PIN antes de mostrar la mascota?
 async function needsGate() {
   if (offline) return false;                       // sin internet: se usa lo guardado
-  const hp = await db.rpc("has_pin", { p_code: code });
+  const pf = prefetch || {};
+  const hp = await (pf.hp || db.rpc("has_pin", { p_code: code }));
   if (hp.error) return false;                      // Supabase sin el SQL del PIN, o sin conexión
   hasPin = hp.data === true; cachePut({ hasPin });
   if (!hasPin) { showGate("create"); return true; }
   const pin = getPin();
   if (!pin) { showGate("enter"); return true; }
-  const v = await db.rpc("verify_pin", { p_code: code, p_pin: pin });
+  const v = await (pf.vp && pin === getPin() ? pf.vp : db.rpc("verify_pin", { p_code: code, p_pin: pin }));
   if (v.error || v.data === "ok") return false;
   savePin("");
   showGate("enter", v.data === "PIN bloqueado" ? "Demasiados intentos. Espera 15 minutos." : "El PIN familiar cambió. Escribe el nuevo.");
