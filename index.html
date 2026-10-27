@@ -2431,6 +2431,7 @@ function openAuto() {
       <option value="">Nada (abrir la página como siempre)</option>
       <option value="comida"${cfg.kind === "comida" ? " selected" : ""}>🍽️ Comida</option>
       <option value="agua"${cfg.kind === "agua" ? " selected" : ""}>💧 Agua</option>
+      <option value="ambas"${cfg.kind === "ambas" ? " selected" : ""}>🍽️💧 Comida y agua</option>
     </select>
     ${pets.length ? `<select id="auPet" class="tqSel" style="margin-top:8px" aria-label="Para quién">
       <option value="">Para todas (comida: según sus horarios)</option>${pets.map(p => `<option${cfg.pet === p ? " selected" : ""}>${esc(p)}</option>`).join("")}</select>` : ""}
@@ -2440,7 +2441,7 @@ function openAuto() {
     const kind = $("auKind").value, pet = $("auPet") ? $("auPet").value : "";
     autoSet(kind ? { kind, pet: pet || null } : null);
     closeModal();
-    showNote(kind ? `📲 Listo: al acercar este teléfono se registrará ${kind === "comida" ? "comida" : "agua"}.` : "📲 Registrar al acercar: desactivado.");
+    showNote(kind ? `📲 Listo: al acercar este teléfono se registrará ${kind === "comida" ? "comida" : kind === "agua" ? "agua" : "comida y agua"}.` : "📲 Registrar al acercar: desactivado.");
   };
 }
 
@@ -2492,7 +2493,9 @@ function autoWarn(kind, fed) {
   const a = fed.length > 1 ? joinNames(fed.map(x => x.p)) : (f.p || plate.pet_name);
   autoSheet(`<p style="margin:0 0 6px"><b>⚠️ ${quien} le dio comida a ${esc(a)}</b></p>
     <p class="muted">A las ${fmt(f.e.t)} (${ago(f.e.t)}). No registré nada para no repetir.</p>
+    ${autoWater ? `<button class="primary" id="auWater" style="width:100%;margin-top:12px">💧 Registrar solo el agua</button>` : ""}
     <div class="grid" style="margin-top:12px"><button onclick="autoClose()">Cerrar</button><button id="auForce">Registrar igual</button></div>`);
+  if ($("auWater")) $("auWater").onclick = () => { const w = autoWater; autoWater = null; autoClose(); autoSaveOne("agua", w); };
   $("auForce").onclick = () => { autoClose(); petsOf().length ? autoChoose(kind, "", fed.map(x => x.p)) : autoSave(kind, [null]); };
 }
 // Botón "Todos": marca todas (o las desmarca si ya estaban todas)
@@ -2508,6 +2511,7 @@ function autoAllSync() {
 // Elegir a mano a quién se le dio (platos con varias mascotas)
 function autoChoose(kind, msg, pre) {
   clearInterval(autoTimer); autoTimer = null;
+  if (kind === "comida" && autoWater && autoWater[0]) msg = (msg ? msg + " " : "") + `El agua se registrará para ${esc(joinNames(autoWater))}.`;
   autoSheet(`<p style="margin:0 0 6px"><b>${kind === "agua" ? "💧 ¿A quién le cambiaste el agua?" : "🍽️ ¿A quién le diste comida?"}</b></p>
     ${msg ? `<p class="muted" style="margin-bottom:8px">${msg}</p>` : ""}
     <div id="auChips"><button type="button" class="chip" id="auAll" aria-pressed="false" onclick="autoAll()">Todos</button>${petsOf().map(p => { const on = pre.includes(p);
@@ -2526,7 +2530,9 @@ function autoRun() {
   const cfg = autoGet();
   if (!cfg || !me || isSupport() || !openedFromTag()) return;
   try { sessionStorage.setItem("comitag_auto_hecho_" + code, "1"); } catch {}
-  const kind = cfg.kind, pets = petsOf();
+  const both = cfg.kind === "ambas", kind = both ? "comida" : cfg.kind, pets = petsOf();
+  // "Comida y agua": primero la comida (con sus horarios y avisos) y después el agua
+  autoWater = both ? (pets.length ? (cfg.pet && pets.includes(cfg.pet) ? [cfg.pet] : pets) : [null]) : null;
   let sel = [null], extra = "";
   if (kind === "comida") {
     if (pets.length && !(cfg.pet && pets.includes(cfg.pet)) && hasPetSlots()) {
@@ -2551,7 +2557,9 @@ function autoRun() {
   }
   if (kind === "agua" && pets.length) sel = cfg.pet && pets.includes(cfg.pet) ? [cfg.pet] : pets;
   const quien = sel[0] ? joinNames(sel) : plate.pet_name;
-  const lbl = kind === "comida" ? `🍽️ Registrando comida de ${esc(quien)}` : `💧 Registrando agua de ${esc(quien)}`;
+  const qAgua = autoWater ? (autoWater[0] ? joinNames(autoWater) : plate.pet_name) : "";
+  const lbl = autoWater ? (qAgua === quien ? `🍽️💧 Registrando comida y agua de ${esc(quien)}` : `🍽️💧 Registrando comida de ${esc(quien)} y agua de ${esc(qAgua)}`)
+    : kind === "comida" ? `🍽️ Registrando comida de ${esc(quien)}` : `💧 Registrando agua de ${esc(quien)}`;
   const many = pets.length;
   let n = AUTO_SEG;
   autoSheet(`<p style="margin:0"><b>${lbl}…</b> <span id="auN" class="auN">${n}</span></p>
@@ -2567,15 +2575,33 @@ function autoRun() {
     autoSave(kind, sel);
   }, 1000);
 }
-function autoSave(kind, sel) {
+let autoWater = null;   // "Comida y agua": a quiénes se les registra el agua después de la comida
+async function autoSaveOne(kind, sel) {
   ask(kind);
   if (petsOf().length) {
     $("cPets").querySelectorAll(".chip[data-p]").forEach(b => {
       const on = sel.includes(b.dataset.p) || sel[0] === null;
       b.classList.toggle("on", on); b.setAttribute("aria-pressed", on);
     });
+    chipsAllSync();
   }
-  save();
+  await save();
+}
+async function autoSave(kind, sel) {
+  const water = kind === "comida" ? autoWater : null;
+  autoWater = null;
+  const before = lastSaved;
+  await autoSaveOne(kind, sel);
+  if (!water || lastSaved === before) return;              // sin agua, o la comida no se guardó
+  const food = lastSaved;
+  await autoSaveOne("agua", water);
+  if (lastSaved === food) return;
+  lastSaved = [...food, ...lastSaved];                     // "Deshacer" quita las dos
+  if (queueGet().length) return;                           // sin internet: queda el aviso de "por enviar"
+  const fp = food.map(x => x.pet).filter(Boolean), wp = water.filter(Boolean);
+  const same = fp.length === wp.length && fp.every(p => wp.includes(p));
+  showNote(!fp.length ? "✅ Comida y agua registradas." : same ? `✅ Comida y agua registradas para ${joinNames(fp)}.`
+    : `✅ Comida registrada para ${joinNames(fp)} y agua para ${joinNames(wp)}.`, true);
 }
 async function openInvite() {
   const url = `${location.origin}/p/${code}`, pet = plate.pet_name;
