@@ -105,6 +105,27 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .nHelp summary::-webkit-details-marker{display:none}
 .nHelp p{margin:8px 0 0;color:var(--muted);line-height:1.4}
 .nOk{border-radius:14px;padding:12px;margin-top:14px;font-size:15px;font-weight:600;text-align:center;background:rgba(34,197,94,.14)}
+/* Animación: el celular toca el dispositivo con su parte de arriba */
+.nfcA{display:flex;justify-content:center;margin:2px 0 4px}
+.nfcStage{position:relative;overflow:hidden;width:240px;height:230px}
+.nfcDev{position:absolute;left:50%;top:36px;width:64px;height:64px;margin-left:-32px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff,#eef1f6 60%,#dfe4ec);box-shadow:0 8px 18px rgba(30,40,70,.18),inset 0 -3px 6px rgba(0,0,0,.06);display:flex;align-items:center;justify-content:center;animation:nfcGlow 3.2s ease-in-out infinite}
+.nfcDev svg{width:40px;height:40px}
+.nfcRing{position:absolute;left:50%;top:36px;width:64px;height:64px;margin-left:-32px;border-radius:50%;border:3px solid #2f6bff;opacity:0;animation:nfcRing 3.2s ease-out infinite}
+.nfcRing.r2{animation-delay:.22s}
+.nfcPhone{position:absolute;left:50%;bottom:0;z-index:2;width:64px;height:118px;margin-left:-32px;border-radius:14px;background:#1f2430;box-shadow:0 10px 20px rgba(0,0,0,.22);animation:nfcGo 3.2s cubic-bezier(.45,.05,.3,1) infinite}
+.nfcScreen{position:absolute;inset:5px;border-radius:10px;background:linear-gradient(160deg,#4f86ff,#2f6bff);overflow:hidden}
+.nfcNotch{position:absolute;top:4px;left:50%;width:20px;height:4px;margin-left:-10px;border-radius:4px;background:#1f2430}
+.nfcPaw,.nfcOk{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.nfcPaw{animation:nfcPaw 3.2s ease infinite}
+.nfcOk{color:#fff;font-size:30px;font-weight:800;opacity:0;animation:nfcOk 3.2s ease infinite}
+.nfcT{text-align:center;font-weight:700;font-size:17px;margin:0}
+.nfcS{text-align:center;margin:2px 0 14px!important}
+@keyframes nfcGo{0%{transform:translateY(70px);opacity:0}12%{opacity:1}38%,70%{transform:translateY(-34px)}88%{opacity:1}96%,100%{transform:translateY(70px);opacity:0}}
+@keyframes nfcRing{0%,36%{opacity:0;transform:scale(.9)}42%{opacity:.75}70%,100%{opacity:0;transform:scale(2)}}
+@keyframes nfcGlow{0%,38%,90%,100%{box-shadow:0 8px 18px rgba(30,40,70,.18)}48%,70%{box-shadow:0 8px 18px rgba(30,40,70,.18),0 0 0 7px rgba(47,107,255,.18)}}
+@keyframes nfcOk{0%,46%{opacity:0;transform:scale(.4)}54%,80%{opacity:1;transform:scale(1)}90%,100%{opacity:0}}
+@keyframes nfcPaw{0%,44%{opacity:.9}52%,82%{opacity:0}92%,100%{opacity:.9}}
+@media (prefers-reduced-motion:reduce){.nfcPhone{animation:none;transform:translateY(-34px)}.nfcRing,.nfcPaw,.nfcOk,.nfcDev{animation:none}}
 .maint{display:flex;gap:10px;align-items:flex-start;background:#fef3c7;color:#7c4a03;border:1px solid #f5d77a;border-radius:14px;padding:11px 14px;margin-bottom:12px;font-size:14px;line-height:1.4}
 @media (prefers-color-scheme:dark){.maint{background:#33290f;color:#fbd56b;border-color:#5a4512}}
 .poll{padding:16px 18px;margin-bottom:14px}
@@ -471,6 +492,15 @@ body::before{animation:drift 28s ease-in-out infinite alternate;will-change:tran
   </div>
 
   <section id="setup" class="card hidden">
+    <div class="nfcA" aria-hidden="true">
+      <div class="nfcStage">
+        <div class="nfcRing r1"></div><div class="nfcRing r2"></div>
+        <div class="nfcDev"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="42" fill="none" stroke="#2f6bff" stroke-width="9"/><g fill="#2f6bff"><ellipse cx="60" cy="70" rx="13" ry="11"/><circle cx="42" cy="55" r="6.5"/><circle cx="52" cy="43.5" r="6.5"/><circle cx="68" cy="43.5" r="6.5"/><circle cx="78" cy="55" r="6.5"/></g></svg></div>
+        <div class="nfcPhone"><div class="nfcScreen"><div class="nfcPaw"><svg viewBox="0 0 120 120" width="34" height="34"><g fill="#fff"><ellipse cx="60" cy="70" rx="13" ry="11"/><circle cx="42" cy="55" r="6.5"/><circle cx="52" cy="43.5" r="6.5"/><circle cx="68" cy="43.5" r="6.5"/><circle cx="78" cy="55" r="6.5"/></g></svg></div><div class="nfcOk">✓</div></div><div class="nfcNotch"></div></div>
+      </div>
+    </div>
+    <p class="nfcT">Acerca tu teléfono al dispositivo</p>
+    <p class="muted nfcS">Así registras la comida con un solo toque.</p>
     <p class="muted">Este plato todavía no está configurado. Solo hay que hacerlo una vez y queda listo para toda la familia.</p>
     <p><b>¿Cómo se llama tu mascota?</b></p>
     <p class="muted" style="margin:-4px 0 0">Toca 📷 para ponerle su foto (opcional).</p>
