@@ -1047,11 +1047,11 @@ async function saveAt(kind, sel, atDate) {
   const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 10), at = atDate.toISOString();
   const items = sel.map((pet, i) => ({ id: sel.length > 1 ? `${id}-${i}` : id, code, kind, who: me, at, note: null, pet }));
   queueSet([...queueGet(), ...items]);
+  chime(kind);                                     // suena al tiro, sin esperar a internet
   for (let i = 0; syncing && i < 50; i++) await new Promise(r => setTimeout(r, 100));
   await syncQueue();
   if (items.some(x => rejected.has(x.id))) return "No se pudo guardar. Intenta de nuevo.";
   const waiting = queueGet().some(x => items.some(y => y.id === x.id));
-  chime(kind);
   await refresh();
   lastSaved = items;
   const para = sel[0] ? ` de ${joinNames(sel)}` : "";
@@ -1583,6 +1583,7 @@ function unlockAudio() {
 // Al tocar cualquier parte de la página (y al volver a ella), dejar el audio listo
 ["pointerdown", "touchend"].forEach(ev => document.addEventListener(ev, unlockAudio, { passive: true }));
 document.addEventListener("visibilitychange", () => { if (!document.hidden && audio && audio.state !== "running") audio.resume().catch(() => {}); });
+let chimeQuiet = false;   // "Comida y agua": suena una sola vez
 function chime(kind) {
   try {
     if (!audio) return;
@@ -1614,12 +1615,14 @@ async function save() {
   const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 10), at = new Date().toISOString();
   const items = sel.map((pet, i) => ({ id: sel.length > 1 ? `${id}-${i}` : id, code, kind, who: me, at, note: note || null, pet }));
   queueSet([...queueGet(), ...items]);
+  // Suena al tiro: ya quedó guardado en el teléfono (no espera a internet)
+  if (!chimeQuiet) chime(kind);
+  chimeQuiet = false;
   for (let i = 0; syncing && i < 50; i++) await new Promise(r => setTimeout(r, 100));
   await syncQueue();
   $("cYes").disabled = false;
   if (items.some(x => rejected.has(x.id))) { $("cMsg").textContent = "No se pudo guardar. Intenta de nuevo."; return; }
   const waiting = queueGet().some(x => items.some(y => y.id === x.id));
-  chime(kind);
   closeC();
   await refresh();
   lastSaved = items;
@@ -2603,6 +2606,7 @@ async function autoSave(kind, sel, extra) {
   await autoSaveOne(kind, sel);
   if (!water || lastSaved === before) { if (lastSaved !== before) noteExtra(extra); return; }   // sin agua, o la comida no se guardó
   const food = lastSaved;
+  chimeQuiet = true;
   await autoSaveOne("agua", water);
   if (lastSaved === food) return;
   lastSaved = [...food, ...lastSaved];                     // "Deshacer" quita las dos
