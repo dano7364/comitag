@@ -105,6 +105,24 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .nHelp summary::-webkit-details-marker{display:none}
 .nHelp p{margin:8px 0 0;color:var(--muted);line-height:1.4}
 .nOk{border-radius:14px;padding:12px;margin-top:14px;font-size:15px;font-weight:600;text-align:center;background:rgba(34,197,94,.14)}
+/* ✓ grande al registrar (1 segundo) */
+#okBig{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;visibility:hidden}
+#okBig.show{visibility:visible;animation:okFade 1.1s ease forwards}
+#okBig::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 50% 50%,rgba(255,255,255,.85),rgba(255,255,255,.55) 70%)}
+.okCard{position:relative;display:flex;flex-direction:column;align-items:center;gap:10px}
+#okBig svg{width:150px;height:150px;filter:drop-shadow(0 12px 28px rgba(22,163,74,.35))}
+.okCircle{fill:#22c55e;transform-origin:60px 60px}
+.okTick{fill:none;stroke:#fff;stroke-width:10;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:80;stroke-dashoffset:80}
+.okTxt{margin:0;font-size:19px;font-weight:800;color:#14532d;background:#fff;padding:8px 16px;border-radius:99px;box-shadow:0 6px 18px rgba(0,0,0,.1)}
+#okBig.show .okCircle{animation:okPop .45s cubic-bezier(.2,1.6,.4,1) both}
+#okBig.show .okTick{animation:okDraw .35s .2s ease-out forwards}
+#okBig.show .okTxt{animation:okUp .4s .15s ease-out both}
+@keyframes okFade{0%{opacity:0}12%,78%{opacity:1}100%{opacity:0;visibility:hidden}}
+@keyframes okPop{0%{transform:scale(.2)}100%{transform:scale(1)}}
+@keyframes okDraw{to{stroke-dashoffset:0}}
+@keyframes okUp{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:none}}
+@media (prefers-color-scheme:dark){#okBig::before{background:radial-gradient(circle at 50% 50%,rgba(0,0,0,.75),rgba(0,0,0,.5) 70%)}.okTxt{background:#1e1e1e;color:#bbf7d0}}
+@media (prefers-reduced-motion:reduce){#okBig.show .okCircle,#okBig.show .okTxt{animation:none}#okBig.show .okTick{animation:none;stroke-dashoffset:0}}
 /* Animación: el celular toca el dispositivo con su parte de arriba */
 .nfcA{display:flex;justify-content:center;margin:2px 0 4px}
 .nfcStage{position:relative;overflow:hidden;width:240px;height:230px}
@@ -1566,40 +1584,24 @@ function closeC() {
   $("actions").classList.remove("hidden");
 }
 
-// ---- Sonido al registrar (generado aquí mismo, sin archivos) ----
-let audio;
-function unlockAudio() {
-  // iPhone solo deja sonar si el audio se prepara justo al tocar un botón.
-  // Si la página estuvo en segundo plano, el audio queda "interrumpido": hay que reactivarlo.
-  try {
-    if (audio && audio.state === "closed") audio = null;
-    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
-    if (audio.state !== "running") audio.resume().catch(() => {});
-    // Un sonido vacío dentro del toque termina de "desbloquear" el audio en iPhone
-    const b = audio.createBuffer(1, 1, 22050), src = audio.createBufferSource();
-    src.buffer = b; src.connect(audio.destination); src.start(0);
-  } catch {}
-}
-// Al tocar cualquier parte de la página (y al volver a ella), dejar el audio listo
-["pointerdown", "touchend"].forEach(ev => document.addEventListener(ev, unlockAudio, { passive: true }));
-document.addEventListener("visibilitychange", () => { if (!document.hidden && audio && audio.state !== "running") audio.resume().catch(() => {}); });
-let chimeQuiet = false;   // "Comida y agua": suena una sola vez
+// ---- Sin sonido al registrar (el teléfono no deja sonar sin un toque): se muestra un ✓ grande ----
+function unlockAudio() {}
+let chimeQuiet = false;   // "Comida y agua": se muestra una sola vez
+let chimeBoth = false;    // "Comida y agua": el ✓ dice las dos
+// Al registrar: un ✓ verde grande y animado durante 1 segundo (sin sonido) + vibración en Android
 function chime(kind) {
+  const both = chimeBoth; chimeBoth = false;
   try {
-    if (!audio) return;
-    if (audio.state !== "running") audio.resume().catch(() => {});
-    const notes = kind === "comida" ? [659, 880, 1319] : [523, 659]; // comida: Mi-La-Mi; agua: Do-Mi suave
-    const vol = kind === "comida" ? 0.22 : 0.14;
-    notes.forEach((f, i) => {
-      const t = audio.currentTime + i * 0.13;
-      const o = audio.createOscillator(), g = audio.createGain();
-      o.type = "sine"; o.frequency.value = f;
-      g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(vol, t + 0.015);
-      g.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
-      o.connect(g).connect(audio.destination);
-      o.start(t); o.stop(t + 0.5);
-    });
+    let el = $("okBig");
+    if (!el) {
+      el = document.createElement("div"); el.id = "okBig"; el.setAttribute("aria-live", "polite");
+      el.innerHTML = `<div class="okCard"><svg viewBox="0 0 120 120" aria-hidden="true"><circle class="okCircle" cx="60" cy="60" r="52"/><path class="okTick" d="M36 62 L53 78 L86 44"/></svg><p class="okTxt"></p></div>`;
+      document.body.appendChild(el);
+    }
+    el.querySelector(".okTxt").textContent = both ? "🍽️💧 ¡Comida y agua listas!" : kind === "comida" ? "🍽️ ¡Comida registrada!" : "💧 ¡Agua registrada!";
+    el.classList.remove("show"); void el.offsetWidth;          // reinicia la animación
+    el.classList.add("show");
+    clearTimeout(chime.t); chime.t = setTimeout(() => el.classList.remove("show"), 1100);
   } catch {}
   try { navigator.vibrate && navigator.vibrate(kind === "comida" ? [60, 50, 60] : 40); } catch {}
 }
@@ -2602,6 +2604,7 @@ function noteExtra(extra) {
 async function autoSave(kind, sel, extra) {
   const water = kind === "comida" ? autoWater : null;
   autoWater = null;
+  chimeBoth = !!water;
   const before = lastSaved;
   await autoSaveOne(kind, sel);
   if (!water || lastSaved === before) { if (lastSaved !== before) noteExtra(extra); return; }   // sin agua, o la comida no se guardó
