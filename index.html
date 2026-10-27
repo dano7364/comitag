@@ -180,6 +180,13 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .prow{display:flex;justify-content:space-between;align-items:center;background:var(--card);border:1px solid var(--chip);border-radius:14px;padding:8px 8px 8px 16px;font-size:16px}
 .rm{width:auto;padding:9px 14px;font-size:14px;color:var(--red);border-color:var(--red-border)}
 .overlay{position:fixed;inset:0;background:var(--scrim);display:flex;align-items:center;justify-content:center;padding:16px;z-index:50;animation:fade .15s ease-out}
+.crop{position:relative;width:260px;height:260px;margin:14px auto 0;border-radius:16px;overflow:hidden;background:#111;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
+.crop:active{cursor:grabbing}
+.crop img{position:absolute;left:50%;top:50%;max-width:none;transform-origin:center;pointer-events:none;-webkit-user-drag:none}
+.crop::after{content:"";position:absolute;inset:0;border-radius:50%;box-shadow:0 0 0 200px rgba(0,0,0,.55);border:2px solid rgba(255,255,255,.9);pointer-events:none}
+.cropZoom{display:flex;align-items:center;gap:10px;margin:14px 4px 0;font-size:18px}
+.cropZoom input{flex:1;accent-color:var(--blue);background:none;border:0;padding:0;margin:0;box-shadow:none;min-height:0;height:28px}
+.photoMenu button{display:block;width:100%;margin-top:10px}
 .modal{background:var(--card);border-radius:18px;padding:20px;max-width:360px;width:100%;box-sizing:border-box;box-shadow:0 12px 40px rgba(0,0,0,.25);animation:pop .18s ease-out}
 @keyframes fade{from{opacity:0}}
 @keyframes pop{from{transform:scale(.94);opacity:0}}
@@ -480,7 +487,7 @@ body::before{animation:drift 28s ease-in-out infinite alternate;will-change:tran
   <div id="maintBar" class="maint hidden" role="status"><span aria-hidden="true">🚧</span><span id="maintText"></span></div>
   <nav id="pets" class="pets hidden" aria-label="Mis mascotas"></nav>
   <div id="photoBox" class="photoBox hidden">
-    <button class="photo" id="photoBtn" onclick="photoTarget = null; $('photoIn').click()" aria-label="Agregar o cambiar la foto de la mascota" title="Toca para agregar o cambiar la foto">
+    <button class="photo" id="photoBtn" onclick="photoTap(null)" aria-label="Agregar o cambiar la foto de la mascota" title="Toca para agregar o cambiar la foto">
       <img id="photoImg" class="hidden" alt="">
       <span id="photoEmpty"><span style="font-size:34px">🐾</span><br>Agregar foto</span>
     </button>
@@ -1500,7 +1507,8 @@ function addNameRow(box, val) {
     b.onclick = () => f.click();
     f.onchange = async () => {
       const file = f.files[0]; f.value = ""; if (!file) return;
-      try { r._photo = await shrink(file); } catch { $("setErr").textContent = "No se pudo leer esa imagen. Prueba con otra."; return; }
+      let d; try { d = await adjustPhoto(file); } catch { $("setErr").textContent = "No se pudo leer esa imagen. Prueba con otra."; return; }
+      if (!d) return; r._photo = d;
       b.textContent = ""; b.classList.add("has"); b.style.backgroundImage = `url('${r._photo}')`;
     };
     r.prepend(b, f);
@@ -2021,7 +2029,7 @@ function renderPetPhotos() {
     return `<div class="pp"><button class="photo" style="--s:${s}px" data-i="${i}" aria-label="Agregar o cambiar la foto de ${esc(p)}">${src
       ? `<img src="${src}" alt="Foto de ${esc(p)}">` : `<span><span style="font-size:26px">🐾</span><br>Agregar foto</span>`}</button>
       <button class="ppName" data-i="${i}" aria-label="Cambiar el nombre y los horarios de ${esc(p)}">${esc(p)}</button></div>`; }).join("");
-  $("petRow").querySelectorAll(".pp .photo").forEach(b => b.onclick = () => { photoTarget = pets[+b.dataset.i]; $("photoIn").click(); });
+  $("petRow").querySelectorAll(".pp .photo").forEach(b => b.onclick = () => photoTap(pets[+b.dataset.i]));
   $("petRow").querySelectorAll(".ppName").forEach(b => b.onclick = () => openPetEditor(pets[+b.dataset.i]));
   applyMultiTheme(pets.map(photoOf).filter(Boolean));
 }
@@ -2063,11 +2071,14 @@ function shrink(file, max = 480) {
 $("photoIn").onchange = async () => {
   const f = $("photoIn").files[0];
   $("photoIn").value = "";
-  if (!f) { photoTarget = null; return; }
-  $("photoMsg").textContent = "Subiendo foto…";
-  let data;
-  try { data = await shrink(f); } catch { $("photoMsg").textContent = "No se pudo leer esa imagen. Prueba con otra."; return; }
   const pet = photoTarget; photoTarget = null;
+  if (!f) return;
+  let data;
+  try { data = await adjustPhoto(f); } catch { $("photoMsg").textContent = "No se pudo leer esa imagen. Prueba con otra."; return; }
+  if (data) savePhoto(pet, data);
+};
+async function savePhoto(pet, data) {
+  $("photoMsg").textContent = "Subiendo foto…";
   if (pet && petsOf().includes(pet)) {
     const r = await rpcPin("set_pet_photo", { p_code: code, p_pet: pet, p_photo: data });
     if (r.error) { $("photoMsg").textContent = r.error.code === "PGRST202" ? "Falta correr fotos_por_mascota.sql en Supabase." : errText(r.error, "No se pudo guardar la foto. Intenta de nuevo."); return; }
@@ -2081,8 +2092,63 @@ $("photoIn").onchange = async () => {
   const { error } = await rpcPin("set_photo", { p_code: code, p_photo: data });
   if (error) { $("photoMsg").textContent = errText(error, "No se pudo guardar la foto. Intenta de nuevo."); return; }
   $("photoMsg").textContent = "";
+  platePhoto = data; cachePut({ photo: data });
   showPhoto(data);
-};
+}
+// Al tocar una foto: si ya hay, se puede ajustar la actual o cambiarla; si no, se elige una
+function photoTap(pet) {
+  const cur = pet ? photoOf(pet) : platePhoto || ($("photoImg").classList.contains("hidden") ? null : $("photoImg").src);
+  const pick = () => { photoTarget = pet; $("photoIn").click(); };
+  if (!cur) { pick(); return; }
+  openModal(`<p style="font-size:18px;margin-top:4px"><b>📷 Foto${pet ? ` de ${esc(pet)}` : ""}</b></p>
+    <div class="photoMenu"><button class="primary" id="pmAdj">✂️ Ajustar esta foto</button><button id="pmNew">🖼️ Elegir otra foto</button><button id="pmNo">Cancelar</button></div>`);
+  $("pmNo").onclick = () => closeModal();
+  $("pmNew").onclick = () => { closeModal(); pick(); };
+  $("pmAdj").onclick = async () => { const d = await adjustPhoto(cur); if (d) savePhoto(pet, d); };
+}
+// Ajustar foto: arrastrar para mover, pellizcar o la barra para acercar. Devuelve JPEG cuadrado (o null si se cancela).
+function adjustPhoto(src, max = 480) {
+  return new Promise((ok, fail) => {
+    const isFile = typeof src !== "string", url = isFile ? URL.createObjectURL(src) : src, img = new Image();
+    const done = v => { if (isFile) URL.revokeObjectURL(url); ok(v); };
+    img.onerror = () => { if (isFile) URL.revokeObjectURL(url); fail(); };
+    img.onload = () => {
+      const W = img.naturalWidth, H = img.naturalHeight, S = 260, base = S / Math.min(W, H);
+      let z = 1, x = 0, y = 0;
+      openModal(`<p style="font-size:18px;margin-top:4px"><b>✂️ Ajusta la foto</b></p>
+        <p class="muted" style="margin-top:4px">Arrastra para moverla y usa la barra (o pellizca) para acercar.</p>
+        <div class="crop" id="cropBox"></div>
+        <div class="cropZoom"><span aria-hidden="true">−</span><input type="range" id="cropZ" min="1" max="4" step="0.01" value="1" aria-label="Acercar"><span aria-hidden="true">+</span></div>
+        <div class="grid" style="margin-top:14px"><button id="cropNo">Cancelar</button><button class="primary" id="cropOk">Usar foto</button></div>`, v => done(v));
+      const box = $("cropBox"); img.alt = ""; img.draggable = false; box.appendChild(img);
+      const clamp = () => { const s = base * z, mx = (W * s - S) / 2, my = (H * s - S) / 2;
+        x = Math.max(-mx, Math.min(mx, x)); y = Math.max(-my, Math.min(my, y)); };
+      const draw = () => { clamp(); const s = base * z;
+        img.style.width = W * s + "px"; img.style.height = H * s + "px";
+        img.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`; $("cropZ").value = z; };
+      const zoomTo = nz => { nz = Math.max(1, Math.min(4, nz)); x *= nz / z; y *= nz / z; z = nz; draw(); };
+      draw();
+      $("cropZ").oninput = e => zoomTo(+e.target.value);
+      const pts = new Map(); let last = null;
+      const gest = () => { const a = [...pts.values()];
+        return a.length > 1 ? { cx: (a[0].x + a[1].x) / 2, cy: (a[0].y + a[1].y) / 2, d: Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y) } : { cx: a[0].x, cy: a[0].y, d: 0 }; };
+      box.onpointerdown = e => { box.setPointerCapture(e.pointerId); pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); last = gest(); };
+      box.onpointermove = e => { if (!pts.has(e.pointerId)) return; pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        const g = gest(); x += g.cx - last.cx; y += g.cy - last.cy;
+        if (g.d && last.d) zoomTo(z * g.d / last.d); else draw(); last = g; };
+      box.onpointerup = box.onpointercancel = e => { pts.delete(e.pointerId); last = pts.size ? gest() : null; };
+      box.onwheel = e => { e.preventDefault(); zoomTo(z * (e.deltaY < 0 ? 1.08 : 1 / 1.08)); };
+      $("cropNo").onclick = () => closeModal(null);
+      $("cropOk").onclick = () => {
+        const s = base * z, side = S / s, cx = W / 2 - x / s, cy = H / 2 - y / s, out = Math.max(1, Math.round(Math.min(max, side)));
+        const c = document.createElement("canvas"); c.width = c.height = out;
+        c.getContext("2d").drawImage(img, cx - side / 2, cy - side / 2, side, side, 0, 0, out, out);
+        closeModal(c.toDataURL("image/jpeg", 0.82));
+      };
+    };
+    img.src = url;
+  });
+}
 
 // ---- Contactos de WhatsApp ----
 let contacts = [];
