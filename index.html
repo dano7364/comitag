@@ -187,6 +187,15 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .cropZoom{display:flex;align-items:center;gap:10px;margin:14px 4px 0;font-size:18px}
 .cropZoom input{flex:1;accent-color:var(--blue);background:none;border:0;padding:0;margin:0;box-shadow:none;min-height:0;height:28px}
 .photoMenu button{display:block;width:100%;margin-top:10px}
+.piList{margin-top:12px;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.piRow{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-top:1px solid var(--line)}
+.piRow:first-child{border-top:none}
+.piRow .mi{font-style:normal;font-size:20px;width:24px;text-align:center;flex:none;line-height:1.3}
+.piRow small{display:block;color:var(--muted);font-size:12px}
+.piRow b{display:block;font-size:16px;font-weight:600;overflow-wrap:anywhere}
+.piRow b.none{color:var(--muted);font-weight:400}
+.piActs{display:flex;gap:8px;margin-top:10px}
+.piActs a{flex:1;min-width:0;white-space:nowrap;gap:4px;text-align:center;padding:10px 4px;font-size:14px;background:var(--off-bg);color:var(--off);border:1px solid var(--line)}
 .modal{background:var(--card);border-radius:18px;padding:20px;max-width:360px;width:100%;box-sizing:border-box;box-shadow:0 12px 40px rgba(0,0,0,.25);animation:pop .18s ease-out}
 @keyframes fade{from{opacity:0}}
 @keyframes pop{from{transform:scale(.94);opacity:0}}
@@ -640,6 +649,7 @@ body::before{animation:drift 28s ease-in-out infinite alternate;will-change:tran
       </div>
       <div id="menuList" class="menuList" role="menu">
         <button role="menuitem" onclick="menuDo(openAuto)"><i class="mi">📲</i><span>Registrar al acercar</span></button>
+        <button role="menuitem" onclick="menuDo(openPetInfo)"><i class="mi">🪪</i><span>Datos de la mascota</span></button>
         <button role="menuitem" onclick="menuDo(openInvite)"><i class="mi">👨‍👩‍👧</i><span>Invitar a la familia</span></button>
         <button role="menuitem" onclick="menuDo(openNotifGuide)"><i class="mi">🔔</i><span>Activar notificaciones</span></button>
         <button role="menuitem" onclick="menuDo(openWaMenu)"><i class="mi">💬</i><span>Avisos por WhatsApp</span></button>
@@ -2920,6 +2930,66 @@ async function openHelp() {
   const mail = String(c.contact_email || "");
   $("hpDirect").innerHTML = MAIL_RE.test(mail)
     ? `<a class="btnlike hpMail" href="mailto:${esc(mail)}?subject=${encodeURIComponent("Ayuda con Comitag")}&body=${encodeURIComponent(msg)}">✉️ Escribir un correo</a>` : "";
+}
+
+// ================= Datos de la mascota (dueño, dirección y teléfono) =================
+async function openPetInfo() {
+  openModal(`<p style="font-size:18px;margin-top:4px"><b>🪪 Datos de la mascota</b></p><p class="muted" id="piLoad" style="margin-top:10px">Cargando…</p>`);
+  const r = await rpcPin("get_pet_info", { p_code: code });
+  if (!$("piLoad")) return;
+  if (r.error) {
+    if (r.error.cancelled) { closeModal(); return; }
+    $("piLoad").textContent = r.error.code === "PGRST202" ? "Falta correr datos_mascota.sql en Supabase." : errText(r.error, "No se pudo cargar. Intenta de nuevo.");
+    return;
+  }
+  const info = r.data && typeof r.data === "object" ? r.data : {};
+  cachePut({ petInfo: info });
+  showPetInfo(info);
+}
+function petInfoNames() { const p = petsOf(); return p.length ? joinNames(p) : (plate && plate.pet_name) || ""; }
+function showPetInfo(info) {
+  const many = petsOf().length > 1, ph = info.phone || "";
+  const row = (ic, lbl, val, none) => `<div class="piRow"><i class="mi">${ic}</i><span><small>${lbl}</small><b class="${val ? "" : "none"}">${val ? esc(val) : none}</b></span></div>`;
+  const empty = !info.owner && !info.address && !ph;
+  openModal(`<p style="font-size:18px;margin-top:4px"><b>🪪 Datos de la mascota</b></p>
+    ${empty ? `<p class="muted" style="margin-top:4px">Guarda aquí los datos del dueño para tenerlos siempre a mano.</p>` : ""}
+    <div class="piList">
+      ${row("🐾", many ? "Mascotas" : "Mascota", petInfoNames(), "Sin nombre")}
+      ${row("👤", "Dueño", info.owner, "Sin agregar")}
+      ${row("📍", "Dirección", info.address, "Sin agregar")}
+      ${row("📞", "Teléfono del dueño", ph ? prettyPhone(ph) : "", "Sin agregar")}
+    </div>
+    ${ph || info.address ? `<div class="piActs">${ph ? `<a class="btnlike" href="tel:+${esc(ph)}">📞 Llamar</a><a class="btnlike" href="https://wa.me/${esc(ph)}" target="_blank" rel="noopener">💬 WhatsApp</a>` : ""}${info.address ? `<a class="btnlike" href="https://maps.google.com/?q=${encodeURIComponent(info.address)}" target="_blank" rel="noopener">🗺️ Mapa</a>` : ""}</div>` : ""}
+    <div class="grid" style="margin-top:14px"><button onclick="closeModal()">Cerrar</button><button class="primary" id="piEdit">${empty ? "Agregar datos" : "✏️ Editar"}</button></div>`);
+  $("piEdit").onclick = () => editPetInfo(info);
+}
+function editPetInfo(info) {
+  openModal(`<p style="font-size:18px;margin-top:4px"><b>🪪 Datos de la mascota</b></p>
+    <p class="muted" style="margin-top:4px">${esc(petInfoNames()) || "Tu mascota"} · el nombre se cambia tocándolo en la página.</p>
+    <p class="eLbl" style="margin-top:14px">Nombre del dueño</p>
+    <input id="piOwner" maxlength="40" autocomplete="name" placeholder="Ej: Daniel Pérez" value="${esc(info.owner || "")}" style="margin-top:6px">
+    <p class="eLbl" style="margin-top:12px">Dirección</p>
+    <input id="piAddr" maxlength="120" autocomplete="street-address" placeholder="Ej: Av. Siempre Viva 742, Talca" value="${esc(info.address || "")}" style="margin-top:6px">
+    <p class="eLbl" style="margin-top:12px">Teléfono del dueño</p>
+    <input id="piPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+56 9 1234 5678" value="${esc(info.phone ? prettyPhone(info.phone) : "")}" style="margin-top:6px">
+    <p id="piErr" class="muted warn" style="margin-top:8px"></p>
+    <div class="grid" style="margin-top:8px"><button id="piNo">Cancelar</button><button class="primary" id="piOk">Guardar</button></div>`);
+  $("piNo").onclick = () => showPetInfo(info);
+  $("piOk").onclick = async () => {
+    const owner = $("piOwner").value.trim(), address = $("piAddr").value.trim(), raw = $("piPhone").value.trim();
+    const phone = raw ? cleanPhone(raw) : "";
+    if (raw && !phone) { $("piErr").textContent = "Revisa el teléfono. Ej: +56 9 1234 5678"; $("piPhone").focus(); return; }
+    $("piOk").disabled = true; $("piErr").textContent = "Guardando…";
+    const next = { owner, address, phone };
+    const r = await rpcPin("set_pet_info", { p_code: code, p_info: next });
+    if (!$("piOk")) return;
+    $("piOk").disabled = false;
+    if (r.error) { $("piErr").textContent = r.error.code === "PGRST202" ? "Falta correr datos_mascota.sql en Supabase." : errText(r.error, "No se pudo guardar. Intenta de nuevo."); return; }
+    if (r.data !== "ok") { $("piErr").textContent = "No se pudo guardar. Intenta de nuevo."; return; }
+    const saved = {}; if (owner) saved.owner = owner; if (address) saved.address = address; if (phone) saved.phone = phone;
+    cachePut({ petInfo: saved });
+    showPetInfo(saved); showNote("✅ Datos guardados.");
+  };
 }
 
 // ================= Menú de opciones =================
