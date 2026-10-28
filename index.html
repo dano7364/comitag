@@ -187,6 +187,20 @@ input{font-size:16px;padding:12px;width:100%;box-sizing:border-box;border:1px so
 .cropZoom{display:flex;align-items:center;gap:10px;margin:14px 4px 0;font-size:18px}
 .cropZoom input{flex:1;accent-color:var(--blue);background:none;border:0;padding:0;margin:0;box-shadow:none;min-height:0;height:28px}
 .photoMenu button{display:block;width:100%;margin-top:10px}
+.aiLog{display:flex;flex-direction:column;gap:10px;margin-top:12px;max-height:48dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:2px}
+.aiMsg{max-width:88%;padding:10px 14px;border-radius:18px;font-size:15px;line-height:1.45;overflow-wrap:anywhere}
+.aiMsg.me{align-self:flex-end;background:var(--blue);color:#fff;border-bottom-right-radius:6px}
+.aiMsg.bot{align-self:flex-start;background:var(--off-bg);color:var(--text);border-bottom-left-radius:6px}
+.aiMsg.err{background:transparent;border:1px solid var(--line);color:var(--muted)}
+.aiMsg .aiGo{display:block;width:100%;margin-top:10px;font-size:14px;padding:10px 12px}
+.aiDots span{display:inline-block;width:7px;height:7px;margin:0 2px;border-radius:50%;background:var(--muted);animation:aiDot 1s infinite ease-in-out}
+.aiDots span:nth-child(2){animation-delay:.15s}.aiDots span:nth-child(3){animation-delay:.3s}
+@keyframes aiDot{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
+.aiSug{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.aiSug button{font-size:13px;padding:8px 12px;border-radius:99px;width:auto}
+.aiForm{display:flex;gap:8px;margin-top:12px;align-items:center}
+.aiForm input{flex:1;margin:0}
+.aiForm button{flex:none;width:auto;padding:12px 16px}
 .piList{margin-top:12px;border:1px solid var(--line);border-radius:14px;overflow:hidden}
 .piRow{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-top:1px solid var(--line)}
 .piRow:first-child{border-top:none}
@@ -648,6 +662,7 @@ body::before{animation:drift 28s ease-in-out infinite alternate;will-change:tran
         <span class="profTxt"><b id="profName"></b><small id="profRole"></small></span>
       </div>
       <div id="menuList" class="menuList" role="menu">
+        <button role="menuitem" onclick="menuDo(openAi)"><i class="mi">✨</i><span>Pregúntale a Comitag</span></button>
         <button role="menuitem" onclick="menuDo(openAuto)"><i class="mi">📲</i><span>Registrar al acercar</span></button>
         <button role="menuitem" onclick="menuDo(openPetInfo)"><i class="mi">🪪</i><span>Datos de la mascota</span></button>
         <button role="menuitem" onclick="menuDo(openInvite)"><i class="mi">👨‍👩‍👧</i><span>Invitar a la familia</span></button>
@@ -2930,6 +2945,86 @@ async function openHelp() {
   const mail = String(c.contact_email || "");
   $("hpDirect").innerHTML = MAIL_RE.test(mail)
     ? `<a class="btnlike hpMail" href="mailto:${esc(mail)}?subject=${encodeURIComponent("Ayuda con Comitag")}&body=${encodeURIComponent(msg)}">✉️ Escribir un correo</a>` : "";
+}
+
+// ================= Asistente con IA: "Pregúntale a Comitag" =================
+let aiHist = [], aiBusy = false;
+const AI_GO = {
+  pin: ["🔒 Abrir PIN familiar", () => openPinSettings()],
+  auto: ["📲 Abrir Registrar al acercar", () => openAuto()],
+  datos: ["🪪 Abrir Datos de la mascota", () => openPetInfo()],
+  invitar: ["👨‍👩‍👧 Abrir Invitar a la familia", () => openInvite()],
+  notificaciones: ["🔔 Abrir Activar notificaciones", () => openNotifGuide()],
+  whatsapp: ["💬 Abrir Avisos por WhatsApp", () => openWaMenu()],
+  otra: ["＋ Abrir otra mascota", () => openAddPet()],
+  tutorial: ["💡 Ver el tutorial", () => startTour(true)],
+  sugerencia: ["✍️ Enviar una sugerencia", () => openSuggest()],
+  ayuda: ["🆘 Abrir Contacto y ayuda", () => openHelp()],
+  perfil: ["👤 Abrir mi perfil", () => openProfile()],
+  historial: ["📋 Ver el historial", () => { histOpen(true); setTimeout(() => $("histBtn").scrollIntoView({ behavior: "smooth", block: "start" }), 60); }],
+  horarios: ["⏰ Editar los horarios", () => { editSched(); setTimeout(() => $("schedEdit") && $("schedEdit").scrollIntoView({ behavior: "smooth", block: "center" }), 60); }],
+};
+const AI_SUG = ["¿Cómo cambio mi PIN?", "¿Cómo activo las notificaciones?", "¿Cómo invito a mi familia?", "¿Cómo registro solo con acercar el celular?"];
+function aiFormat(t) {
+  return esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\n/g, "<br>");
+}
+function aiBubble(kind, html) {
+  const d = document.createElement("div"); d.className = "aiMsg " + kind; d.innerHTML = html;
+  $("aiLog").appendChild(d); $("aiLog").scrollTop = $("aiLog").scrollHeight; return d;
+}
+function aiShowAnswer(text) {
+  const tags = [...text.matchAll(/\[\[abrir:([a-z]+)\]\]/g)].map(m => m[1]).filter(k => AI_GO[k]);
+  const clean = text.replace(/\[\[[^\]]*\]\]/g, "").replace(/\n{3,}/g, "\n\n").trim();
+  const d = aiBubble("bot", aiFormat(clean));
+  const k = tags[0];
+  if (k) {
+    const b = document.createElement("button"); b.className = "aiGo primary"; b.textContent = AI_GO[k][0];
+    b.onclick = () => { closeModal(); AI_GO[k][1](); };
+    d.appendChild(b);
+  }
+}
+function openAi() {
+  openModal(`<p style="font-size:18px;margin-top:4px"><b>✨ Pregúntale a Comitag</b></p>
+    <p class="muted" style="margin-top:2px">Pregunta cómo usar la página y te explico paso a paso.</p>
+    <div class="aiLog" id="aiLog" aria-live="polite"></div>
+    <div class="aiSug" id="aiSug"></div>
+    <form class="aiForm" id="aiForm"><input id="aiIn" maxlength="300" autocomplete="off" placeholder="Ej: ¿cómo cambio mi PIN?" aria-label="Tu pregunta"><button class="primary" id="aiSend" aria-label="Enviar">➤</button></form>
+    <p class="muted" style="font-size:12px;margin-top:8px">Respuestas con IA: pueden tener errores. No escribas tu PIN ni datos personales.</p>
+    <button class="link" style="display:block;margin:8px auto 0" onclick="closeModal()">Cerrar</button>`);
+  if (!aiHist.length) aiBubble("bot", "¡Hola! 🐾 Soy el asistente de Comitag. ¿En qué te ayudo?");
+  else aiHist.forEach(m => m.role === "user" ? aiBubble("me", esc(m.text)) : aiShowAnswer(m.text));
+  if (!aiHist.length) $("aiSug").innerHTML = AI_SUG.map((q, i) => `<button type="button" data-i="${i}">${esc(q)}</button>`).join("");
+  $("aiSug").querySelectorAll("button").forEach(b => b.onclick = () => aiAsk(AI_SUG[+b.dataset.i]));
+  $("aiForm").onsubmit = e => { e.preventDefault(); aiAsk($("aiIn").value); };
+}
+async function aiAsk(q) {
+  q = String(q || "").trim();
+  if (!q || aiBusy || !$("aiLog")) return;
+  aiBusy = true; $("aiIn").value = ""; $("aiSug").innerHTML = "";
+  aiBubble("me", esc(q));
+  const wait = aiBubble("bot", '<span class="aiDots" aria-label="Escribiendo"><span></span><span></span><span></span></span>');
+  let r;
+  try {
+    r = await db.functions.invoke("asistente", { body: { q, history: aiHist.slice(-6), client: deviceId(),
+      ctx: { os: isIOS ? "ios" : isAndroid ? "android" : "otro", pets: petsOf().length || 1, hasPin } } });
+  } catch (e) { r = { error: e }; }
+  aiBusy = false;
+  if (!$("aiLog")) return;
+  wait.remove();
+  const data = r && r.data || {};
+  if (!r.error && data.text) {
+    aiHist.push({ role: "user", text: q }, { role: "model", text: data.text });
+    aiShowAnswer(data.text);
+    return;
+  }
+  const code = data.error || "";
+  const msg = code === "sin_clave" ? "El asistente aún no está activado. Mientras, puedes usar 🆘 Contacto y ayuda en el menú."
+    : code === "limite" ? "Llegaste al límite de preguntas de hoy. Vuelve mañana o escríbenos en 🆘 Contacto y ayuda."
+    : code === "ocupado" ? "El asistente está con muchas preguntas ahora. Intenta de nuevo en un rato."
+    : offline || !navigator.onLine ? "No hay internet. Intenta cuando vuelva la conexión."
+    : "No pude responder esta vez. Intenta de nuevo.";
+  aiBubble("bot err", esc(msg));
+  setTimeout(() => $("aiIn") && $("aiIn").focus(), 30);
 }
 
 // ================= Datos de la mascota (dueño, dirección y teléfono) =================
